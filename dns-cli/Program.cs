@@ -39,11 +39,12 @@ namespace DnsCli
                 //_settings = Settings.CreateConfig($"{homePath}{Path.DirectorySeparatorChar}{arguments.ConfigurationFile}").Result;
 
                 //services.AddSingleton<Settings>(_settings);
-                
+                Console.WriteLine("Read config:");
                 IConfiguration configuration = new ConfigurationBuilder()
                     .AddJsonFile(args[0], true, true)
                     .Build();
-
+                Console.WriteLine("Done!");
+                
                 Dns.Config.AppConfig appConfig = configuration.Get<Dns.Config.AppConfig>();
                 
                 services.AddSingleton(configuration);
