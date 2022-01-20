@@ -59,11 +59,11 @@ namespace Dns
             }
         }
 
-        public static void WriteToStream(this string str, Stream stream)
+        public static void WriteToStream(this string str, Stream stream, char segmentSplit = '.')
         {
             if (!string.IsNullOrWhiteSpace(str))
             {
-                string[] segments = str.Split(new char[] { '.' });
+                string[] segments = str.Split(new char[] { segmentSplit });
                 foreach (string segment in segments)
                 {
                     stream.WriteByte((byte)segment.Length);
@@ -76,6 +76,17 @@ namespace Dns
 
             // null delimiter
             stream.WriteByte(0x0);
+        }
+
+        public static void WriteToStream2(this string str, Stream stream)
+        {
+	        if (string.IsNullOrWhiteSpace(str)) return;
+
+	        stream.WriteByte((byte)str.Length);
+	        foreach (char currentChar in str)
+	        {
+		        stream.WriteByte((byte)currentChar);
+	        }
         }
 
         public static void WriteToStream(this IEnumerable<byte> chars, Stream stream)

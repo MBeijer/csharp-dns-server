@@ -4,15 +4,15 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
 using Newtonsoft.Json;
 
 namespace Dns
 {
-    using System;
-    using System.IO;
-    using System.Net;
-
-    public abstract class RData
+	public abstract class RData
     {
         public abstract void Dump();
         public abstract void WriteToStream(Stream stream);
@@ -106,35 +106,84 @@ namespace Dns
 
     public class ANameRData : RData
     {
-        public IPAddress Address
-        {
-            get;
-            set;
-        }
+	    private readonly ResourceType _type;
 
-        public static ANameRData Parse(byte[] bytes, int offset, int size)
-        {
-            ANameRData aname = new ANameRData();
-            uint addressBytes = BitConverter.ToUInt32(bytes, offset);
-            aname.Address = new IPAddress(addressBytes);
-            return aname;
-        }
+	    public ANameRData() {}
+	    private ANameRData(IReadOnlyList<byte> bytes, int offset, int size)
+	    {
+		    _type = size == 4 ? ResourceType.A : ResourceType.AAAA;
+		    byte[] addressBytes = new byte[size];// = BitConverter.(bytes, offset);
+
+		    int j = 0;
+		    for (int i = offset; i < offset + size; i++)
+		    {
+			    addressBytes[j] = bytes[i];
+			    j++;
+		    }
+
+		    Address = new IPAddress(addressBytes);
+	    }
+
+        public static ANameRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
 
         public override void WriteToStream(Stream stream)
         {
-            byte[] bytes = this.Address.GetAddressBytes();
+            byte[] bytes = Address.GetAddressBytes();
             stream.Write(bytes, 0, bytes.Length);
         }
 
-        public override ushort Length
-        {
-            get { return 4; }
-        }
+        public override ushort Length => (ushort)(_type == ResourceType.A?4:16);
+
+        public IPAddress Address { get; set; }
 
         public override void Dump()
         {
-            Console.WriteLine("Address:   {0}", this.Address.ToString());
+            Console.WriteLine("Address:   {0}", Address);
         }
+    }
+
+    // ReSharper disable once InconsistentNaming
+    public class TXTRData : RData
+    {
+	    public string Name { get; set; } = "";
+
+	    public override ushort Length =>
+		    // dots replaced by bytes
+		    // + 1 segment prefix
+		    // + 1 null terminator
+		    (ushort) (Name.Length + 1);
+
+	    // ReSharper disable once IdentifierTypo
+	    private TXTRData(byte[] bytes, int offset, int size) => Name = DnsProtocol.ReadString(bytes, ref offset)[..(size-1)];
+
+
+	    public static TXTRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
+
+	    public override void WriteToStream(Stream stream) => Name.Trim().WriteToStream2(stream);
+
+	    public override void Dump() => Console.WriteLine("CName:   {0}", Name);
+    }
+
+
+    // ReSharper disable once InconsistentNaming
+    public class NSRData : RData
+    {
+	    public string Name { get; set; }
+
+	    public override ushort Length =>
+		    // dots replaced by bytes
+		    // + 1 segment prefix
+		    // + 1 null terminator
+		    (ushort) (Name.Length + 2);
+
+	    public static NSRData Parse(byte[] bytes, int offset, int size) => new() { Name = DnsProtocol.ReadString(bytes, ref offset) };
+
+	    public override void WriteToStream(Stream stream) => Name.WriteToStream(stream);
+
+	    public override void Dump()
+	    {
+		    Console.WriteLine("CName:   {0}", Name);
+	    }
     }
 
     public class CNameRData : RData
@@ -163,7 +212,7 @@ namespace Dns
 
         public override void Dump()
         {
-            Console.WriteLine("CName:   {0}", this.Name);
+            Console.WriteLine("CName:   {0}", Name);
         }
     }
 
@@ -193,7 +242,7 @@ namespace Dns
 
         public override void Dump()
         {
-            Console.WriteLine("DName:   {0}", this.Name);
+            Console.WriteLine("DName:   {0}", Name);
         }
     }
 
@@ -218,13 +267,13 @@ namespace Dns
 
         public override void WriteToStream(Stream stream)
         {
-            this.Name.WriteToStream(stream);
+            Name.WriteToStream(stream);
         }
 
 
         public override void Dump()
         {
-            Console.WriteLine("NameServer:   {0}", this.Name);
+            Console.WriteLine("NameServer:   {0}", Name);
         }
     }
 
@@ -262,24 +311,24 @@ namespace Dns
 
         public override void WriteToStream(Stream stream)
         {
-            this.PrimaryNameServer.WriteToStream(stream);
-            this.ResponsibleAuthoritativeMailbox.WriteToStream(stream);
-            this.Serial.SwapEndian().WriteToStream(stream);
-            this.RefreshInterval.SwapEndian().WriteToStream(stream);
-            this.RetryInterval.SwapEndian().WriteToStream(stream);
-            this.ExpirationLimit.SwapEndian().WriteToStream(stream);
-            this.MinimumTTL.SwapEndian().WriteToStream(stream);
+            PrimaryNameServer.WriteToStream(stream);
+            ResponsibleAuthoritativeMailbox.WriteToStream(stream);
+            Serial.SwapEndian().WriteToStream(stream);
+            RefreshInterval.SwapEndian().WriteToStream(stream);
+            RetryInterval.SwapEndian().WriteToStream(stream);
+            ExpirationLimit.SwapEndian().WriteToStream(stream);
+            MinimumTTL.SwapEndian().WriteToStream(stream);
         }
 
         public override void Dump()
         {
-            Console.WriteLine("PrimaryNameServer:               {0}", this.PrimaryNameServer);
-            Console.WriteLine("ResponsibleAuthoritativeMailbox: {0}", this.ResponsibleAuthoritativeMailbox);
-            Console.WriteLine("Serial:                          {0}", this.Serial);
-            Console.WriteLine("RefreshInterval:                 {0}", this.RefreshInterval);
-            Console.WriteLine("RetryInterval:                   {0}", this.RetryInterval);
-            Console.WriteLine("ExpirationLimit:                 {0}", this.ExpirationLimit);
-            Console.WriteLine("MinimumTTL:                      {0}", this.MinimumTTL);
+            Console.WriteLine("PrimaryNameServer:               {0}", PrimaryNameServer);
+            Console.WriteLine("ResponsibleAuthoritativeMailbox: {0}", ResponsibleAuthoritativeMailbox);
+            Console.WriteLine("Serial:                          {0}", Serial);
+            Console.WriteLine("RefreshInterval:                 {0}", RefreshInterval);
+            Console.WriteLine("RetryInterval:                   {0}", RetryInterval);
+            Console.WriteLine("ExpirationLimit:                 {0}", ExpirationLimit);
+            Console.WriteLine("MinimumTTL:                      {0}", MinimumTTL);
         }
     }
 

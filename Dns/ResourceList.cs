@@ -37,25 +37,30 @@ namespace Dns
                 resourceRecord.DataLength = BitConverter.ToUInt16(bytes, currentOffset).SwapEndian();
                 currentOffset += sizeof (ushort);
 
-                if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type == ResourceType.A)
+                if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
                 {
                     resourceRecord.RData = ANameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
                 }
-                else if (resourceRecord.Type == ResourceType.CNAME)
+                else switch (resourceRecord.Type)
                 {
-                    resourceRecord.RData = CNameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-                }
-                else if (resourceRecord.Type == ResourceType.MX)
-                {
-	                resourceRecord.RData = MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-                }
-                else if (resourceRecord.Type == ResourceType.SOA)
-                {
-	                resourceRecord.RData = SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-                }
-                else
-                {
-	                Console.WriteLine(resourceRecord.Type);
+	                case ResourceType.CNAME:
+		                resourceRecord.RData = CNameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+		                break;
+	                case ResourceType.MX:
+		                resourceRecord.RData = MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+		                break;
+	                case ResourceType.SOA:
+		                resourceRecord.RData = SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+		                break;
+	                case ResourceType.NS:
+		                resourceRecord.RData = NSRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+		                break;
+	                case ResourceType.TEXT:
+		                resourceRecord.RData = TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+		                break;
+	                default:
+		                Console.WriteLine(resourceRecord.Type);
+		                break;
                 }
 
                 // move past resource data record
