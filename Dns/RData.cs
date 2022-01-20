@@ -154,12 +154,12 @@ namespace Dns
 		    (ushort) (Name.Length + 1);
 
 	    // ReSharper disable once IdentifierTypo
-	    private TXTRData(byte[] bytes, int offset, int size) => Name = DnsProtocol.ReadString(bytes, ref offset)[..(size-1)];
+	    private TXTRData(byte[] bytes, int offset, int size) => Name = DnsProtocol.ReadString(bytes, ref offset)[..(size-1)].Trim();
 
 
 	    public static TXTRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
 
-	    public override void WriteToStream(Stream stream) => Name.Trim().WriteToStream2(stream);
+	    public override void WriteToStream(Stream stream) => Name.WriteToStream2(stream);
 
 	    public override void Dump() => Console.WriteLine("CName:   {0}", Name);
     }
