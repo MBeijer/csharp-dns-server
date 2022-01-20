@@ -1,14 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using static System.Threading.Tasks.Task;
+
 namespace Dns.ZoneProvider.IPProbe
 {
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using System.Net;
-    using System.Collections.Generic;
-    using System.Linq;
-    using Microsoft.Extensions.Configuration;
-
-
     /// <summary>
     /// IPProbeZoneProvider map via configuration a set of monitored IPs to host A records.
     /// Various monitoring strategies are implemented to detect IP health.
@@ -23,54 +23,48 @@ namespace Dns.ZoneProvider.IPProbe
         private Task runningTask { get; set; }
 
         /// <summary>Initialize ZoneProvider</summary>
+        /// <param name="serviceCollection"></param>
         /// <param name="config">ZoneProvider Configuration Section</param>
         /// <param name="zoneName">Zone suffix</param>
-        public override void Initialize(IConfiguration config, string zoneName)
+        public override void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName)
         {
-            this.options = config.Get<IPProbeProviderOptions>();
+            options = config.Get<IPProbeProviderOptions>();
             if (options == null)
             {
                 throw new Exception("Error loading IPProbeProviderOptions");
             }
 
             // load up initial state from options
-            this.state = new State(options);
-            this.Zone = zoneName;
-
-            return;
+            state = new State(options);
+            Zone = zoneName;
         }
 
         public void ProbeLoop(CancellationToken ct)
         {
             Console.WriteLine("Probe loop started");
 
-            ParallelOptions options = new ParallelOptions();
-            options.CancellationToken = ct;
-            options.MaxDegreeOfParallelism = 4;
+            ParallelOptions options = new() { CancellationToken = ct, MaxDegreeOfParallelism = 4 };
 
             while (!ct.IsCancellationRequested)
             {
-                var batchStartTime = DateTime.UtcNow;
+                DateTime batchStartTime = DateTime.UtcNow;
 
-                Parallel.ForEach(this.state.Targets, options, (probe) =>
+                Parallel.ForEach(state.Targets, options, probe =>
                 {
-                    var startTime = DateTime.UtcNow;
-                    var result = probe.ProbeFunction(probe.Address, probe.TimeoutMilliseconds);
-                    var duration = DateTime.UtcNow - startTime;
+                    DateTime startTime = DateTime.UtcNow;
+                    bool result = probe.ProbeFunction(probe.Address, probe.TimeoutMilliseconds);
+                    TimeSpan duration = DateTime.UtcNow - startTime;
                     probe.AddResult(new ProbeResult { StartTime = startTime, Duration = duration, Available = result });
                 });
 
-                Task.Run(() => this.GetZone(state)).ContinueWith(t => this.Notify(t.Result));
+                Run(() => GetZone(state), ct).ContinueWith(t => Notify(t.Result), ct);
 
-                var batchDuration = DateTime.UtcNow - batchStartTime;
+                TimeSpan batchDuration = DateTime.UtcNow - batchStartTime;
                 Console.WriteLine("Probe batch duration {0}", batchDuration);
 
                 // wait remainder of Polling Interval
-                var remainingWaitTimeout = (this.options.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
-                if(remainingWaitTimeout > 0)
-                {
-                    ct.WaitHandle.WaitOne(remainingWaitTimeout);
-                }
+                int remainingWaitTimeout = (this.options.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
+                if(remainingWaitTimeout > 0) ct.WaitHandle.WaitOne(remainingWaitTimeout);
             }
         }
 
@@ -81,30 +75,24 @@ namespace Dns.ZoneProvider.IPProbe
 
         public override void Start(CancellationToken ct)
         {
-            ct.Register(this.Stop);
-            this.runningTask = Task.Run(()=>ProbeLoop(ct));
+            ct.Register(Stop);
+            runningTask = Run(()=>ProbeLoop(ct), ct);
         }
 
-        private void Stop()
-        {
-            this.runningTask.Wait();
-        }
+        private void Stop() => runningTask.Wait(ct);
 
-        internal IEnumerable<ZoneRecord>GetZoneRecords(State state)
+        internal static IEnumerable<ZoneRecord>GetZoneRecords(State state)
         {
-            foreach(var host in state.Hosts)
+            foreach(Host host in state.Hosts)
             {
-                var availableAddresses = host.AddressProbes
+                IEnumerable<IPAddress> availableAddresses = host.AddressProbes
                     .Where(addr => addr.IsAvailable)
                     .Select(addr => addr.Address);
 
-                if(host.AvailabilityMode == AvailabilityMode.First)
-                {
-                    availableAddresses = availableAddresses.Take(1);
-                }
+                if(host.AvailabilityMode == AvailabilityMode.First) availableAddresses = availableAddresses.Take(1);
 
                 // materialize query
-                var addresses = availableAddresses.ToArray();
+                IPAddress[] addresses = availableAddresses.ToArray();
 
                 if (addresses.Length == 0)
                 {
@@ -115,7 +103,7 @@ namespace Dns.ZoneProvider.IPProbe
 
                 yield return new ZoneRecord
                 {
-                    Host = host.Name + this.Zone,
+                    Host = host.Name + Zone,
                     Addresses = addresses,
                     Count = addresses.Length,
                     Type = ResourceType.A,
@@ -124,13 +112,11 @@ namespace Dns.ZoneProvider.IPProbe
             }
         }
 
-        internal Zone GetZone(State state)
+        private Zone GetZone(State state)
         {
-            var zoneRecords = GetZoneRecords(state);
+            IEnumerable<ZoneRecord> zoneRecords = GetZoneRecords(state);
 
-            Zone zone = new Zone();
-            zone.Suffix = this.Zone;
-            zone.Serial = _serial;
+            Zone zone = new() { Suffix = Zone, Serial = _serial };
             zone.Initialize(zoneRecords);
 
             // increment serial number

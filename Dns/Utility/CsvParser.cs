@@ -4,18 +4,17 @@
 // // </copyright>
 // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+
 namespace Dns.Utility
 {
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Linq;
-
     /// <summary>Parses CSV files</summary>
     public class CsvParser
     {
-        private static readonly char[] CSVDELIMITER = new[] {','};
-        private static readonly char[] COLONDELIMITER = new[] {':'};
+        private static readonly char[] CSVDELIMITER = {','};
+        private static readonly char[] COLONDELIMITER = {':'};
 
         private readonly string _filePath;
 
@@ -26,16 +25,10 @@ namespace Dns.Utility
         {
         }
 
-        private CsvParser(string filePath)
-        {
-            this._filePath = filePath;
-        }
+        private CsvParser(string filePath) => _filePath = filePath;
 
         /// <summary>List of fields detected in CSV file</summary>
-        public IEnumerable<string> Fields
-        {
-            get { return this._fields; }
-        }
+        public IEnumerable<string> Fields => _fields;
 
         /// <summary>
         ///   Returns enumerable collection of rows
@@ -44,44 +37,27 @@ namespace Dns.Utility
         {
             get
             {
-                using (FileStream stream = new FileStream(this._filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                using (StreamReader csvReader = new StreamReader(stream))
+                using FileStream stream = new(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using StreamReader csvReader = new(stream);
                 while (true)
                 {
                     if (csvReader.Peek() < 0)
-                    {
                         yield break;
-                    }
 
-                    this._currentLine = csvReader.ReadLine();
-                    if (this._currentLine == null)
-                    {
+                    _currentLine = csvReader.ReadLine();
+                    if (_currentLine == null)
                         yield break;
-                    }
-                    if(this._currentLine.Trim() == string.Empty)
-                    {
+                    if(_currentLine.Trim() == string.Empty)
                         continue;
-                    }
-                    if ("#;".Contains(this._currentLine[0]))
+                    if ("#;".Contains(_currentLine[0]))
                     {
                         // is a comment
-                        if (this._currentLine.Length > 1 && this._currentLine.Substring(1).StartsWith("Fields"))
-                        {
-                            string[] fieldDeclaration = this._currentLine.Split(COLONDELIMITER);
-                            if (fieldDeclaration.Length != 2)
-                            {
-                                this._fields = null;
-                            }
-                            else
-                            {
-                                this._fields = fieldDeclaration[1].Trim().Split(CSVDELIMITER);
-                            }
-                        }
+                        if (_currentLine.Length <= 1 || !_currentLine[1..].StartsWith("Fields")) continue;
+                        string[] fieldDeclaration = _currentLine.Split(COLONDELIMITER);
+                        _fields = fieldDeclaration.Length != 2 ? null : fieldDeclaration[1].Trim().Split(CSVDELIMITER);
                     }
                     else
-                    {
-                        yield return new CsvRow(this._fields, this._currentLine.Split(CSVDELIMITER));
-                    }
+                        yield return new CsvRow(_fields, _currentLine.Split(CSVDELIMITER));
                 }
             }
         }
@@ -94,14 +70,10 @@ namespace Dns.Utility
         public static CsvParser Create(string filePath)
         {
             if (filePath == null)
-            {
                 throw new ArgumentNullException("filePath");
-            }
 
             if (!File.Exists(filePath))
-            {
                 throw new FileNotFoundException("File Not Found", filePath);
-            }
 
             CsvParser result = new CsvParser(filePath);
             return result;

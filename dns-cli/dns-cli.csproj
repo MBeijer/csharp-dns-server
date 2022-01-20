@@ -2,13 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>DnsCli</RootNamespace>
     <StartupObject>DnsCli.Program</StartupObject>
+    <LangVersion>default</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\dns\dns.csproj" />
+    <ProjectReference Include="..\Dns\Dns.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="appsettings.json" />

@@ -4,18 +4,17 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using Dns.Contracts;
+
 namespace Dns
 {
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Net;
-    using Dns.Contracts;
-
     /// <summary>Address Dispenser enables round-robin ordering for the specified zone record</summary>
     public class SmartAddressDispenser : IAddressDispenser
     {
-        private ulong _sequence = 0;
+        private ulong _sequence;
 
         private readonly ZoneRecord _zoneRecord;
         private readonly ushort _maxAddressesReturned;
@@ -26,10 +25,7 @@ namespace Dns
             _maxAddressesReturned = maxAddressesReturned;
         }
 
-        string IAddressDispenser.HostName
-        {
-            get { return this._zoneRecord.Host; }
-        }
+        string IAddressDispenser.HostName => _zoneRecord.Host;
 
         /// <summary>Returns round-robin rotated set of IP addresses</summary>
         /// <returns>Set of IP Addresses</returns>
@@ -38,9 +34,7 @@ namespace Dns
             IPAddress[] addresses = _zoneRecord.Addresses;
 
             if(addresses.Length == 0)
-            {
                 yield break;
-            }
 
             // starting position in rollover list
             int start = (int) (_sequence % (ulong) addresses.Length);
@@ -49,28 +43,20 @@ namespace Dns
             uint count = 0;
             while (true)
             {
-
                 yield return addresses[offset];
                 offset++;
 
                 // rollover to start of list
-                if (offset == addresses.Length)
-                {
-                    offset = 0;
-                }
+                if (offset == addresses.Length) offset = 0;
 
                 // if back at starting position then exit
                 if (offset == start)
-                {
                     break;
-                }
 
                 // manage max number of dns entries returned
                 count++;
                 if (count == _maxAddressesReturned)
-                {
                     break;
-                }
             }
             // advance sequence
             _sequence++;
@@ -78,11 +64,8 @@ namespace Dns
 
         public void DumpHtml(TextWriter writer)
         {
-            writer.WriteLine("Sequence:{0}", this._sequence);
-            foreach (var address in this._zoneRecord.Addresses)
-            {
-                writer.WriteLine(address);
-            }
+            writer.WriteLine("Sequence:{0}", _sequence);
+            foreach (IPAddress address in _zoneRecord.Addresses) writer.WriteLine(address);
         }
     }
 }

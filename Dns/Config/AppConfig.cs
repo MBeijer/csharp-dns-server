@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Dns.Config
 {
    public class AppConfig
@@ -16,6 +18,7 @@ namespace Dns.Config
    {
       public string Name { get; set; }
       public string Provider { get; set; }
+      public IReadOnlyDictionary<string,string> ProviderSettings { get; set; }
    }
 
    public class DnsListenerOptions

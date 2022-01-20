@@ -1,37 +1,119 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
+using Dns.Handlers;
+using Dns.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 
 namespace DnsCli
 {
     /// <summary>Stub program that enables DNS Server to run from the command line</summary>
 
-    class Program
+    internal static class Program
     {
-        private static CancellationTokenSource cts = new CancellationTokenSource();
-        private static ManualResetEvent _exitTimeout = new ManualResetEvent(false);
+        private static readonly CancellationTokenSource Cts = new();
+        private static readonly ManualResetEvent ExitTimeout = new(false);
 
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             Console.CancelKeyPress += Console_CancelKeyPress;
 
             Console.WriteLine("DNS Server - Console Mode");
 
-            if(args.Length == 0)
+            if(args.Length == 0) args = new[] { "./appsettings.json" };
+
+            IHostBuilder builder = Host.CreateDefaultBuilder().ConfigureServices((hostContext, services) =>
             {
-                args = new string[] { "./appsettings.json" };
+                services.AddAutoMapper(typeof(Program).Assembly);
+                services.AddSingleton(services);
+                services.AddSingleton<Dns.Program>();
+				
+                //string homePath = Environment.OSVersion.Platform is PlatformID.Unix or PlatformID.MacOSX ? Environment.GetEnvironmentVariable("HOME") + "/.config/tbnotify" : Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                //_settings = Settings.CreateConfig($"{homePath}{Path.DirectorySeparatorChar}{arguments.ConfigurationFile}").Result;
+
+                //services.AddSingleton<Settings>(_settings);
+                
+                IConfiguration configuration = new ConfigurationBuilder()
+                    .AddJsonFile(args[0], true, true)
+                    .Build();
+
+                Dns.Config.AppConfig appConfig = configuration.Get<Dns.Config.AppConfig>();
+                
+                services.AddSingleton(configuration);
+                services.AddSingleton(appConfig);
+                services.AddTransient<TraefikClientHandler>();
+                services.AddHttpClient<TraefikClientService>().ConfigurePrimaryHttpMessageHandler<TraefikClientHandler>();
+								
+                services.AddLogging(
+                    configure =>
+                    {
+                        configure.AddSimpleConsole(options =>
+                        {
+                            options.IncludeScopes = true;
+                            options.SingleLine = true;
+                            options.TimestampFormat = "[hh:mm:ss] ";
+                            options.ColorBehavior = LoggerColorBehavior.Enabled;
+                        });
+
+                       // if (_settings?.General?.Loglevel == Debug)
+                       //     configure.SetMinimumLevel(LogLevel.Debug);
+                    }
+                );
+                services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
+            }).UseConsoleLifetime();
+            
+            builder.ConfigureHostConfiguration(config =>
+            {
+                if (args != null)
+                    // environment from command line
+                    // e.g.: dotnet run --environment "Staging"
+                    config.AddCommandLine(args);
+            }).ConfigureAppConfiguration((context, builder) => { builder.SetBasePath(AppContext.BaseDirectory).AddEnvironmentVariables(); });
+            
+            
+            IHost host = builder.Build();
+
+            using IServiceScope serviceScope = host.Services.CreateScope();
+            {
+                IServiceProvider services = serviceScope.ServiceProvider;
+
+                try
+                {
+                    Dns.Program myService = services.GetRequiredService<Dns.Program>();
+					
+                    //myService?.Init(arguments);
+
+                    while (myService is { Running: true })
+                    {
+						
+                        /*await*/ myService?.Run(args[0], Cts.Token);
+                        //Thread.Sleep(Engine.DefaultTicks*1000);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error Occured: {ex}");
+                }
             }
+            
+            
 
-            Dns.Program.Run(args[0], cts.Token);
-
-            _exitTimeout.Set();
+            ExitTimeout.Set();
 
         }
 
         private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
             Console.WriteLine("\r\nShutting Down");
-            cts.Cancel();
-            _exitTimeout.WaitOne(5000);
+            Cts.Cancel();
+            ExitTimeout.WaitOne(5000);
         }
     }
 }

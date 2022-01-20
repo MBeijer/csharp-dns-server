@@ -4,14 +4,14 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+
 namespace Dns.ZoneProvider
 {
-    using System;
-    using System.IO;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.Extensions.Configuration;
-
     public abstract class FileWatcherZoneProvider : BaseZoneProvider
     {
         public delegate void FileWatcherDelegate(object sender, FileSystemEventArgs e);
@@ -23,107 +23,90 @@ namespace Dns.ZoneProvider
         public event FileWatcherDelegate OnSettlement = delegate {};
 
         private FileSystemWatcher _fileWatcher;
-        private TimeSpan _settlement = TimeSpan.FromSeconds(10);
         private Timer _timer;
 
         public abstract Zone GenerateZone();
 
         /// <summary>Timespan between last file change and zone generation</summary>
-        public TimeSpan FileSettlementPeriod
+        private TimeSpan FileSettlementPeriod { get; set; } = TimeSpan.FromSeconds(10);
+
+        protected string Filename { get; private set; }
+
+        public override void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName)
         {
-            get { return this._settlement; }
-            set { this._settlement = value; }
-        }
+            FileWatcherZoneProviderOptions filewatcherConfig = config.Get<FileWatcherZoneProviderOptions>();
 
-        public string Filename { get; private set; }
-
-        public override void Initialize(IConfiguration config, string zoneName)
-        {
-            var filewatcherConfig = config.Get<FileWatcherZoneProviderOptions>();
-
-            var filename = filewatcherConfig.FileName;
+            string filename = filewatcherConfig.FileName;
 
             if (string.IsNullOrWhiteSpace(filename))
-            {
                 throw new ArgumentException("Null or empty", "filename");
-            }
 
             filename = Environment.ExpandEnvironmentVariables(filename);
             filename = Path.GetFullPath(filename);
 
             if (!File.Exists(filename))
-            {
                 throw new FileNotFoundException("filename not found", filename);
-            }
 
 
             string directory = Path.GetDirectoryName(filename); 
             string fileNameFilter = Path.GetFileName(filename);
 
-            this.Filename = filename;
-            this._fileWatcher = new FileSystemWatcher(directory, fileNameFilter); 
+            Filename = filename;
+            _fileWatcher = new FileSystemWatcher(directory, fileNameFilter); 
 
-            this._fileWatcher.Created += (s, e) => this.OnCreated(s, e);
-            this._fileWatcher.Changed += (s, e) => this.OnChanged(s, e);
-            this._fileWatcher.Renamed += (s, e) => this.OnRenamed(s, e);
-            this._fileWatcher.Deleted += (s, e) => this.OnDeleted(s, e);
+            _fileWatcher.Created += (s, e) => OnCreated(s, e);
+            _fileWatcher.Changed += (s, e) => OnChanged(s, e);
+            _fileWatcher.Renamed += (s, e) => OnRenamed(s, e);
+            _fileWatcher.Deleted += (s, e) => OnDeleted(s, e);
 
-            this._timer = new Timer(this.OnTimer);
+            _timer = new Timer(OnTimer);
 
-            this._fileWatcher.Created += this.FileChange;
-            this._fileWatcher.Changed += this.FileChange;
-            this._fileWatcher.Renamed += this.FileChange;
-            this._fileWatcher.Deleted += this.FileChange;
+            _fileWatcher.Created += FileChange;
+            _fileWatcher.Changed += FileChange;
+            _fileWatcher.Renamed += FileChange;
+            _fileWatcher.Deleted += FileChange;
 
-            this.Zone = zoneName;
+            Zone = zoneName;
         }
 
         /// <summary>Start watching and generating zone files</summary>
         public override void Start(CancellationToken ct)
         {
-            ct.Register(this.Stop);
+            ct.Register(Stop);
 
             // fire first zone generation event on startup
-            this._timer.Change(TimeSpan.FromSeconds(3), Timeout.InfiniteTimeSpan);
-            this._fileWatcher.EnableRaisingEvents = true;
+            _timer.Change(TimeSpan.FromSeconds(3), Timeout.InfiniteTimeSpan);
+            _fileWatcher.EnableRaisingEvents = true;
         }
 
         /// <summary>Handler for any file changes</summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void FileChange(object sender, FileSystemEventArgs e)
-        {
-            this._timer.Change(this._settlement, Timeout.InfiniteTimeSpan);
-        }
+        private void FileChange(object sender, FileSystemEventArgs e) => _timer.Change(FileSettlementPeriod, Timeout.InfiniteTimeSpan);
 
         /// <summary>Stop watching</summary>
-        private void Stop()
-        {
-            this._fileWatcher.EnableRaisingEvents = false;
-        }
+        private void Stop() => _fileWatcher.EnableRaisingEvents = false;
 
         /// <summary>Handler for settlement completion</summary>
         /// <param name="state"></param>
         private void OnTimer(object state)
         {
-            this._timer.Change(Timeout.Infinite, Timeout.Infinite);
-            Task.Run(() => this.GenerateZone()).ContinueWith(t => this.Notify(t.Result));
+            _timer.Change(Timeout.Infinite, Timeout.Infinite);
+            Task.Run(() => GenerateZone()).ContinueWith(t => Notify(t.Result));
         }
 
 
         public override void Dispose()
         {
-            if (this._fileWatcher != null)
+            if (_fileWatcher != null)
             {
-                this._fileWatcher.EnableRaisingEvents = false;
-                this._fileWatcher.Dispose();
+                _fileWatcher.EnableRaisingEvents = false;
+                _fileWatcher.Dispose();
             }
 
-            if (this._timer != null)
-            {
-                this._timer.Change(Timeout.Infinite, Timeout.Infinite);
-                this._timer.Dispose();
-            }
+            if (_timer == null) return;
+            _timer.Change(Timeout.Infinite, Timeout.Infinite);
+            _timer.Dispose();
         }
     }
 }

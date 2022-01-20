@@ -4,6 +4,9 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using Dns.Config;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Dns
 {
     using System;
@@ -18,20 +21,26 @@ namespace Dns
 
     public class Program
     {
-
-        private static IKernel container = new StandardKernel();
+        private static IServiceProvider _services; 
+        public Program(IServiceProvider services)
+        {
+            _services = services;
+        }
+        
+        private static readonly IKernel Container = new StandardKernel();
 
         private static ZoneProvider.BaseZoneProvider _zoneProvider; // reloads Zones from machineinfo.csv changes
         private static SmartZoneResolver _zoneResolver; // resolver and delegated lookup for unsupported zones;
         private static DnsServer _dnsServer; // resolver and delegated lookup for unsupported zones;
         private static HttpServer _httpServer;
+        public bool Running { get; set; } = true;
 
         /// <summary>
         /// DNS Server entrypoint
         /// </summary>
         /// <param name="configFile">Fully qualified configuration filename</param>
         /// <param name="cts">Cancellation Token Source</param>
-        public static void Run(string configFile, CancellationToken ct)
+        public void Run(string configFile, CancellationToken ct)
         {
 
             if (!File.Exists(configFile))
@@ -39,16 +48,13 @@ namespace Dns
                 throw new FileNotFoundException(null, configFile);
             }
 
-            IConfiguration configuration = new ConfigurationBuilder()
-                .AddJsonFile(configFile, true, true)
-                .Build();
-
-            var appConfig = configuration.Get<Config.AppConfig>();
-
-            container.Bind<ZoneProvider.BaseZoneProvider>().To(ByName(appConfig.Server.Zone.Provider));
-            var zoneProviderConfig = configuration.GetSection("zoneprovider");
-            _zoneProvider = container.Get<ZoneProvider.BaseZoneProvider>();
-            _zoneProvider.Initialize(zoneProviderConfig, appConfig.Server.Zone.Name);
+            AppConfig appConfig = _services.GetService<AppConfig>();
+            IConfiguration configuration = _services.GetService<IConfiguration>();
+            
+            Container.Bind<ZoneProvider.BaseZoneProvider>().To(ByName(appConfig.Server.Zone.Provider));
+            IConfigurationSection zoneProviderConfig = configuration.GetSection("zoneprovider");
+            _zoneProvider = Container.Get<ZoneProvider.BaseZoneProvider>();
+            _zoneProvider.Initialize(_services, zoneProviderConfig, appConfig.Server.Zone.Name);
 
             _zoneResolver = new SmartZoneResolver();
             _zoneResolver.SubscribeTo(_zoneProvider);
@@ -62,71 +68,61 @@ namespace Dns
             _zoneProvider.Start(ct);
             _dnsServer.Start(ct);
 
+            /*
             if(appConfig.Server.WebServer.Enabled)
             {
-                _httpServer.Initialize(string.Format("http://+:{0}/", appConfig.Server.WebServer.Port));
+                _httpServer.Initialize($"http://+:{appConfig.Server.WebServer.Port}/");
                 _httpServer.OnProcessRequest += _httpServer_OnProcessRequest;
                 _httpServer.OnHealthProbe += _httpServer_OnHealthProbe;
                 _httpServer.Start(ct);
             }
+            */
 
             ct.WaitHandle.WaitOne();
 
         }
 
-        static void _httpServer_OnHealthProbe(HttpListenerContext context)
+        private static void _httpServer_OnHealthProbe(HttpListenerContext context)
         {
         }
 
         private static void _httpServer_OnProcessRequest(HttpListenerContext context)
         {
             string rawUrl = context.Request.RawUrl;
-            if (rawUrl == "/dump/dnsresolver")
+            switch (rawUrl)
             {
-                context.Response.Headers.Add("Content-Type","text/html");
-                using (TextWriter writer = context.Response.OutputStream.CreateWriter())
+                case "/dump/dnsresolver":
                 {
+                    context.Response.Headers.Add("Content-Type","text/html");
+                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
                     _zoneResolver.DumpHtml(writer);
+
+                    break;
                 }
-            }
-            else if (rawUrl == "/dump/httpserver")
-            {
-                context.Response.Headers.Add("Content-Type", "text/html");
-                using (TextWriter writer = context.Response.OutputStream.CreateWriter())
+                case "/dump/httpserver":
                 {
+                    context.Response.Headers.Add("Content-Type", "text/html");
+                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
                     _httpServer.DumpHtml(writer);
+                    break;
                 }
-            }
-            else if (rawUrl == "/dump/dnsserver")
-            {
-                context.Response.Headers.Add("Content-Type", "text/html");
-                using (TextWriter writer = context.Response.OutputStream.CreateWriter())
+                case "/dump/dnsserver":
                 {
+                    context.Response.Headers.Add("Content-Type", "text/html");
+                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
                     _dnsServer.DumpHtml(writer);
+                    break;
                 }
-            }
-            else if (rawUrl == "/dump/zoneprovider")
-            {
-                context.Response.Headers.Add("Content-Type", "text/html");
-                using (TextWriter writer = context.Response.OutputStream.CreateWriter())
+                case "/dump/zoneprovider":
                 {
+                    context.Response.Headers.Add("Content-Type", "text/html");
+                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
                     _httpServer.DumpHtml(writer);
+                    break;
                 }
             }
         }
 
-        private static Type ByName(string name)
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Reverse())
-            {
-                var tt = assembly.GetType(name);
-                if (tt != null)
-                {
-                    return tt;
-                }
-            }
-
-            return null;
-        }
+        private static Type ByName(string name) => AppDomain.CurrentDomain.GetAssemblies().Reverse().Select(assembly => assembly.GetType(name)).FirstOrDefault(tt => tt != null);
     }
 }

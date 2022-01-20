@@ -16,8 +16,9 @@ namespace Dns
 
         public void Initialize(IEnumerable<ZoneRecord> nameRecords)
         {
-            this.Clear();
-            this.AddRange(nameRecords);
+            Clear();
+            if (nameRecords != null)
+                AddRange(nameRecords);
         }
     }
 }
