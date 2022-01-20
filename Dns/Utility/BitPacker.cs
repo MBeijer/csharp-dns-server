@@ -4,20 +4,17 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+
 namespace Dns.Utility
 {
-    using System;
-
-    public class BitPacker
+	public class BitPacker
 	{
 		private readonly byte[] _buffer;
-		private int _bitOffset = 0;
-		private readonly int[] _mask = new[] {1, 2, 4, 8, 16, 32, 64, 128};
+		private int _bitOffset;
+		private readonly int[] _mask = {1, 2, 4, 8, 16, 32, 64, 128};
 
-		public BitPacker(byte[] buffer)
-		{
-			this._buffer = buffer;
-		}
+		public BitPacker(byte[] buffer) => _buffer = buffer;
 
 		/// <param name="count"></param>
 		/// <returns></returns>
@@ -25,21 +22,21 @@ namespace Dns.Utility
 		{
 			if (count > 8) throw new ArgumentOutOfRangeException("count");
 
-			int bit = this._bitOffset;
+			int bit = _bitOffset;
 
-			if (((bit + count) / 8) > this._buffer.Length) throw new ArgumentOutOfRangeException("count");
+			if (((bit + count) / 8) > _buffer.Length) throw new ArgumentOutOfRangeException("count");
 
 			int byteNumber;
 			ushort bitOffset;
 
-			this.GenerateInitialOffset(out byteNumber, out bitOffset);
+			GenerateInitialOffset(out byteNumber, out bitOffset);
 
-			ushort span = BitConverter.ToUInt16(this._buffer, byteNumber);
+			ushort span = BitConverter.ToUInt16(_buffer, byteNumber);
 
 			int mask = GetMask(count, bitOffset);
 			int value = (span & mask) >> bitOffset;
 
-			this._bitOffset += count;
+			_bitOffset += count;
 			return (byte) value;
 		}
 
@@ -53,47 +50,41 @@ namespace Dns.Utility
 		{
 			if (count > 16) throw new ArgumentOutOfRangeException("count");
 
-			int bit = this._bitOffset;
+			int bit = _bitOffset;
 
-			if (((bit + count) / 8) > this._buffer.Length) throw new ArgumentOutOfRangeException("count");
+			if (((bit + count) / 8) > _buffer.Length) throw new ArgumentOutOfRangeException("count");
 
 			int byteNumber;
 			ushort bitOffset;
 
-			this.GenerateInitialOffset(out byteNumber, out bitOffset);
+			GenerateInitialOffset(out byteNumber, out bitOffset);
 
 			uint span;
-			if (byteNumber + 4 <= this._buffer.Length)
+			if (byteNumber + 4 <= _buffer.Length)
 			{
-				span = BitConverter.ToUInt32(this._buffer, byteNumber);
+				span = BitConverter.ToUInt32(_buffer, byteNumber);
 			}
 			else
 			{
 				// buffer too small - clone bytes into an empty buffer
 				byte[] copy = new byte[8];
-				Array.Copy(this._buffer, byteNumber, copy, byteNumber, this._buffer.Length - byteNumber);
+				Array.Copy(_buffer, byteNumber, copy, byteNumber, _buffer.Length - byteNumber);
 				span = BitConverter.ToUInt32(copy, byteNumber);
 			}
 
 			int mask = GetMask(count, bitOffset);
 			ushort value = (ushort) ((span & mask) >> bitOffset);
 
-			if (endian == Endian.HiLo)
-			{
-				SwapEndian(ref value);
-			}
+			if (endian == Endian.HiLo) SwapEndian(ref value);
 
-			this._bitOffset += count;
+			_bitOffset += count;
 			return value;
 		}
 
 		private static int GetMask(int count, ushort bitOffset)
 		{
 			int mask = 0;
-			for (int index = bitOffset; index < bitOffset + count; index++)
-			{
-				mask = mask + (int) Math.Pow(2, index);
-			}
+			for (int index = bitOffset; index < bitOffset + count; index++) mask += (int)Math.Pow(2, index);
 			return mask;
 		}
 
@@ -102,41 +93,29 @@ namespace Dns.Utility
 			int byteNumber;
 			ushort bitOffset;
 			
-			this.GenerateInitialOffset(out byteNumber, out bitOffset);
-			int bitMask = this._mask[bitOffset];
+			GenerateInitialOffset(out byteNumber, out bitOffset);
+			int bitMask = _mask[bitOffset];
 
-			bool value = (this._buffer[byteNumber] & bitMask) > 0;
+			bool value = (_buffer[byteNumber] & bitMask) > 0;
 
-			this._bitOffset++;
+			_bitOffset++;
 			return value;
 		}
 
-		public void Reset()
-		{
-			this._bitOffset = 0;
-		}
+		public void Reset() => _bitOffset = 0;
 
-		public int Write(byte value, uint count)
-		{
-			
+		public int Write(byte value, uint count) =>
 			// generate bit
-			return 0;
-		}
+			0;
 
 		private void GenerateInitialOffset(out int index, out ushort offset)
 		{
-			index = this._bitOffset == 0 ? 0 : (this._bitOffset / 8);
-			offset = (ushort)(this._bitOffset - (index * 8));
+			index = _bitOffset == 0 ? 0 : (_bitOffset / 8);
+			offset = (ushort)(_bitOffset - (index * 8));
 		}
 
-		public static void SwapEndian(ref ushort val)
-		{
-			val = (ushort)((val << 8) | (val >> 8));
-		}
+		public static void SwapEndian(ref ushort val) => val = (ushort)((val << 8) | (val >> 8));
 
-		public static void SwapEndian(ref uint val)
-		{
-			val = (val<<24) | ((val<<8) & 0x00ff0000) | ((val>>8) & 0x0000ff00) | (val>>24);
-		}
+		public static void SwapEndian(ref uint val) => val = (val<<24) | ((val<<8) & 0x00ff0000) | ((val>>8) & 0x0000ff00) | (val>>24);
 	}
 }

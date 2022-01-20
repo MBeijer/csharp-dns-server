@@ -6,6 +6,6 @@
     {
         internal string Name { get; set; }
         internal AvailabilityMode AvailabilityMode { get; set; }
-        internal List<Target> AddressProbes = new List<Target>();
+        internal List<Target> AddressProbes = new();
     }
 }

@@ -34,10 +34,10 @@ namespace Dns
                 try
                 {
                     // Reusable SocketAsyncEventArgs and awaitable wrapper 
-                    SocketAsyncEventArgs args = new SocketAsyncEventArgs();
+                    SocketAsyncEventArgs args = new();
                     args.SetBuffer(new byte[0x1000], 0, 0x1000);
                     args.RemoteEndPoint = _listener.LocalEndPoint;
-                    SocketAwaitable awaitable = new SocketAwaitable(args);
+                    SocketAwaitable awaitable = new(args);
 
                     // Do processing, continually receiving from the socket 
                     while (true)
@@ -45,18 +45,16 @@ namespace Dns
                         await _listener.ReceiveFromAsync(awaitable);
                         int bytesRead = args.BytesTransferred;
                         if (bytesRead <= 0)
-                        {
                             break;
-                        }
 
                         if (OnRequest != null)
                         {
-                            var process = Task.Run(() => OnRequest(args));
+                            Task process = Task.Run(() => OnRequest(args));
                         }
                         else
                         {
                             // defaults to console dump if no listener is bound
-                            var dump = Task.Run(() => ProcessReceiveFrom(args));
+                            Task dump = Task.Run(() => ProcessReceiveFrom(args));
                         }
                     }
                 }
@@ -68,10 +66,7 @@ namespace Dns
             }
         }
 
-        public void Stop()
-        {
-            _listener.Close();
-        }
+        public void Stop() => _listener.Close();
 
         public async void SendToAsync(SocketAsyncEventArgs args)
         {
@@ -97,25 +92,15 @@ namespace Dns
 
         public SocketAwaitable(SocketAsyncEventArgs eventArgs)
         {
-            if (eventArgs == null)
-            {
-                throw new ArgumentNullException("eventArgs");
-            }
-            m_eventArgs = eventArgs;
+            m_eventArgs = eventArgs ?? throw new ArgumentNullException("eventArgs");
             eventArgs.Completed += delegate
                                    {
                                        Action prev = m_continuation ?? Interlocked.CompareExchange(ref m_continuation, SENTINEL, null);
-                                       if (prev != null)
-                                       {
-                                           prev();
-                                       }
+                                       prev?.Invoke();
                                    };
         }
 
-        public bool IsCompleted
-        {
-            get { return m_wasCompleted; }
-        }
+        public bool IsCompleted => m_wasCompleted;
 
         public void OnCompleted(Action continuation)
         {
@@ -131,17 +116,12 @@ namespace Dns
             m_continuation = null;
         }
 
-        public SocketAwaitable GetAwaiter()
-        {
-            return this;
-        }
+        public SocketAwaitable GetAwaiter() => this;
 
         public void GetResult()
         {
             if (m_eventArgs.SocketError != SocketError.Success)
-            {
-                throw new SocketException((int) m_eventArgs.SocketError);
-            }
+                throw new SocketException((int)m_eventArgs.SocketError);
         }
     }
 }

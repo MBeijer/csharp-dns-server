@@ -4,16 +4,16 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Threading;
+using Dns.Contracts;
+
 namespace Dns
 {
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Linq;
-    using System.Net;
-    using System.Threading;
-    using Dns.Contracts;
-
     public class SmartZoneResolver : IObserver<Zone>, IDnsResolver
     {
         private long _hits;
@@ -24,56 +24,36 @@ namespace Dns
         private Dictionary<string, IAddressDispenser> _zoneMap;
         private DateTime _zoneReload = DateTime.MinValue;
 
-        public string GetZoneName()
-        {
-            return this.Zone.Suffix;
-        }
+        public string GetZoneName() => Zone?.Suffix;
 
-        public uint GetZoneSerial()
-        {
-            return this._zone.Serial;
-        }
+        public uint GetZoneSerial() => _zone.Serial;
 
         public Zone Zone
         {
-            get { return this._zone; }
+            get => _zone;
             set
             {
-                if(value == null) throw new ArgumentNullException("value");
-
-                this._zone = value;
-                this._zoneReload = DateTime.Now;
-                this._zoneMap = this._zone.ToDictionary(GenerateKey, zoneRecord => new SmartAddressDispenser(zoneRecord) as IAddressDispenser, StringComparer.CurrentCultureIgnoreCase);
+                _zone = value ?? throw new ArgumentNullException(nameof(value));
+                _zoneReload = DateTime.Now;
+                _zoneMap = _zone.ToDictionary(GenerateKey, zoneRecord => new SmartAddressDispenser(zoneRecord) as IAddressDispenser, StringComparer.CurrentCultureIgnoreCase);
                 Console.WriteLine("Zone reloaded");
             }
         }
 
-        public DateTime LastZoneReload
-        {
-            get { return _zoneReload; }
-        }
+        public DateTime LastZoneReload => _zoneReload;
 
-        void IObserver<Zone>.OnCompleted()
-        {
-            throw new NotImplementedException();
-        }
+        void IObserver<Zone>.OnCompleted() => throw new NotImplementedException();
 
-        void IObserver<Zone>.OnError(Exception error)
-        {
-            throw new NotImplementedException();
-        }
+        void IObserver<Zone>.OnError(Exception error) => throw new NotImplementedException();
 
-        void IObserver<Zone>.OnNext(Zone value)
-        {
-            this.Zone = value;
-        }
+        void IObserver<Zone>.OnNext(Zone value) => Zone = value;
 
         public void DumpHtml(TextWriter writer)
         {
-            writer.WriteLine("Type:{0}<br/>", this.GetType().Name);
-            writer.WriteLine("Queries:{0}<br/>", this._queries);
-            writer.WriteLine("Hits:{0}<br/>", this._hits);
-            writer.WriteLine("Misses:{0}<br/>", this._misses);
+            writer.WriteLine("Type:{0}<br/>", GetType().Name);
+            writer.WriteLine("Queries:{0}<br/>", _queries);
+            writer.WriteLine("Hits:{0}<br/>", _hits);
+            writer.WriteLine("Misses:{0}<br/>", _misses);
 
             writer.WriteLine("<table>");
             writer.WriteLine("<tr><td>Key</td><td>Value</td></tr>");
@@ -95,53 +75,45 @@ namespace Dns
 
             entry = null;
 
-            Interlocked.Increment(ref this._queries);
+            Interlocked.Increment(ref _queries);
 
             // fail fasts
-            if (!this.IsZoneLoaded()) return false;
-            if (!hostName.EndsWith(this._zone.Suffix)) return false;
+            if (!IsZoneLoaded()) return false;
+            if (!hostName.EndsWith(_zone.Suffix)) return false;
 
             // lookup locally
+            if (resType is ResourceType.ALL or ResourceType.ANY) resType = ResourceType.A;
             string key = GenerateKey(hostName, resClass, resType);
             IAddressDispenser dispenser;
             if (_zoneMap.TryGetValue(key, out dispenser))
             {
-                Interlocked.Increment(ref this._hits);
+                Interlocked.Increment(ref _hits);
                 entry = new IPHostEntry {AddressList = dispenser.GetAddresses().ToArray(), Aliases = new string[] {}, HostName = hostName};
                 return true;
             }
 
-            Interlocked.Increment(ref this._misses);
+            Interlocked.Increment(ref _misses);
             return false;
         }
 
-        public bool IsZoneLoaded()
-        {
-            return _zone != null;
-        }
+        public bool IsZoneLoaded() => _zone != null;
 
         /// <summary>Subscribe to specified zone provider</summary>
         /// <param name="zoneProvider"></param>
         public void SubscribeTo(IObservable<Zone> zoneProvider)
         {
             // release previous subscription
-            if (this._subscription != null)
+            if (_subscription != null)
             {
-                this._subscription.Dispose();
-                this._subscription = null;
+                _subscription.Dispose();
+                _subscription = null;
             }
 
-            this._subscription = zoneProvider.Subscribe(this);
+            _subscription = zoneProvider.Subscribe(this);
         }
 
-        private string GenerateKey(ZoneRecord record)
-        {
-            return GenerateKey(record.Host, record.Class, record.Type);
-        }
+        private static string GenerateKey(ZoneRecord record) => GenerateKey(record.Host, record.Class, record.Type);
 
-        private string GenerateKey(string host, ResourceClass resClass, ResourceType resType)
-        {
-            return string.Format("{0}|{1}|{2}", host, resClass, resType);
-        }
+        private static string GenerateKey(string host, ResourceClass resClass, ResourceType resType) => $"{host}|{resClass}|{resType}";
     }
 }

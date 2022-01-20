@@ -1,36 +1,33 @@
-﻿namespace Dns.ZoneProvider.IPProbe
-{
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Net;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Net;
 
+namespace Dns.ZoneProvider.IPProbe
+{
     internal class Target
     {
         internal IPAddress Address;
         internal Strategy.Probe ProbeFunction;
         internal ushort TimeoutMilliseconds;
-        internal List<ProbeResult> Results = new List<ProbeResult>();
+        internal readonly List<ProbeResult> Results = new();
 
-        public override int GetHashCode()
-        {
-            return string.Format("{0}|{1}|{2}", this.Address, this.ProbeFunction, this.TimeoutMilliseconds).GetHashCode();
-        }
+        public override int GetHashCode() => $"{Address}|{ProbeFunction}|{TimeoutMilliseconds}".GetHashCode();
 
         internal bool IsAvailable
         {
             get
             {
                 // Endpoint is available up-to last 3 results were successful
-                return this.Results.TakeLast(3).All(r => r.Available);
+                return Results.TakeLast(3).All(r => r.Available);
             }
         }
 
         internal void AddResult(ProbeResult result)
         {
-            this.Results.Add(result);
-            if (this.Results.Count > 10)
+            Results.Add(result);
+            if (Results.Count > 10)
             {
-                this.Results.RemoveAt(0);
+                Results.RemoveAt(0);
             }
         }
 
