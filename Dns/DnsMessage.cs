@@ -1,15 +1,15 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="DnsMessage.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.IO;
+
 namespace Dns
 {
-    using System;
-    using System.IO;
-
-    public class DnsMessage
+	public class DnsMessage
     {
         public ResourceList Additionals = new ResourceList();
         public ResourceList Answers = new ResourceList();
@@ -39,16 +39,16 @@ namespace Dns
         /// <summary>Is Query Response</summary>
         public bool QR
         {
-            get { return (this.Flags & 0x8000) == 0x8000; }
+            get { return (Flags & 0x8000) == 0x8000; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x8000);
+                    Flags = (ushort)(Flags | 0x8000);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x8000));
+                    Flags = (ushort)(Flags & (~0x8000));
                 }
             }
         }
@@ -56,23 +56,23 @@ namespace Dns
         /// <summary>Opcode</summary>
         public byte Opcode
         {
-            get { return (byte) ((this.Flags & 0x7800) >> 11); }
-            set { this.Flags = (ushort) ((this.Flags & ~0x7800) | (value << 11)); }
+            get { return (byte) ((Flags & 0x7800) >> 11); }
+            set { Flags = (ushort) ((Flags & ~0x7800) | (value << 11)); }
         }
 
         /// <summary>Is Authorative Answer</summary>
         public bool AA
         {
-            get { return (this.Flags & 0x0400) == 0x0400; }
+            get { return (Flags & 0x0400) == 0x0400; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x0400);
+                    Flags = (ushort)(Flags | 0x0400);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x0400));
+                    Flags = (ushort)(Flags & (~0x0400));
                 }
             }
         }
@@ -80,16 +80,16 @@ namespace Dns
         /// <summary>Is Truncated</summary>
         public bool TC
         {
-            get { return (this.Flags & 0x0200) == 0x0200; }
+            get { return (Flags & 0x0200) == 0x0200; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x0200);
+                    Flags = (ushort)(Flags | 0x0200);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x0200));
+                    Flags = (ushort)(Flags & (~0x0200));
                 }
             }
         }
@@ -97,16 +97,16 @@ namespace Dns
         /// <summary>Is Recursive Desired</summary>
         public bool RD
         {
-            get { return (this.Flags & 0x0100) == 0x0100; }
+            get { return (Flags & 0x0100) == 0x0100; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x0100);
+                    Flags = (ushort)(Flags | 0x0100);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x0100));
+                    Flags = (ushort)(Flags & (~0x0100));
                 }
             }
         }
@@ -114,16 +114,16 @@ namespace Dns
         /// <summary>Is Recursive Allowable</summary>
         public bool RA
         {
-            get { return (this.Flags & 0x0080) == 0x0080; }
+            get { return (Flags & 0x0080) == 0x0080; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x0080);
+                    Flags = (ushort)(Flags | 0x0080);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x0080));
+                    Flags = (ushort)(Flags & (~0x0080));
                 }
             }
         }
@@ -131,56 +131,56 @@ namespace Dns
         /// <summary>Reserved for future use</summary>
         public bool Zero
         {
-            get { return (this.Flags & 0x0040) == 0x0040; }
+            get { return (Flags & 0x0040) == 0x0040; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x0040);
+                    Flags = (ushort)(Flags | 0x0040);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x0040));
+                    Flags = (ushort)(Flags & (~0x0040));
                 }
             }
         }
 
         public bool AuthenticatingData
         {
-            get { return (this.Flags & 0x0020) == 0x0020; }
+            get { return (Flags & 0x0020) == 0x0020; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x0020);
+                    Flags = (ushort)(Flags | 0x0020);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x0020));
+                    Flags = (ushort)(Flags & (~0x0020));
                 }
             }
         }
 
         public bool CheckingDisabled
         {
-            get { return (this.Flags & 0x0010) == 0x0010; }
+            get { return (Flags & 0x0010) == 0x0010; }
             set
             {
                 if (value)
                 {
-                    this.Flags = (ushort)(this.Flags | 0x0010);
+                    Flags = (ushort)(Flags | 0x0010);
                 }
                 else
                 {
-                    this.Flags = (ushort)(this.Flags & (~0x0010));
+                    Flags = (ushort)(Flags & (~0x0010));
                 }
             }
         }
 
         public byte RCode
         {
-            get { return (byte) (this.Flags & 0x000F); }
-            set { this.Flags = (ushort) ((this.Flags & ~0x000F) | value); }
+            get { return (byte) (Flags & 0x000F); }
+            set { Flags = (ushort) ((Flags & ~0x000F) | value); }
         }
 
         public ushort AdditionalCount
@@ -240,7 +240,7 @@ namespace Dns
 
         public bool IsQuery()
         {
-            return this.QR == false;
+            return QR == false;
         }
 
         /// <summary></summary>
@@ -286,37 +286,37 @@ namespace Dns
 
         public void Dump()
         {
-            Console.WriteLine("QueryIdentifier:   0x{0:X4}", this.QueryIdentifier);
-            Console.WriteLine("QR:                ({0}... .... .... ....) {1}", this.QR ? 1 : 0, this.QR ? "Response" : "Query");
-            Console.WriteLine("Opcode:            (.{0}{1}{2} {3}... .... ....) {4}", (this.Opcode & 1) > 1 ? 1 : 0, (this.Opcode & 2) > 1 ? 1 : 0, (this.Opcode & 4) > 1 ? 1 : 0, (this.Opcode & 8) > 1 ? 1 : 0, (OpCode) (this.Opcode));
-            Console.WriteLine("AA:                (.... .{0}.. .... ....) {1}", this.AA ? 1 : 0, this.AA ? "Authoritative" : "Not Authoritative");
-            Console.WriteLine("TC:                (.... ..{0}. .... ....) {1}", this.TC ? 1 : 0, this.TC ? "Truncated" : "Not Truncated");
-            Console.WriteLine("RD:                (.... ...{0} .... ....) {1}", this.RD ? 1 : 0, this.RD ? "Recursion Desired" : "Recursion not desired");
-            Console.WriteLine("RA:                (.... .... {0}... ....) {1}", this.RA ? 1 : 0, this.RA ? "Recursive Query Support Available" : "Recursive Query Support Not Available");
+            Console.WriteLine("QueryIdentifier:   0x{0:X4}", QueryIdentifier);
+            Console.WriteLine("QR:                ({0}... .... .... ....) {1}", QR ? 1 : 0, QR ? "Response" : "Query");
+            Console.WriteLine("Opcode:            (.{0}{1}{2} {3}... .... ....) {4}", (Opcode & 1) > 1 ? 1 : 0, (Opcode & 2) > 1 ? 1 : 0, (Opcode & 4) > 1 ? 1 : 0, (Opcode & 8) > 1 ? 1 : 0, (OpCode) (Opcode));
+            Console.WriteLine("AA:                (.... .{0}.. .... ....) {1}", AA ? 1 : 0, AA ? "Authoritative" : "Not Authoritative");
+            Console.WriteLine("TC:                (.... ..{0}. .... ....) {1}", TC ? 1 : 0, TC ? "Truncated" : "Not Truncated");
+            Console.WriteLine("RD:                (.... ...{0} .... ....) {1}", RD ? 1 : 0, RD ? "Recursion Desired" : "Recursion not desired");
+            Console.WriteLine("RA:                (.... .... {0}... ....) {1}", RA ? 1 : 0, RA ? "Recursive Query Support Available" : "Recursive Query Support Not Available");
             Console.WriteLine("Zero:              (.... .... .0.. ....) 0");
-            Console.WriteLine("AuthenticatedData: (.... .... ..{0}. ....) {1}", this.AuthenticatingData ? 1 : 0, this.AuthenticatingData ? "AuthenticatingData" : "Not AuthenticatingData");
-            Console.WriteLine("CheckingDisabled:  (.... .... ...{0} ....) {1}", this.CheckingDisabled ? 1 : 0, this.CheckingDisabled ? "Checking Disabled" : "Not CheckingEnabled");
-            Console.WriteLine("RCode:             (.... .... .... {0}{1}{2}{3}) {4}", (this.RCode & 1) > 1 ? 1 : 0, (this.RCode & 2) > 1 ? 1 : 0, (this.RCode & 4) > 1 ? 1 : 0, (this.RCode & 8) > 1 ? 1 : 0, (RCode) (this.RCode));
-            Console.WriteLine("QuestionCount:     0x{0:X4}", this.QuestionCount);
-            Console.WriteLine("AnswerCount:       0x{0:X4}", this.AnswerCount);
-            Console.WriteLine("NameServerCount:   0x{0:X4}", this.NameServerCount);
-            Console.WriteLine("AdditionalCount:   0x{0:X4}", this.AdditionalCount);
+            Console.WriteLine("AuthenticatedData: (.... .... ..{0}. ....) {1}", AuthenticatingData ? 1 : 0, AuthenticatingData ? "AuthenticatingData" : "Not AuthenticatingData");
+            Console.WriteLine("CheckingDisabled:  (.... .... ...{0} ....) {1}", CheckingDisabled ? 1 : 0, CheckingDisabled ? "Checking Disabled" : "Not CheckingEnabled");
+            Console.WriteLine("RCode:             (.... .... .... {0}{1}{2}{3}) {4}", (RCode & 1) > 1 ? 1 : 0, (RCode & 2) > 1 ? 1 : 0, (RCode & 4) > 1 ? 1 : 0, (RCode & 8) > 1 ? 1 : 0, (RCode) (RCode));
+            Console.WriteLine("QuestionCount:     0x{0:X4}", QuestionCount);
+            Console.WriteLine("AnswerCount:       0x{0:X4}", AnswerCount);
+            Console.WriteLine("NameServerCount:   0x{0:X4}", NameServerCount);
+            Console.WriteLine("AdditionalCount:   0x{0:X4}", AdditionalCount);
             Console.WriteLine();
 
             if (Questions != null)
             {
-                foreach (Question question in this.Questions)
+                foreach (Question question in Questions)
                 {
-                    Console.WriteLine("QRecord: {0} of type {1} on class {2}", question.Name, (ResourceType)question.Type, (ResourceClass)question.Class);
+                    Console.WriteLine("QRecord: {0} of type {1} on class {2}", question.Name, question.Type, question.Class);
                 }
                 Console.WriteLine();
             }
 
             if (Answers != null)
             {
-                foreach (ResourceRecord resource in this.Answers)
+                foreach (ResourceRecord resource in Answers)
                 {
-                    Console.WriteLine("Record: {0} of type {1} on class {2}", resource.Name, (ResourceType) resource.Type, (ResourceClass)resource.Class);
+                    Console.WriteLine("Record: {0} of type {1} on class {2}", resource.Name, resource.Type, resource.Class);
                     resource.Dump();
                     Console.WriteLine();
                 }
@@ -324,9 +324,9 @@ namespace Dns
 
             if (Authorities != null)
             {
-                foreach (ResourceRecord resource in this.Authorities)
+                foreach (ResourceRecord resource in Authorities)
                 {
-                    Console.WriteLine("Record: {0} of type {1} on class {2}", resource.Name, (ResourceType)resource.Type, (ResourceClass)resource.Class);
+                    Console.WriteLine("Record: {0} of type {1} on class {2}", resource.Name, resource.Type, resource.Class);
                     resource.Dump();
                     Console.WriteLine();
                 }
@@ -336,17 +336,15 @@ namespace Dns
 
         public byte[] GetBytes()
         {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                this.WriteToStream(stream);
-                return stream.GetBuffer();
-            }
+	        using MemoryStream stream = new();
+	        WriteToStream(stream);
+	        return stream.GetBuffer();
         }
 
         public void WriteToStream(Stream stream)
         {
             // write header
-            stream.Write(this._header, 0, _header.Length);
+            stream.Write(_header, 0, _header.Length);
             Questions.WriteToStream(stream);
             Answers.WriteToStream(stream);
             Authorities.WriteToStream(stream);

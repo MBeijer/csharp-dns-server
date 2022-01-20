@@ -1,16 +1,16 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="ResourceList.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+
 namespace Dns
 {
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-
-    public class ResourceList : List<ResourceRecord>
+	public class ResourceList : List<ResourceRecord>
     {
         public int LoadFrom(byte[] bytes, int offset, ushort count)
         {
@@ -45,11 +45,23 @@ namespace Dns
                 {
                     resourceRecord.RData = CNameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
                 }
+                else if (resourceRecord.Type == ResourceType.MX)
+                {
+	                resourceRecord.RData = MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+                }
+                else if (resourceRecord.Type == ResourceType.SOA)
+                {
+	                resourceRecord.RData = SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+                }
+                else
+                {
+	                Console.WriteLine(resourceRecord.Type);
+                }
 
                 // move past resource data record
                 currentOffset = currentOffset + resourceRecord.DataLength;
 
-                this.Add(resourceRecord);
+                Add(resourceRecord);
             }
 
             int bytesRead = currentOffset - offset;

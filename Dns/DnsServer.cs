@@ -1,4 +1,4 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="DnsServer.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
@@ -45,7 +45,7 @@ namespace Dns
             _resolver = resolver;
 
             _udpListener = new UdpListener();
-            
+
             _udpListener.Initialize(this.port);
             _udpListener.OnRequest += ProcessUdpRequest;
 
@@ -75,7 +75,7 @@ namespace Dns
             if (message.IsQuery())
             {
                 if (message.Questions.Count <= 0) return;
-                
+
                 foreach (Question question in message.Questions)
                 {
                     Console.WriteLine("{0} asked for {1} {2} {3}", args.RemoteEndPoint.ToString(),question.Name, question.Class, question.Type);
@@ -117,10 +117,12 @@ namespace Dns
                         message.NameServerCount++;
                         message.Authorities.Add(soaResourceRecord);
                     }
-                    // 
+                    //
                     else // Referral to regular DC DNS servers
                     {
                         // store current IP address and Query ID.
+
+
                         try
                         {
                             string key = GetKeyName(message);
@@ -132,10 +134,11 @@ namespace Dns
                         {
                             _requestResponseMapLock.ExitWriteLock();
                         }
+
                     }
 
                     using MemoryStream responseStream = new(512);
-                    
+
                     message.WriteToStream(responseStream);
                     if (message.IsQuery())
                     {
@@ -168,19 +171,18 @@ namespace Dns
                         {
                             _requestResponseMapLock.EnterWriteLock();
                             // second test within lock means exclusive access
-                            if (_requestResponseMap.TryGetValue(key, out ep))
+                            if (!_requestResponseMap.TryGetValue(key, out ep)) return;
+
+                            using (MemoryStream responseStream = new(512))
                             {
-                                using (MemoryStream responseStream = new MemoryStream(512))
-                                {
-                                    message.WriteToStream(responseStream);
-                                    Interlocked.Increment(ref _responses);
+	                            message.WriteToStream(responseStream);
+	                            Interlocked.Increment(ref _responses);
 
-                                    Console.WriteLine("{0} answered {1} {2} {3} to {4}", args.RemoteEndPoint.ToString(), message.Questions[0].Name, message.Questions[0].Class, message.Questions[0].Type, ep.ToString());
+	                            Console.WriteLine("{0} answered {1} {2} {3} to {4}", args.RemoteEndPoint, message.Questions[0].Name, message.Questions[0].Class, message.Questions[0].Type, ep.ToString());
 
-                                    SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, ep);
-                                }
-                                _requestResponseMap.Remove(key);
+	                            SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, ep);
                             }
+                            _requestResponseMap.Remove(key);
 
                         }
                         finally
@@ -200,17 +202,7 @@ namespace Dns
             }
         }
 
-        private string GetKeyName(DnsMessage message)
-        {
-            if (message.QuestionCount > 0)
-            {
-                return string.Format("{0}|{1}|{2}|{3}", message.QueryIdentifier, message.Questions[0].Class, message.Questions[0].Type, message.Questions[0].Name);
-            }
-            else
-            {
-                return message.QueryIdentifier.ToString();
-            }
-        }
+        private static string GetKeyName(DnsMessage message) => message.QuestionCount > 0 ? $"{message.QueryIdentifier}|{message.Questions[0].Class}|{message.Questions[0].Type}|{message.Questions[0].Name}" : message.QueryIdentifier.ToString();
 
         /// <summary>Send UDP response via UDP listener socket</summary>
         /// <param name="bytes"></param>
@@ -219,13 +211,7 @@ namespace Dns
         /// <param name="remoteEndpoint"></param>
         private void SendUdp(byte[] bytes, int offset, int count, EndPoint remoteEndpoint)
         {
-            //for (int index = 0; index < count; index++)
-            //{
-            //    Console.Write("0x{0:X},", bytes[offset + index]);
-            //}
-            //Console.WriteLine();
-
-            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
+            SocketAsyncEventArgs args = new();
             args.RemoteEndPoint = remoteEndpoint;
             args.SetBuffer(bytes, offset, count);
 
@@ -234,7 +220,8 @@ namespace Dns
 
         /// <summary>Returns list of manual or DHCP specified DNS addresses</summary>
         /// <returns>List of configured DNS names</returns>
-        private IEnumerable<IPAddress> GetDefaultDNS()
+        // ReSharper disable once InconsistentNaming
+        private static IEnumerable<IPAddress> GetDefaultDNS()
         {
             NetworkInterface[] adapters  = NetworkInterface.GetAllNetworkInterfaces();
             foreach (NetworkInterface adapter in adapters)
@@ -246,10 +233,10 @@ namespace Dns
                 foreach (IPAddress dns in dnsServers)
                 {
                     Console.WriteLine("Discovered DNS: ", dns);
-                    
+
                     yield return dns;
                 }
-                    
+
             }
         }
 

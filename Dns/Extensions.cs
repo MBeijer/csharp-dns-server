@@ -1,8 +1,10 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="Extensions.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
+
+using System.Collections.Generic;
 
 namespace Dns
 {
@@ -74,6 +76,14 @@ namespace Dns
 
             // null delimiter
             stream.WriteByte(0x0);
+        }
+
+        public static void WriteToStream(this IEnumerable<byte> chars, Stream stream)
+        {
+	        foreach (byte currentChar in chars)
+	        {
+		        stream.WriteByte(currentChar);
+	        }
         }
 
 

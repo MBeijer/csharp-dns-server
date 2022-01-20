@@ -1,8 +1,10 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="RData.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
+
+using Newtonsoft.Json;
 
 namespace Dns
 {
@@ -19,11 +21,94 @@ namespace Dns
 
     }
 
+    // ReSharper disable once InconsistentNaming
+    public class SOARData : RData
+    {
+	    private readonly string _masterDomainName;
+	    private readonly string _responsibleDomainName;
+	    private uint _serialNumber;
+	    private uint _refreshInterval;
+	    private uint _retryInterval;
+	    private uint _expireInterval;
+	    private uint _ttl;
+
+	    private SOARData(byte[] bytes, int offset, int size)
+	    {
+		    _masterDomainName = DnsProtocol.ReadString(bytes, ref offset);
+		    _responsibleDomainName = DnsProtocol.ReadString(bytes, ref offset);
+
+		    _serialNumber = BitConverter.ToUInt32(bytes, offset).SwapEndian();
+		    offset += 4;
+		    _refreshInterval = BitConverter.ToUInt32(bytes, offset).SwapEndian();
+		    offset += 4;
+		    _retryInterval = BitConverter.ToUInt32(bytes, offset).SwapEndian();
+		    offset += 4;
+		    _expireInterval = BitConverter.ToUInt32(bytes, offset).SwapEndian();
+		    offset += 4;
+		    _ttl = BitConverter.ToUInt32(bytes, offset).SwapEndian();
+
+	    }
+
+	    public static SOARData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
+
+	    public override void WriteToStream(Stream stream)
+	    {
+		    _masterDomainName.WriteToStream(stream);
+		    _responsibleDomainName.WriteToStream(stream);
+		    _serialNumber.SwapEndian().WriteToStream(stream);
+		    _refreshInterval.SwapEndian().WriteToStream(stream);
+		    _retryInterval.SwapEndian().WriteToStream(stream);
+		    _expireInterval.SwapEndian().WriteToStream(stream);
+		    _ttl.SwapEndian().WriteToStream(stream);
+	    }
+
+	    public override ushort Length => (ushort)(_masterDomainName.Length + 2 + _responsibleDomainName.Length + 2 + (4*5));
+
+	    public override void Dump()
+	    {
+		    Console.WriteLine("Address:   {0}", JsonConvert.SerializeObject(this));
+	    }
+    }
+
+    // ReSharper disable once InconsistentNaming
+    public class MXRData : RData
+    {
+	    private readonly ushort _preference;
+	    private readonly int _size;
+	    private readonly string _name;
+
+
+	    private MXRData(byte[] bytes, int offset, int size)
+	    {
+		    _preference = BitConverter.ToUInt16(bytes, offset).SwapEndian();
+		    offset += 2;
+		    _name = DnsProtocol.ReadString(bytes, ref offset);
+		    _size = size;
+	    }
+
+	    public static MXRData Parse(byte[] bytes, int offset, int size) => new MXRData(bytes, offset, size);
+
+	    public override void WriteToStream(Stream stream)
+	    {
+		    byte[] bytes = BitConverter.GetBytes(_preference.SwapEndian());
+
+		    stream.Write(bytes, 0, bytes.Length);
+		    _name.WriteToStream(stream);
+	    }
+
+	    public override ushort Length => (ushort)(_name.Length + 2 + 2);
+
+	    public override void Dump()
+	    {
+		    Console.WriteLine("Address:   {0}", JsonConvert.SerializeObject(this));
+	    }
+    }
+
     public class ANameRData : RData
     {
         public IPAddress Address
         {
-            get; 
+            get;
             set;
         }
 
@@ -58,7 +143,7 @@ namespace Dns
 
         public override ushort Length
         {
-            // dots replaced by bytes 
+            // dots replaced by bytes
             // + 1 segment prefix
             // + 1 null terminator
             get { return (ushort) (Name.Length + 2); }
@@ -100,7 +185,7 @@ namespace Dns
 
         public override ushort Length
         {
-            // dots replaced by bytes 
+            // dots replaced by bytes
             // + 1 segment prefix
             // + 1 null terminator
             get { return (ushort)(Name.Length + 2); }
@@ -125,7 +210,7 @@ namespace Dns
 
         public override ushort Length
         {
-            // dots replaced by bytes 
+            // dots replaced by bytes
             // + 1 segment prefix
             // + 1 null terminator
             get { return (ushort)(Name.Length + 2); }
@@ -169,7 +254,7 @@ namespace Dns
 
         public override ushort Length
         {
-            // dots replaced by bytes 
+            // dots replaced by bytes
             // + 1 segment prefix
             // + 1 null terminator
             get { return (ushort) (PrimaryNameServer.Length + 2 + ResponsibleAuthoritativeMailbox.Length + 2 + 20); }
