@@ -59,7 +59,7 @@ namespace Dns
 		                resourceRecord.RData = TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
 		                break;
 	                default:
-		                Console.WriteLine(resourceRecord.Type);
+		                resourceRecord.RData = GenericRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
 		                break;
                 }
 

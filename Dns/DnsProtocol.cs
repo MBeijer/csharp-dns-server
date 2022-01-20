@@ -15,15 +15,7 @@ namespace Dns
         /// <param name="bytes"></param>
         /// <param name="dnsMessage"></param>
         /// <returns></returns>
-        public static bool TryParse(byte[] bytes, out DnsMessage dnsMessage)
-        {
-            if (!DnsMessage.TryParse(bytes, out dnsMessage))
-            {
-                return false;
-            }
-
-            return true;
-        }
+        public static bool TryParse(byte[] bytes, out DnsMessage dnsMessage) => DnsMessage.TryParse(bytes, out dnsMessage);
 
         public static ushort ReadUshort(byte[] bytes, ref int offset)
         {

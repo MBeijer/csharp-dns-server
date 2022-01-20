@@ -20,17 +20,39 @@ namespace Dns
         public abstract ushort Length { get; }
 
     }
+	
+	// ReSharper disable once InconsistentNaming
+	public class GenericRData : RData
+	{
+		private readonly byte[] _bytes;
+
+		private GenericRData(IReadOnlyList<byte> bytes, int offset, int size)
+		{
+			_bytes = new byte[size];
+
+			for (int i = 0; i < size; i++)
+				_bytes[i] = bytes[offset + i];
+		}
+
+		public static GenericRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
+
+		public override void WriteToStream(Stream stream) => stream.Write(_bytes, 0, _bytes.Length);
+
+		public override ushort Length => (ushort)_bytes.Length;
+
+		public override void Dump() => Console.WriteLine("Address:   {0}", JsonConvert.SerializeObject(this));
+	}
 
     // ReSharper disable once InconsistentNaming
     public class SOARData : RData
     {
 	    private readonly string _masterDomainName;
 	    private readonly string _responsibleDomainName;
-	    private uint _serialNumber;
-	    private uint _refreshInterval;
-	    private uint _retryInterval;
-	    private uint _expireInterval;
-	    private uint _ttl;
+	    private readonly uint _serialNumber;
+	    private readonly uint _refreshInterval;
+	    private readonly uint _retryInterval;
+	    private readonly uint _expireInterval;
+	    private readonly uint _ttl;
 
 	    private SOARData(byte[] bytes, int offset, int size)
 	    {
@@ -106,7 +128,8 @@ namespace Dns
 
     public class ANameRData : RData
     {
-	    private readonly ResourceType _type;
+	    private ResourceType _type = ResourceType.A;
+	    private IPAddress _address;
 
 	    public ANameRData() {}
 	    private ANameRData(IReadOnlyList<byte> bytes, int offset, int size)
@@ -134,7 +157,15 @@ namespace Dns
 
         public override ushort Length => (ushort)(_type == ResourceType.A?4:16);
 
-        public IPAddress Address { get; set; }
+        public IPAddress Address
+        {
+	        get => _address;
+	        init
+	        {
+		        _type = value.GetAddressBytes().Length == 4 ? ResourceType.A : ResourceType.AAAA;
+		        _address = value;
+	        }
+        }
 
         public override void Dump()
         {
