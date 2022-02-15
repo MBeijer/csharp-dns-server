@@ -51,7 +51,7 @@ namespace Dns
                         {
                             var buffer = new byte[bytesRead];
                             Buffer.BlockCopy(args.Buffer, 0, buffer, 0, buffer.Length);
-                            Task process = Task.Run(() => OnRequest(buffer, args.RemoteEndPoint));
+                            Task process = Task.Run(() => OnRequest(buffer, remoteEndPoint));
                         }
                         else
                         {

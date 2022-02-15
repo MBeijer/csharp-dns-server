@@ -148,7 +148,7 @@ namespace Dns
                     else
                     {
                         Interlocked.Increment(ref _responses);
-                        SendUdp(responseStream.GetBuffer(), 0, (int) responseStream.Position, args.RemoteEndPoint);
+                        SendUdp(responseStream.GetBuffer(), 0, (int) responseStream.Position, remoteEndPoint);
                     }
                 }
             }
