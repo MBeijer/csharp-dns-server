@@ -61,9 +61,10 @@ namespace Dns
 
         /// <summary>Process UDP Request</summary>
         /// <param name="args"></param>
-        private void ProcessUdpRequest(SocketAsyncEventArgs args)
+        private void ProcessUdpRequest(byte[] buffer, EndPoint remoteEndPoint)
         {
-            if (!DnsProtocol.TryParse(args.Buffer, out DnsMessage message))
+            DnsMessage message;
+            if (!DnsProtocol.TryParse(buffer, out message))
             {
                 // TODO log bad message
                 Console.WriteLine("unable to parse message");
@@ -74,68 +75,64 @@ namespace Dns
 
             if (message.IsQuery())
             {
-                if (message.Questions.Count <= 0) return;
-
-                foreach (Question question in message.Questions)
+                if (message.Questions.Count > 0)
                 {
-                    Console.WriteLine("{0} asked for {1} {2} {3}", args.RemoteEndPoint.ToString(),question.Name, question.Class, question.Type);
-                    IPHostEntry entry;
-                    if (question.Type == ResourceType.PTR)
+                    foreach (Question question in message.Questions)
                     {
-                        if (question.Name == "1.0.0.127.in-addr.arpa") // query for PTR record
+                        Console.WriteLine("{0} asked for {1} {2} {3}", remoteEndPoint.ToString(),question.Name, question.Class, question.Type);
+                        IPHostEntry entry;
+                        if (question.Type == ResourceType.PTR)
+                        {
+                            if (question.Name == "1.0.0.127.in-addr.arpa") // query for PTR record
+                            {
+                                message.QR = true;
+                                message.AA = true;
+                                message.RA = false;
+                                message.AnswerCount++;
+                                message.Answers.Add(new ResourceRecord {Name = question.Name, Class = ResourceClass.IN, Type = ResourceType.PTR, TTL = 3600, DataLength = 0xB, RData = new DomainNamePointRData() {Name = "localhost"}});
+                            }
+                        }
+                        else if (_resolver.TryGetHostEntry(question.Name, question.Class, question.Type, out entry)) // Right zone, hostname/machine function does exist
                         {
                             message.QR = true;
                             message.AA = true;
                             message.RA = false;
-                            message.AnswerCount++;
-                            message.Answers.Add(new ResourceRecord {Name = question.Name, Class = ResourceClass.IN, Type = ResourceType.PTR, TTL = 3600, DataLength = 0xB, RData = new DomainNamePointRData() {Name = "localhost"}});
+                            message.RCode = (byte) RCode.NOERROR;
+                            foreach (IPAddress address in entry.AddressList)
+                            {
+                                message.AnswerCount++;
+                                message.Answers.Add(new ResourceRecord {Name = question.Name, Class = ResourceClass.IN, Type = ResourceType.A, TTL = 10, RData = new ANameRData {Address = address}});
+                            }
                         }
-                    }
-                    else if (_resolver.TryGetHostEntry(question.Name, question.Class, question.Type, out entry)) // Right zone, hostname/machine function does exist
-                    {
-                        message.QR = true;
-                        message.AA = true;
-                        message.RA = false;
-                        message.RCode = (byte) RCode.NOERROR;
-                        foreach (IPAddress address in entry.AddressList)
+                        else if (question.Name.EndsWith(_resolver.GetZoneName())) // Right zone, but the hostname/machine function doesn't exist
                         {
-                            message.AnswerCount++;
-                            message.Answers.Add(new ResourceRecord {Name = question.Name, Class = ResourceClass.IN, Type = ResourceType.A, TTL = 10, RData = new ANameRData {Address = address}});
+                            message.QR = true;
+                            message.AA = true;
+                            message.RA = false;
+                            message.RCode = (byte) RCode.NXDOMAIN;
+                            message.AnswerCount = 0;
+                            message.Answers.Clear();
+
+                            var soaResourceData = new StatementOfAuthorityRData() {PrimaryNameServer = Environment.MachineName, ResponsibleAuthoritativeMailbox = "stephbu." + Environment.MachineName, Serial = _resolver.GetZoneSerial(), ExpirationLimit = 86400, RetryInterval = 300, RefreshInterval = 300, MinimumTTL = 300};
+                            var soaResourceRecord = new ResourceRecord {Class = ResourceClass.IN, Type = ResourceType.SOA, TTL = 300, RData = soaResourceData};
+                            message.NameServerCount++;
+                            message.Authorities.Add(soaResourceRecord);
                         }
-                    }
-                    else if (_resolver.GetZoneName() != null && question.Name.EndsWith(_resolver.GetZoneName())) // Right zone, but the hostname/machine function doesn't exist
-                    {
-                        message.QR = true;
-                        message.AA = true;
-                        message.RA = false;
-                        message.RCode = (byte) RCode.NXDOMAIN;
-                        message.AnswerCount = 0;
-                        message.Answers.Clear();
-
-                        StatementOfAuthorityRData soaResourceData = new() {PrimaryNameServer = Environment.MachineName, ResponsibleAuthoritativeMailbox = "stephbu." + Environment.MachineName, Serial = _resolver.GetZoneSerial(), ExpirationLimit = 86400, RetryInterval = 300, RefreshInterval = 300, MinimumTTL = 300};
-                        ResourceRecord soaResourceRecord = new() {Class = ResourceClass.IN, Type = ResourceType.SOA, TTL = 300, RData = soaResourceData};
-                        message.NameServerCount++;
-                        message.Authorities.Add(soaResourceRecord);
-                    }
-                    //
-                    else // Referral to regular DC DNS servers
-                    {
-                        // store current IP address and Query ID.
-
-
-                        try
+                            // 
+                        else // Referral to regular DC DNS servers
                         {
-                            string key = GetKeyName(message);
-                            _requestResponseMapLock.EnterWriteLock();
-                            if (!_requestResponseMap.ContainsKey(key))
-                                _requestResponseMap.Add(key, args.RemoteEndPoint);
+                            // store current IP address and Query ID.
+                            try
+                            {
+                                string key = GetKeyName(message);
+                                _requestResponseMapLock.EnterWriteLock();
+                                _requestResponseMap.Add(key, remoteEndPoint);
+                            }
+                            finally
+                            {
+                                _requestResponseMapLock.ExitWriteLock();
+                            }
                         }
-                        finally
-                        {
-                            _requestResponseMapLock.ExitWriteLock();
-                        }
-
-                    }
 
                     using MemoryStream responseStream = new(512);
 
@@ -178,7 +175,7 @@ namespace Dns
 	                            message.WriteToStream(responseStream);
 	                            Interlocked.Increment(ref _responses);
 
-	                            Console.WriteLine("{0} answered {1} {2} {3} to {4}", args.RemoteEndPoint, message.Questions[0].Name, message.Questions[0].Class, message.Questions[0].Type, ep.ToString());
+                                    Console.WriteLine("{0} answered {1} {2} {3} to {4}", remoteEndPoint.ToString(), message.Questions[0].Name, message.Questions[0].Class, message.Questions[0].Type, ep.ToString());
 
 	                            SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, ep);
                             }
