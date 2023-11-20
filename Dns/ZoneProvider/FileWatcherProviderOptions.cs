@@ -1,5 +1,4 @@
-﻿using System;
-namespace Dns.ZoneProvider
+﻿namespace Dns.ZoneProvider
 {
     public class FileWatcherZoneProviderOptions
     {

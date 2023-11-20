@@ -4,14 +4,13 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 
 namespace Dns
 {
-    using System;
-    using System.IO;
-    using System.Text;
-
     public static class Extensions
     {
         public static TextWriter CreateWriter(this Stream stream, Encoding encoding = null)
@@ -44,7 +43,7 @@ namespace Dns
 
             using (var stream = new MemoryStream(str.Length + 2))
             {
-                var segments = str.Split(new char[] {'.'});
+                var segments = str.Split(new[] {'.'});
                 foreach (var segment in segments)
                 {
                     stream.WriteByte((byte)segment.Length);
@@ -63,7 +62,7 @@ namespace Dns
         {
             if (!string.IsNullOrWhiteSpace(str))
             {
-                var segments = str.Split(new char[] { segmentSplit });
+                var segments = str.Split(new[] { segmentSplit });
                 foreach (var segment in segments)
                 {
                     stream.WriteByte((byte)segment.Length);

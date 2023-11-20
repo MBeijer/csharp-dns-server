@@ -4,11 +4,11 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Text;
+
 namespace Dns
 {
-    using System;
-    using System.Text;
-
     public class DnsProtocol
     {
         /// <summary></summary>

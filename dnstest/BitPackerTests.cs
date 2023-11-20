@@ -1,10 +1,9 @@
 ﻿using System;
+using Dns.Utility;
 using Xunit;
 
 namespace DnsTest
 {
-    using Dns.Utility;
-
     public class BitPackerTests
     {
         [Fact]
@@ -23,7 +22,7 @@ namespace DnsTest
             Assert.True(packer.GetBoolean());
 
             bytes = BitConverter.GetBytes(0x0A);
-            packer = new BitPacker(bytes);
+            packer = new(bytes);
             Assert.False(packer.GetBoolean());
             Assert.True(packer.GetBoolean());
             Assert.False(packer.GetBoolean());
@@ -41,7 +40,7 @@ namespace DnsTest
             BitPacker packer;
 
             bytes = BitConverter.GetBytes(0xAFFF);
-            packer = new BitPacker(bytes);
+            packer = new(bytes);
             
             Assert.True(packer.GetBoolean());
             Assert.True(packer.GetBoolean());
@@ -59,26 +58,26 @@ namespace DnsTest
             BitPacker packer;
 
             bytes = BitConverter.GetBytes(0xAFFF);
-            packer = new BitPacker(bytes);
+            packer = new(bytes);
 
             Assert.Equal(15, packer.GetByte(4));
             Assert.Equal(15, packer.GetByte(4));
             Assert.Equal(0xAF,packer.GetUshort(8));
 
             bytes = BitConverter.GetBytes(0x0CD000);
-            packer = new BitPacker(bytes);
+            packer = new(bytes);
 
             Assert.Equal(0x00, packer.GetByte(8));
-            Assert.Equal(0x0CD0, packer.GetUshort(16));
+            Assert.Equal(0x0CD0, packer.GetUshort());
 
             bytes = BitConverter.GetBytes(0x000F << 1) ;
-            packer = new BitPacker(bytes);
+            packer = new(bytes);
             Assert.False(packer.GetBoolean());
             Assert.Equal(0xF, packer.GetUshort(8));
 
             bytes = BitConverter.GetBytes(0xAABB);
-            packer = new BitPacker(bytes);
-            Assert.Equal(0xAABB, packer.GetUshort(16, BitPacker.Endian.LoHi));
+            packer = new(bytes);
+            Assert.Equal(0xAABB, packer.GetUshort());
 
             packer.Reset();
             Assert.Equal(0xBBAA, packer.GetUshort(16, BitPacker.Endian.HiLo));
@@ -87,7 +86,7 @@ namespace DnsTest
             Assert.Equal(0xBBAA, packer.GetUshort(16, BitPacker.Endian.HiLo));
 
             bytes = BitConverter.GetBytes(0x0100);
-            packer = new BitPacker(bytes);
+            packer = new(bytes);
             Assert.Equal(0x0001, packer.GetUshort(16, BitPacker.Endian.HiLo));
         }
 

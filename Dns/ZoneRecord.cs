@@ -4,10 +4,10 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System.Net;
+
 namespace Dns
 {
-    using System.Net;
-
     public class ZoneRecord
     {
         public string Host;

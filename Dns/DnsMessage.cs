@@ -11,10 +11,10 @@ namespace Dns
 {
 	public class DnsMessage
     {
-        public ResourceList Additionals = new ResourceList();
-        public ResourceList Answers = new ResourceList();
-        public ResourceList Authorities = new ResourceList();
-        public QuestionList Questions = new QuestionList();
+        public ResourceList Additionals = new();
+        public ResourceList Answers     = new();
+        public ResourceList Authorities = new();
+        public QuestionList Questions   = new();
 
         private ushort _additionalCount;
         private ushort _answerCount;

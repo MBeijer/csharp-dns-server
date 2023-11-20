@@ -57,7 +57,7 @@ namespace Dns.Utility
                         _fields = fieldDeclaration.Length != 2 ? null : fieldDeclaration[1].Trim().Split(CSVDELIMITER);
                     }
                     else
-                        yield return new CsvRow(_fields, _currentLine.Split(CSVDELIMITER));
+                        yield return new(_fields, _currentLine.Split(CSVDELIMITER));
                 }
             }
         }

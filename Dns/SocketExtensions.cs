@@ -4,10 +4,10 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System.Net.Sockets;
+
 namespace Dns
 {
-    using System.Net.Sockets;
-
     public static class SocketExtensions
     {
         public static SocketAwaitable ReceiveFromAsync(this Socket socket, SocketAwaitable awaitable)

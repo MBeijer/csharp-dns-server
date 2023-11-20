@@ -4,10 +4,10 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System.Net;
+
 namespace Dns.Contracts
 {
-    using System.Net;
-
     /// <summary>Provides domain name resolver capabilities</summary>
     internal interface IDnsResolver : IHtmlDump
     {

@@ -12,7 +12,7 @@ namespace Dns.Utility
     public class CsvRow
     {
         private readonly string[] _fieldValues;
-        private readonly Dictionary<string, string> _fieldsByName = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _fieldsByName = new();
 
         internal CsvRow(IReadOnlyList<string> fields, string[] fieldValues)
         {

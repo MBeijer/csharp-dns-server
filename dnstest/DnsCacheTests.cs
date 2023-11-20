@@ -1,24 +1,23 @@
-using System;
-using System.Text;
 using System.Linq;
+using System.Text;
+using Dns;
+using Dns.Contracts;
 using Xunit;
 
 namespace DnsTest
 {
-    using Dns;
-
     public class DnsCacheTests
     {
         [Fact]
         public void Test1() {
-            Dns.Contracts.IDnsCache cache = new Dns.DnsCache();
+            IDnsCache cache = new DnsCache();
             var invalidKeyResult = cache.Get("invalidTestKey");
-            Xunit.Assert.Null(invalidKeyResult);
+            Assert.Null(invalidKeyResult);
         }
 
         [Fact]
         public void Test2() {
-            Dns.Contracts.IDnsCache cache = new Dns.DnsCache();
+            IDnsCache cache = new DnsCache();
 
             var key = "sampleCacheKey";
             var data = Encoding.ASCII.GetBytes("test");
@@ -27,10 +26,10 @@ namespace DnsTest
             cache.Set(key, data, ttl);
             var result = cache.Get(key);
 
-            Xunit.Assert.True(data.SequenceEqual(result));
+            Assert.True(data.SequenceEqual(result));
 
             var invalidKeyResult = cache.Get("invalidTestKey");
-            Xunit.Assert.Null(invalidKeyResult);
+            Assert.Null(invalidKeyResult);
         }
     }
 }

@@ -88,7 +88,7 @@ namespace Dns
             if (_zoneMap.TryGetValue(key, out dispenser))
             {
                 Interlocked.Increment(ref _hits);
-                entry = new IPHostEntry {AddressList = dispenser.GetAddresses().ToArray(), Aliases = new string[] {}, HostName = hostName};
+                entry = new() {AddressList = dispenser.GetAddresses().ToArray(), Aliases = new string[] {}, HostName = hostName};
                 return true;
             }
 

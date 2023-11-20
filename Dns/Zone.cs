@@ -4,10 +4,10 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System.Collections.Generic;
+
 namespace Dns
 {
-    using System.Collections.Generic;
-
     public class Zone : List<ZoneRecord>
     {
         public string Suffix { get; set; }

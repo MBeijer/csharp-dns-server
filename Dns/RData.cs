@@ -108,7 +108,7 @@ namespace Dns
 		    _size = size;
 	    }
 
-	    public static MXRData Parse(byte[] bytes, int offset, int size) => new MXRData(bytes, offset, size);
+	    public static MXRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
 
 	    public override void WriteToStream(Stream stream)
 	    {
@@ -144,7 +144,7 @@ namespace Dns
 			    j++;
 		    }
 
-		    Address = new IPAddress(addressBytes);
+		    Address = new(addressBytes);
 	    }
 
         public static ANameRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);

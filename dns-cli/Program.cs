@@ -1,7 +1,7 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Dns.Config;
 using Dns.Handlers;
 using Dns.Services;
 using Microsoft.Extensions.Configuration;
@@ -45,7 +45,7 @@ namespace DnsCli
                     .Build();
                 Console.WriteLine("Done!");
 
-                var appConfig = configuration.Get<Dns.Config.AppConfig>();
+                var appConfig = configuration.Get<AppConfig>();
 
                 services.AddSingleton(configuration);
                 services.AddSingleton(appConfig);
@@ -89,7 +89,7 @@ namespace DnsCli
                 {
                     var myService = services.GetRequiredService<Dns.Program>();
 
-                    //myService?.Init(arguments);
+                    //myService?.Init(Cts.Token);
 
                     while (myService is { Running: true })
                     {

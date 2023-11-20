@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -31,11 +30,11 @@ namespace Dns.ZoneProvider.IPProbe
             options = config.Get<IPProbeProviderOptions>();
             if (options == null)
             {
-                throw new Exception("Error loading IPProbeProviderOptions");
+                throw new("Error loading IPProbeProviderOptions");
             }
 
             // load up initial state from options
-            state = new State(options);
+            state = new(options);
             Zone = zoneName;
         }
 
@@ -54,7 +53,7 @@ namespace Dns.ZoneProvider.IPProbe
                     var startTime = DateTime.UtcNow;
                     var result = probe.ProbeFunction(probe.Address, probe.TimeoutMilliseconds);
                     var duration = DateTime.UtcNow - startTime;
-                    probe.AddResult(new ProbeResult { StartTime = startTime, Duration = duration, Available = result });
+                    probe.AddResult(new() { StartTime = startTime, Duration = duration, Available = result });
                 });
 
                 Run(() => GetZone(state), ct).ContinueWith(t => Notify(t.Result), ct);
@@ -101,7 +100,7 @@ namespace Dns.ZoneProvider.IPProbe
                 }
 
 
-                yield return new ZoneRecord
+                yield return new()
                 {
                     Host = host.Name + Zone,
                     Addresses = addresses,

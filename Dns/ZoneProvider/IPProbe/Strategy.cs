@@ -11,7 +11,7 @@ namespace Dns.ZoneProvider.IPProbe
         public delegate bool Probe(IPAddress addr, ushort timeout);
 
         // Probe Strategy Dictionary, maps configuration to implemented functions
-        private static Dictionary<string, Probe> probeFunctions = new Dictionary<string, Probe>();
+        private static Dictionary<string, Probe> probeFunctions = new();
 
         static Strategy()
         {

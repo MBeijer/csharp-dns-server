@@ -4,11 +4,11 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.IO;
+
 namespace Dns
 {
-    using System;
-    using System.IO;
-
     public class Question
     {
         public ResourceClass Class;
@@ -17,14 +17,14 @@ namespace Dns
 
         public void WriteToStream(Stream stream)
         {
-            var name = this.Name.GetResourceBytes();
+            var name = Name.GetResourceBytes();
             stream.Write(name, 0, name.Length);
 
             // Type
-            stream.Write(BitConverter.GetBytes(((ushort) (this.Type)).SwapEndian()), 0, 2);
+            stream.Write(BitConverter.GetBytes(((ushort) (Type)).SwapEndian()), 0, 2);
 
             // Class
-            stream.Write(BitConverter.GetBytes(((ushort) this.Class).SwapEndian()), 0, 2);
+            stream.Write(BitConverter.GetBytes(((ushort) Class).SwapEndian()), 0, 2);
         }
     }
 }

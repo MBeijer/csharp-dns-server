@@ -4,12 +4,12 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+
 namespace Dns
 {
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-
     public class QuestionList : List<Question>
     {
         public int LoadFrom(byte[] bytes, int offset, ushort count)
@@ -30,7 +30,7 @@ namespace Dns
                 question.Class = (ResourceClass) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
                 currentOffset += 2;
 
-                this.Add(question);
+                Add(question);
             }
 
             var bytesRead = currentOffset - offset;

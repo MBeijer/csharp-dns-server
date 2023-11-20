@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Authentication;
@@ -20,16 +18,16 @@ namespace Dns.Services
 			_appConfig = appConfig;
 
 			if (!_appConfig.Server.Zone.ProviderSettings.ContainsKey("traefikUrl") || !_appConfig.Server.Zone.ProviderSettings.ContainsKey("username") || !_appConfig.Server.Zone.ProviderSettings.ContainsKey("password"))
-				throw new Exception("Missing settings for Traefik provider, please update your appsettings.json file");
+				throw new("Missing settings for Traefik provider, please update your appsettings.json file");
 
-			client.BaseAddress = new Uri(GetSetting("traefikUrl"));
-			client.DefaultRequestHeaders.Referrer = new Uri(GetSetting("traefikUrl"));
+			client.BaseAddress = new(GetSetting("traefikUrl"));
+			client.DefaultRequestHeaders.Referrer = new(GetSetting("traefikUrl"));
 			client.DefaultRequestHeaders.Authorization = new BasicAuthenticationHeaderValue(GetSetting("username"), GetSetting("password"));
 			client.DefaultRequestHeaders.Add("Accept-language", "en");
 			_client = client;
 		}
 
-		private string GetSetting(string setting) => !_appConfig.Server.Zone.ProviderSettings.ContainsKey(setting) ? throw new Exception($"Setting \"{setting}\" is missing from your appsettings.json file") : _appConfig.Server.Zone.ProviderSettings[setting];
+		private string GetSetting(string setting) => !_appConfig.Server.Zone.ProviderSettings.ContainsKey(setting) ? throw new($"Setting \"{setting}\" is missing from your appsettings.json file") : _appConfig.Server.Zone.ProviderSettings[setting];
 
 		// ReSharper disable once MemberCanBeMadeStatic.Global
 		public IPAddress GetDockerHostInternalIp() => IPAddress.Parse(GetSetting("dockerHostInternalIp"));

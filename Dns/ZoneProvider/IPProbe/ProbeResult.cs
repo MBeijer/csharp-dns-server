@@ -1,7 +1,7 @@
-﻿namespace Dns.ZoneProvider.IPProbe
-{
-    using System;
+﻿using System;
 
+namespace Dns.ZoneProvider.IPProbe
+{
     internal class ProbeResult
     {
         internal DateTime StartTime;

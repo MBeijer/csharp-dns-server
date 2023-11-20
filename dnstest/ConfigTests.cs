@@ -1,18 +1,10 @@
-﻿using System;
+﻿using Microsoft.Extensions.Configuration.Json;
 using Xunit;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Json;
-
-using Dns.Config;
 
 namespace DnsTest
 {
     public class ConfigTests
     {
-        public ConfigTests()
-        {
-        }
-
         [Fact]
         public void LoadConfig()
         {

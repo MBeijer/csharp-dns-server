@@ -4,11 +4,10 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+
 namespace Dns.ZoneProvider.Bind
 {
-    using System;
-    using Dns.ZoneProvider;
-
     public class BindZoneProvider : FileWatcherZoneProvider
     {
         public override Zone GenerateZone()

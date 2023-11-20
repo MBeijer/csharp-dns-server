@@ -50,7 +50,7 @@ namespace Dns.ZoneProvider.Traefik
 
         private void ProbeLoop(CancellationToken ct)
         {
-            _services.GetService<ILogger<TraefikZoneProvider>>()?.LogInformation($"Probe loop started");
+            _services.GetService<ILogger<TraefikZoneProvider>>()?.LogInformation("Probe loop started");
 
             ParallelOptions options = new() { CancellationToken = ct, MaxDegreeOfParallelism = 4 };
 

@@ -6,9 +6,9 @@ namespace Dns.ZoneProvider.IPProbe
 {
     internal class Target
     {
-        internal IPAddress Address;
-        internal Strategy.Probe ProbeFunction;
-        internal ushort TimeoutMilliseconds;
+        internal          IPAddress         Address;
+        internal          Strategy.Probe    ProbeFunction;
+        internal          ushort            TimeoutMilliseconds;
         internal readonly List<ProbeResult> Results = new();
 
         public override int GetHashCode() => $"{Address}|{ProbeFunction}|{TimeoutMilliseconds}".GetHashCode();

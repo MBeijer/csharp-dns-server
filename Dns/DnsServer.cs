@@ -4,20 +4,18 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Threading;
+using Dns.Contracts;
 
 namespace Dns
 {
-    using System;
-    using System.IO;
-    using System.Net;
-    using System.Net.Sockets;
-    using System.Threading;
-    using Dns.Contracts;
-    using Microsoft.Win32;
-    using System.Linq;
-    using System.Collections.Generic;
-
     internal class DnsServer : IHtmlDump
     {
         private IPAddress[] _defaultDns;
@@ -27,9 +25,9 @@ namespace Dns
         private long _responses;
         private long _nacks;
 
-        private Dictionary<string, EndPoint> _requestResponseMap = new Dictionary<string, EndPoint>();
+        private Dictionary<string, EndPoint> _requestResponseMap = new();
 
-        private ReaderWriterLockSlim _requestResponseMapLock = new ReaderWriterLockSlim();
+        private ReaderWriterLockSlim _requestResponseMapLock = new();
 
         private ushort port;
 
@@ -44,9 +42,9 @@ namespace Dns
         {
             _resolver = resolver;
 
-            _udpListener = new UdpListener();
+            _udpListener = new();
 
-            _udpListener.Initialize(this.port);
+            _udpListener.Initialize(port);
             _udpListener.OnRequest += ProcessUdpRequest;
 
             _defaultDns = GetDefaultDNS().ToArray();
@@ -81,7 +79,7 @@ namespace Dns
                     {
                         Console.WriteLine(
                             "{0} asked for {1} {2} {3}",
-                            remoteEndPoint.ToString(),
+                            remoteEndPoint,
                             question.Name,
                             question.Class,
                             question.Type
@@ -96,14 +94,14 @@ namespace Dns
                                 message.RA = false;
                                 message.AnswerCount++;
                                 message.Answers.Add(
-                                    new ResourceRecord
+                                    new()
                                     {
                                         Name = question.Name,
                                         Class = ResourceClass.IN,
                                         Type = ResourceType.PTR,
                                         TTL = 3600,
                                         DataLength = 0xB,
-                                        RData = new DomainNamePointRData() { Name = "localhost" }
+                                        RData = new DomainNamePointRData { Name = "localhost" }
                                     }
                                 );
                             }
@@ -123,7 +121,7 @@ namespace Dns
                             {
                                 message.AnswerCount++;
                                 message.Answers.Add(
-                                    new ResourceRecord
+                                    new()
                                     {
                                         Name = question.Name,
                                         Class = ResourceClass.IN,
@@ -146,7 +144,7 @@ namespace Dns
                             message.AnswerCount = 0;
                             message.Answers.Clear();
 
-                            var soaResourceData = new StatementOfAuthorityRData()
+                            var soaResourceData = new StatementOfAuthorityRData
                             {
                                 PrimaryNameServer = Environment.MachineName,
                                 ResponsibleAuthoritativeMailbox = "stephbu." + Environment.MachineName,
@@ -229,7 +227,7 @@ namespace Dns
 	                            message.WriteToStream(responseStream);
 	                            Interlocked.Increment(ref _responses);
 
-                                    Console.WriteLine("{0} answered {1} {2} {3} to {4}", remoteEndPoint.ToString(), message.Questions[0].Name, message.Questions[0].Class, message.Questions[0].Type, ep.ToString());
+                                    Console.WriteLine("{0} answered {1} {2} {3} to {4}", remoteEndPoint, message.Questions[0].Name, message.Questions[0].Class, message.Questions[0].Type, ep);
 
 	                            SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, ep);
                             }

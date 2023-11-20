@@ -52,14 +52,14 @@ namespace Dns.ZoneProvider
             var fileNameFilter = Path.GetFileName(filename);
 
             Filename = filename;
-            _fileWatcher = new FileSystemWatcher(directory, fileNameFilter); 
+            _fileWatcher = new(directory, fileNameFilter); 
 
             _fileWatcher.Created += (s, e) => OnCreated(s, e);
             _fileWatcher.Changed += (s, e) => OnChanged(s, e);
             _fileWatcher.Renamed += (s, e) => OnRenamed(s, e);
             _fileWatcher.Deleted += (s, e) => OnDeleted(s, e);
 
-            _timer = new Timer(OnTimer);
+            _timer = new(OnTimer);
 
             _fileWatcher.Created += FileChange;
             _fileWatcher.Changed += FileChange;

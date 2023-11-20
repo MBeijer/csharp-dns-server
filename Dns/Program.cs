@@ -1,35 +1,33 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="Program.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Threading;
 using Dns.Config;
+using Dns.ZoneProvider;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Ninject;
 
 namespace Dns
 {
-    using System;
-    using System.IO;
-    using System.Linq;
-    using System.Net;
-    using System.Threading;
-    using Dns.ZoneProvider.AP;
-
-    using Ninject;
-    using Microsoft.Extensions.Configuration;
-
     public class Program
     {
-        private static IServiceProvider _services; 
+        private static IServiceProvider _services;
         public Program(IServiceProvider services)
         {
             _services = services;
         }
-        
+
         private static readonly IKernel Container = new StandardKernel();
 
-        private static ZoneProvider.BaseZoneProvider _zoneProvider; // reloads Zones from machineinfo.csv changes
+        private static BaseZoneProvider _zoneProvider; // reloads Zones from machineinfo.csv changes
         private static SmartZoneResolver _zoneResolver; // resolver and delegated lookup for unsupported zones;
         private static DnsServer _dnsServer; // resolver and delegated lookup for unsupported zones;
         private static HttpServer _httpServer;
@@ -50,25 +48,21 @@ namespace Dns
 
             var appConfig = _services.GetService<AppConfig>();
             var configuration = _services.GetService<IConfiguration>();
-            
-            Container.Bind<ZoneProvider.BaseZoneProvider>().To(ByName(appConfig.Server.Zone.Provider));
+
+            Container.Bind<BaseZoneProvider>().To(ByName(appConfig.Server.Zone.Provider));
             var zoneProviderConfig = configuration.GetSection("zoneprovider");
-            _zoneProvider = Container.Get<ZoneProvider.BaseZoneProvider>();
+            _zoneProvider = Container.Get<BaseZoneProvider>();
             _zoneProvider.Initialize(_services, zoneProviderConfig, appConfig.Server.Zone.Name);
 
-            _zoneResolver = new SmartZoneResolver();
+            _zoneResolver = new();
             _zoneResolver.SubscribeTo(_zoneProvider);
 
-            _dnsServer = new DnsServer(appConfig.Server.DnsListener.Port);
+            _dnsServer = new(appConfig.Server.DnsListener.Port);
 
-            _httpServer = new HttpServer();
+            _httpServer = new();
 
             _dnsServer.Initialize(_zoneResolver);
 
-            _zoneProvider.Start(ct);
-            _dnsServer.Start(ct);
-
-            /*
             if(appConfig.Server.WebServer.Enabled)
             {
                 _httpServer.Initialize($"http://+:{appConfig.Server.WebServer.Port}/");
@@ -76,7 +70,8 @@ namespace Dns
                 _httpServer.OnHealthProbe += _httpServer_OnHealthProbe;
                 _httpServer.Start(ct);
             }
-            */
+            _zoneProvider.Start(ct);
+            _dnsServer.Start(ct);
 
             ct.WaitHandle.WaitOne();
 
@@ -124,5 +119,6 @@ namespace Dns
         }
 
         private static Type ByName(string name) => AppDomain.CurrentDomain.GetAssemblies().Reverse().Select(assembly => assembly.GetType(name)).FirstOrDefault(tt => tt != null);
+
     }
 }

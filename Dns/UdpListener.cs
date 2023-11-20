@@ -4,15 +4,15 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Dns
 {
-    using System;
-    using System.Net;
-    using System.Net.Sockets;
-    using System.Runtime.CompilerServices;
-    using System.Threading;
-    using System.Threading.Tasks;
-
     public delegate void OnRequestHandler(byte[] buffer, EndPoint remoteEndPoint);
 
     public class UdpListener
@@ -22,7 +22,7 @@ namespace Dns
 
         public void Initialize(ushort port = 53)
         {
-            _listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            _listener = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             var ep = new IPEndPoint(IPAddress.Any, port);
             _listener.Bind(ep);
         }

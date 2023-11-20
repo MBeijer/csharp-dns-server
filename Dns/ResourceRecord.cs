@@ -4,11 +4,11 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using System.IO;
+
 namespace Dns
 {
-    using System;
-    using System.IO;
-
     public class ResourceRecord
     {
         public string Name { get; set; }
@@ -22,15 +22,15 @@ namespace Dns
         /// <param name="stream"></param>
         public void WriteToStream(Stream stream)
         {
-            this.Name.WriteToStream(stream);
-            ((ushort)(this.Type)).SwapEndian().WriteToStream(stream);
-            ((ushort)(this.Class)).SwapEndian().WriteToStream(stream);
-            this.TTL.SwapEndian().WriteToStream(stream);
+            Name.WriteToStream(stream);
+            ((ushort)(Type)).SwapEndian().WriteToStream(stream);
+            ((ushort)(Class)).SwapEndian().WriteToStream(stream);
+            TTL.SwapEndian().WriteToStream(stream);
 
-            if(this.RData != null)
+            if(RData != null)
             {
-                this.RData.Length.SwapEndian().WriteToStream(stream);
-                this.RData.WriteToStream(stream);
+                RData.Length.SwapEndian().WriteToStream(stream);
+                RData.WriteToStream(stream);
             }
             else
             {
@@ -42,15 +42,15 @@ namespace Dns
 
         public void Dump()
         {
-            Console.WriteLine("ResourceName:   {0}", this.Name);
-            Console.WriteLine("ResourceType:   {0}", this.Type);
-            Console.WriteLine("ResourceClass:  {0}", this.Class);
-            Console.WriteLine("TimeToLive:     {0}", this.TTL);
-            Console.WriteLine("DataLength:     {0}", this.DataLength);
+            Console.WriteLine("ResourceName:   {0}", Name);
+            Console.WriteLine("ResourceType:   {0}", Type);
+            Console.WriteLine("ResourceClass:  {0}", Class);
+            Console.WriteLine("TimeToLive:     {0}", TTL);
+            Console.WriteLine("DataLength:     {0}", DataLength);
 
-            if (this.RData != null)
+            if (RData != null)
             {
-                this.RData.Dump();
+                RData.Dump();
             }
         }
     }

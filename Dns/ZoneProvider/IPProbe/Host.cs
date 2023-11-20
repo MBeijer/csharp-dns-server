@@ -1,7 +1,7 @@
-﻿namespace Dns.ZoneProvider.IPProbe
-{
-    using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
+namespace Dns.ZoneProvider.IPProbe
+{
     internal class Host
     {
         internal string Name { get; set; }

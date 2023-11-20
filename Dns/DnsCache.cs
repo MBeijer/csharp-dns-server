@@ -1,18 +1,18 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="DnsCache.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
+using Dns.Contracts;
+using Microsoft.Extensions.Caching.Memory;
+
 namespace Dns
 {
-    using System;
-    using Microsoft.Extensions.Caching.Memory;
-    using Dns.Contracts;
-
     public class DnsCache : IDnsCache
     {
-        private readonly MemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
+        private readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
         byte[] IDnsCache.Get(string key)
         {
