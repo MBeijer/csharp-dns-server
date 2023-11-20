@@ -47,23 +47,23 @@ namespace Dns.ZoneProvider.IPProbe
 
             while (!ct.IsCancellationRequested)
             {
-                DateTime batchStartTime = DateTime.UtcNow;
+                var batchStartTime = DateTime.UtcNow;
 
                 Parallel.ForEach(state.Targets, options, probe =>
                 {
-                    DateTime startTime = DateTime.UtcNow;
-                    bool result = probe.ProbeFunction(probe.Address, probe.TimeoutMilliseconds);
-                    TimeSpan duration = DateTime.UtcNow - startTime;
+                    var startTime = DateTime.UtcNow;
+                    var result = probe.ProbeFunction(probe.Address, probe.TimeoutMilliseconds);
+                    var duration = DateTime.UtcNow - startTime;
                     probe.AddResult(new ProbeResult { StartTime = startTime, Duration = duration, Available = result });
                 });
 
                 Run(() => GetZone(state), ct).ContinueWith(t => Notify(t.Result), ct);
 
-                TimeSpan batchDuration = DateTime.UtcNow - batchStartTime;
+                var batchDuration = DateTime.UtcNow - batchStartTime;
                 Console.WriteLine("Probe batch duration {0}", batchDuration);
 
                 // wait remainder of Polling Interval
-                int remainingWaitTimeout = (this.options.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
+                var remainingWaitTimeout = (this.options.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
                 if(remainingWaitTimeout > 0) ct.WaitHandle.WaitOne(remainingWaitTimeout);
             }
         }
@@ -83,16 +83,16 @@ namespace Dns.ZoneProvider.IPProbe
 
         internal static IEnumerable<ZoneRecord>GetZoneRecords(State state)
         {
-            foreach(Host host in state.Hosts)
+            foreach(var host in state.Hosts)
             {
-                IEnumerable<IPAddress> availableAddresses = host.AddressProbes
-                    .Where(addr => addr.IsAvailable)
-                    .Select(addr => addr.Address);
+                var availableAddresses = host.AddressProbes
+                                             .Where(addr => addr.IsAvailable)
+                                             .Select(addr => addr.Address);
 
                 if(host.AvailabilityMode == AvailabilityMode.First) availableAddresses = availableAddresses.Take(1);
 
                 // materialize query
-                IPAddress[] addresses = availableAddresses.ToArray();
+                var addresses = availableAddresses.ToArray();
 
                 if (addresses.Length == 0)
                 {
@@ -114,7 +114,7 @@ namespace Dns.ZoneProvider.IPProbe
 
         private Zone GetZone(State state)
         {
-            IEnumerable<ZoneRecord> zoneRecords = GetZoneRecords(state);
+            var zoneRecords = GetZoneRecords(state);
 
             Zone zone = new() { Suffix = Zone, Serial = _serial };
             zone.Initialize(zoneRecords);

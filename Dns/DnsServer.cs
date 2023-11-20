@@ -77,7 +77,7 @@ namespace Dns
             {
                 if (message.Questions.Count > 0)
                 {
-                    foreach (Question question in message.Questions)
+                    foreach (var question in message.Questions)
                     {
                         Console.WriteLine(
                             "{0} asked for {1} {2} {3}",
@@ -119,7 +119,7 @@ namespace Dns
                             message.AA = true;
                             message.RA = false;
                             message.RCode = (byte)RCode.NOERROR;
-                            foreach (IPAddress address in entry.AddressList)
+                            foreach (var address in entry.AddressList)
                             {
                                 message.AnswerCount++;
                                 message.Answers.Add(
@@ -166,13 +166,13 @@ namespace Dns
                             message.NameServerCount++;
                             message.Authorities.Add(soaResourceRecord);
                         }
-                        // 
+                        //
                         else // Referral to regular DC DNS servers
                         {
                             // store current IP address and Query ID.
                             try
                             {
-                                string key = GetKeyName(message);
+                                var key = GetKeyName(message);
                                 _requestResponseMapLock.EnterWriteLock();
                                 _requestResponseMap.Add(key, remoteEndPoint);
                             }
@@ -188,7 +188,7 @@ namespace Dns
                         if (message.IsQuery())
                         {
                             // send to upstream DNS servers
-                            foreach (IPAddress dnsServer in _defaultDns)
+                            foreach (var dnsServer in _defaultDns)
                             {
                                 SendUdp(
                                     responseStream.GetBuffer(),
@@ -209,7 +209,7 @@ namespace Dns
             else
             {
                 // message is response to a delegated query
-                string key = GetKeyName(message);
+                var key = GetKeyName(message);
                 try
                 {
                     _requestResponseMapLock.EnterUpgradeableReadLock();
@@ -274,14 +274,14 @@ namespace Dns
         // ReSharper disable once InconsistentNaming
         private static IEnumerable<IPAddress> GetDefaultDNS()
         {
-            NetworkInterface[] adapters  = NetworkInterface.GetAllNetworkInterfaces();
-            foreach (NetworkInterface adapter in adapters)
+            var adapters  = NetworkInterface.GetAllNetworkInterfaces();
+            foreach (var adapter in adapters)
             {
 
-                IPInterfaceProperties adapterProperties = adapter.GetIPProperties();
-                IPAddressCollection dnsServers = adapterProperties.DnsAddresses;
+                var adapterProperties = adapter.GetIPProperties();
+                var dnsServers = adapterProperties.DnsAddresses;
 
-                foreach (IPAddress dns in dnsServers)
+                foreach (var dns in dnsServers)
                 {
                     Console.WriteLine("Discovered DNS: ", dns);
 
@@ -295,7 +295,7 @@ namespace Dns
         {
             writer.WriteLine("DNS Server Status<br/>");
             writer.Write("Default Nameservers:");
-            foreach (IPAddress dns in _defaultDns)
+            foreach (var dns in _defaultDns)
             {
                 writer.WriteLine(dns);
             }

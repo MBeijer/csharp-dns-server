@@ -22,7 +22,7 @@ namespace Dns.ZoneProvider.AP
                 return null;
             }
 
-            CsvParser parser = CsvParser.Create(Filename);
+            var parser = CsvParser.Create(Filename);
             var machines = parser.Rows.Select(row => new {MachineFunction = row["MachineFunction"], StaticIP = row["StaticIP"], MachineName = row["MachineName"]}).ToArray();
 
             var zoneRecords = machines

@@ -23,13 +23,13 @@ namespace Dns
 
         public static ushort SwapEndian(this ushort val)
         {
-            ushort value = (ushort) ((val << 8) | (val >> 8));
+            var value = (ushort) ((val << 8) | (val >> 8));
             return value;
         }
 
         public static uint SwapEndian(this uint val)
         {
-            uint value = (val << 24) | ((val << 8) & 0x00ff0000) | ((val >> 8) & 0x0000ff00) | (val >> 24);
+            var value = (val << 24) | ((val << 8) & 0x00ff0000) | ((val >> 8) & 0x0000ff00) | (val >> 24);
             return value;
         }
 
@@ -42,13 +42,13 @@ namespace Dns
                 str = "";
             }
 
-            using (MemoryStream stream = new MemoryStream(str.Length + 2))
+            using (var stream = new MemoryStream(str.Length + 2))
             {
-                string[] segments = str.Split(new char[] {'.'});
-                foreach (string segment in segments)
+                var segments = str.Split(new char[] {'.'});
+                foreach (var segment in segments)
                 {
                     stream.WriteByte((byte)segment.Length);
-                    foreach (char currentChar in segment)
+                    foreach (var currentChar in segment)
                     {
                         stream.WriteByte((byte)currentChar);
                     }
@@ -63,11 +63,11 @@ namespace Dns
         {
             if (!string.IsNullOrWhiteSpace(str))
             {
-                string[] segments = str.Split(new char[] { segmentSplit });
-                foreach (string segment in segments)
+                var segments = str.Split(new char[] { segmentSplit });
+                foreach (var segment in segments)
                 {
                     stream.WriteByte((byte)segment.Length);
-                    foreach (char currentChar in segment)
+                    foreach (var currentChar in segment)
                     {
                         stream.WriteByte((byte)currentChar);
                     }
@@ -83,7 +83,7 @@ namespace Dns
 	        if (string.IsNullOrWhiteSpace(str)) return;
 
 	        stream.WriteByte((byte)str.Length);
-	        foreach (char currentChar in str)
+	        foreach (var currentChar in str)
 	        {
 		        stream.WriteByte((byte)currentChar);
 	        }
@@ -91,7 +91,7 @@ namespace Dns
 
         public static void WriteToStream(this IEnumerable<byte> chars, Stream stream)
         {
-	        foreach (byte currentChar in chars)
+	        foreach (var currentChar in chars)
 	        {
 		        stream.WriteByte(currentChar);
 	        }
@@ -106,7 +106,7 @@ namespace Dns
 
         public static string IP(long ipLong)
         {
-            StringBuilder b = new StringBuilder();
+            var b = new StringBuilder();
             long tempLong, temp;
 
             tempLong = ipLong;

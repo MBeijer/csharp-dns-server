@@ -23,7 +23,7 @@ namespace Dns
         public void Initialize(ushort port = 53)
         {
             _listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            IPEndPoint ep = new IPEndPoint(IPAddress.Any, port);
+            var ep = new IPEndPoint(IPAddress.Any, port);
             _listener.Bind(ep);
         }
 
@@ -43,7 +43,7 @@ namespace Dns
                     while (true)
                     {
                         await _listener.ReceiveFromAsync(awaitable);
-                        int bytesRead = args.BytesTransferred;
+                        var bytesRead = args.BytesTransferred;
                         if (bytesRead <= 0)
                             break;
 
@@ -51,12 +51,12 @@ namespace Dns
                         {
                             var buffer = new byte[bytesRead];
                             Buffer.BlockCopy(args.Buffer, 0, buffer, 0, buffer.Length);
-                            Task process = Task.Run(() => OnRequest(buffer, args.RemoteEndPoint));
+                            var process = Task.Run(() => OnRequest(buffer, args.RemoteEndPoint));
                         }
                         else
                         {
                             // defaults to console dump if no listener is bound
-                            Task dump = Task.Run(() => ProcessReceiveFrom(args));
+                            var dump = Task.Run(() => ProcessReceiveFrom(args));
                         }
                     }
                 }
@@ -72,7 +72,7 @@ namespace Dns
 
         public async void SendToAsync(SocketAsyncEventArgs args)
         {
-            SocketAwaitable awaitable = new SocketAwaitable(args);
+            var awaitable = new SocketAwaitable(args);
             await _listener.SendToAsync(awaitable);
         }
 
@@ -97,7 +97,7 @@ namespace Dns
             m_eventArgs = eventArgs ?? throw new ArgumentNullException("eventArgs");
             eventArgs.Completed += delegate
                                    {
-                                       Action prev = m_continuation ?? Interlocked.CompareExchange(ref m_continuation, SENTINEL, null);
+                                       var prev = m_continuation ?? Interlocked.CompareExchange(ref m_continuation, SENTINEL, null);
                                        prev?.Invoke();
                                    };
         }

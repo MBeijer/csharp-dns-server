@@ -39,7 +39,7 @@ namespace Dns
         public void Initialize(params string[] prefixes)
         {
             _listener = new HttpListener();
-            foreach (string prefix in prefixes)
+            foreach (var prefix in prefixes)
             {
                 _listener.Prefixes.Add(prefix);
             }
@@ -54,7 +54,7 @@ namespace Dns
             {
                 try
                 {
-                    HttpListenerContext context = await this._listener.GetContextAsync();
+                    var context = await this._listener.GetContextAsync();
                     var processRequest = Task.Run(() => this.ProcessRequest(context));
                 }
                 catch (HttpListenerException ex)
@@ -120,7 +120,7 @@ namespace Dns
 
             context.Response.OutputStream.Dispose();
 
-            int statusCode = context.Response.StatusCode;
+            var statusCode = context.Response.StatusCode;
 
             if ((200 <= statusCode) && (statusCode < 300)) _request200++;
             if ((300 <= statusCode) && (statusCode < 400)) _request300++;
@@ -144,7 +144,7 @@ namespace Dns
                 context.Response.StatusCode = 200;
                 context.Response.ContentEncoding = System.Text.Encoding.UTF8;
                 context.Response.ContentType = "text/html";
-                using (TextWriter writer = context.Response.OutputStream.CreateWriter())
+                using (var writer = context.Response.OutputStream.CreateWriter())
                 {
 
                 }

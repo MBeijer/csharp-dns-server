@@ -53,7 +53,7 @@ namespace Dns.Utility
                     {
                         // is a comment
                         if (_currentLine.Length <= 1 || !_currentLine[1..].StartsWith("Fields")) continue;
-                        string[] fieldDeclaration = _currentLine.Split(COLONDELIMITER);
+                        var fieldDeclaration = _currentLine.Split(COLONDELIMITER);
                         _fields = fieldDeclaration.Length != 2 ? null : fieldDeclaration[1].Trim().Split(CSVDELIMITER);
                     }
                     else
@@ -75,7 +75,7 @@ namespace Dns.Utility
             if (!File.Exists(filePath))
                 throw new FileNotFoundException("File Not Found", filePath);
 
-            CsvParser result = new CsvParser(filePath);
+            var result = new CsvParser(filePath);
             return result;
         }
     }

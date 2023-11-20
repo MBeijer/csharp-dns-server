@@ -14,13 +14,13 @@ namespace Dns
     {
         public int LoadFrom(byte[] bytes, int offset, ushort count)
         {
-            int currentOffset = offset;
+            var currentOffset = offset;
 
-            for (int index = 0; index < count; index++)
+            for (var index = 0; index < count; index++)
             {
                 // TODO: move this code into the Resource object
 
-                ResourceRecord resourceRecord = new ResourceRecord();
+                var resourceRecord = new ResourceRecord();
                 //// extract the domain, question type, question class and Ttl
 
                 resourceRecord.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
@@ -69,7 +69,7 @@ namespace Dns
                 Add(resourceRecord);
             }
 
-            int bytesRead = currentOffset - offset;
+            var bytesRead = currentOffset - offset;
             return bytesRead;
         }
 

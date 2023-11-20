@@ -20,7 +20,7 @@ namespace Dns
         public abstract ushort Length { get; }
 
     }
-	
+
 	// ReSharper disable once InconsistentNaming
 	public class GenericRData : RData
 	{
@@ -30,7 +30,7 @@ namespace Dns
 		{
 			_bytes = new byte[size];
 
-			for (int i = 0; i < size; i++)
+			for (var i = 0; i < size; i++)
 				_bytes[i] = bytes[offset + i];
 		}
 
@@ -112,7 +112,7 @@ namespace Dns
 
 	    public override void WriteToStream(Stream stream)
 	    {
-		    byte[] bytes = BitConverter.GetBytes(_preference.SwapEndian());
+		    var bytes = BitConverter.GetBytes(_preference.SwapEndian());
 
 		    stream.Write(bytes, 0, bytes.Length);
 		    _name.WriteToStream(stream);
@@ -135,10 +135,10 @@ namespace Dns
 	    private ANameRData(IReadOnlyList<byte> bytes, int offset, int size)
 	    {
 		    _type = size == 4 ? ResourceType.A : ResourceType.AAAA;
-		    byte[] addressBytes = new byte[size];// = BitConverter.(bytes, offset);
+		    var addressBytes = new byte[size];// = BitConverter.(bytes, offset);
 
-		    int j = 0;
-		    for (int i = offset; i < offset + size; i++)
+		    var j = 0;
+		    for (var i = offset; i < offset + size; i++)
 		    {
 			    addressBytes[j] = bytes[i];
 			    j++;
@@ -151,7 +151,7 @@ namespace Dns
 
         public override void WriteToStream(Stream stream)
         {
-            byte[] bytes = Address.GetAddressBytes();
+            var bytes = Address.GetAddressBytes();
             stream.Write(bytes, 0, bytes.Length);
         }
 
@@ -231,7 +231,7 @@ namespace Dns
 
         public static CNameRData Parse(byte[] bytes, int offset, int size)
         {
-            CNameRData cname = new CNameRData();
+            var cname = new CNameRData();
             cname.Name = DnsProtocol.ReadString(bytes, ref offset);
             return cname;
         }
@@ -253,7 +253,7 @@ namespace Dns
 
         public static DomainNamePointRData Parse(byte[] bytes, int offset, int size)
         {
-            DomainNamePointRData domainName = new DomainNamePointRData();
+            var domainName = new DomainNamePointRData();
             domainName.Name = DnsProtocol.ReadString(bytes, ref offset);
             return domainName;
         }
@@ -283,7 +283,7 @@ namespace Dns
 
         public static NameServerRData Parse(byte[] bytes, int offset, int size)
         {
-            NameServerRData nsRdata = new NameServerRData();
+            var nsRdata = new NameServerRData();
             nsRdata.Name = DnsProtocol.ReadString(bytes, ref offset);
             return nsRdata;
         }
@@ -321,7 +321,7 @@ namespace Dns
 
         public static StatementOfAuthorityRData Parse(byte[] bytes, int offset, int size)
         {
-            StatementOfAuthorityRData soaRdata = new StatementOfAuthorityRData();
+            var soaRdata = new StatementOfAuthorityRData();
             soaRdata.PrimaryNameServer = DnsProtocol.ReadString(bytes, ref offset);
             soaRdata.ResponsibleAuthoritativeMailbox = DnsProtocol.ReadString(bytes, ref offset);
             soaRdata.Serial = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian();

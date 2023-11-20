@@ -10,11 +10,11 @@ namespace Dns.ZoneProvider.IPProbe
 
         internal State(IPProbeProviderOptions options)
         {
-            foreach (HostOptions host in options.Hosts)
+            foreach (var host in options.Hosts)
             {
                 Host hostResult = new() { Name = host.Name, AvailabilityMode = host.AvailabilityMode };
 
-                foreach (string address in host.Ip)
+                foreach (var address in host.Ip)
                 {
                     Target addressProbe = new()
                     {
@@ -23,7 +23,7 @@ namespace Dns.ZoneProvider.IPProbe
                         TimeoutMilliseconds = host.Timeout,
                     };
 
-                    if (Targets.TryGetValue(addressProbe, out Target preExisting))
+                    if (Targets.TryGetValue(addressProbe, out var preExisting))
                     {
                         hostResult.AddressProbes.Add(preExisting);
                     }

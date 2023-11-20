@@ -10,9 +10,9 @@ namespace DnsTest
         [Fact]
         public void Test1()
         {
-            byte[] bytes = BitConverter.GetBytes(0xAA);
+            var bytes = BitConverter.GetBytes(0xAA);
 
-            BitPacker packer = new BitPacker(bytes);
+            var packer = new BitPacker(bytes);
             Assert.False(packer.GetBoolean());
             Assert.True(packer.GetBoolean());
             Assert.False(packer.GetBoolean());
@@ -94,7 +94,7 @@ namespace DnsTest
         [Fact]
         public void TestEndian()
         {
-            uint intValue = 0xAABBCCDD;
+            var intValue = 0xAABBCCDD;
             BitPacker.SwapEndian(ref intValue);
             Assert.Equal(0xDDCCBBAA, intValue);
 

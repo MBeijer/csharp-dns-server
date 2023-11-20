@@ -19,14 +19,14 @@ namespace Dns
 
         public static ushort ReadUshort(byte[] bytes, ref int offset)
         {
-            ushort ret = BitConverter.ToUInt16(bytes, offset);
+            var ret = BitConverter.ToUInt16(bytes, offset);
             offset += sizeof (ushort);
             return ret;
         }
 
         public static uint ReadUint(byte[] bytes, ref int offset)
         {
-            uint ret = BitConverter.ToUInt32(bytes, offset);
+            var ret = BitConverter.ToUInt32(bytes, offset);
             offset += sizeof (uint);
             return ret;
         }
@@ -34,8 +34,8 @@ namespace Dns
 
         public static string ReadString(byte[] bytes, ref int currentOffset)
         {
-            StringBuilder resourceName = new StringBuilder();
-            int compressionOffset = -1;
+            var resourceName = new StringBuilder();
+            var compressionOffset = -1;
             while (true)
             {
                 // get segment length or detect termination of segments

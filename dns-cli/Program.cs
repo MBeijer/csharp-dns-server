@@ -29,12 +29,12 @@ namespace DnsCli
 
             if(args.Length == 0) args = new[] { "./appsettings.json" };
 
-            IHostBuilder builder = Host.CreateDefaultBuilder().ConfigureServices((hostContext, services) =>
+            var builder = Host.CreateDefaultBuilder().ConfigureServices((hostContext, services) =>
             {
                 services.AddAutoMapper(typeof(Program).Assembly);
                 services.AddSingleton(services);
                 services.AddSingleton<Dns.Program>();
-				
+
                 //string homePath = Environment.OSVersion.Platform is PlatformID.Unix or PlatformID.MacOSX ? Environment.GetEnvironmentVariable("HOME") + "/.config/tbnotify" : Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 //_settings = Settings.CreateConfig($"{homePath}{Path.DirectorySeparatorChar}{arguments.ConfigurationFile}").Result;
 
@@ -44,14 +44,14 @@ namespace DnsCli
                     .AddJsonFile(args[0], true, true)
                     .Build();
                 Console.WriteLine("Done!");
-                
-                Dns.Config.AppConfig appConfig = configuration.Get<Dns.Config.AppConfig>();
-                
+
+                var appConfig = configuration.Get<Dns.Config.AppConfig>();
+
                 services.AddSingleton(configuration);
                 services.AddSingleton(appConfig);
                 services.AddTransient<TraefikClientHandler>();
                 services.AddHttpClient<TraefikClientService>().ConfigurePrimaryHttpMessageHandler<TraefikClientHandler>();
-								
+
                 services.AddLogging(
                     configure =>
                     {
@@ -69,7 +69,7 @@ namespace DnsCli
                 );
                 services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
             }).UseConsoleLifetime();
-            
+
             builder.ConfigureHostConfiguration(config =>
             {
                 if (args != null)
@@ -77,34 +77,36 @@ namespace DnsCli
                     // e.g.: dotnet run --environment "Staging"
                     config.AddCommandLine(args);
             }).ConfigureAppConfiguration((context, builder) => { builder.SetBasePath(AppContext.BaseDirectory).AddEnvironmentVariables(); });
-            
-            
-            IHost host = builder.Build();
 
-            using IServiceScope serviceScope = host.Services.CreateScope();
+
+            var host = builder.Build();
+
+            using var serviceScope = host.Services.CreateScope();
             {
-                IServiceProvider services = serviceScope.ServiceProvider;
+                var services = serviceScope.ServiceProvider;
 
                 try
                 {
-                    Dns.Program myService = services.GetRequiredService<Dns.Program>();
-					
+                    var myService = services.GetRequiredService<Dns.Program>();
+
                     //myService?.Init(arguments);
 
                     while (myService is { Running: true })
                     {
-						
+
                         /*await*/ myService?.Run(args[0], Cts.Token);
                         //Thread.Sleep(Engine.DefaultTicks*1000);
                     }
+
+                    await Task.CompletedTask.ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error Occured: {ex}");
                 }
             }
-            
-            
+
+
 
             ExitTimeout.Set();
 

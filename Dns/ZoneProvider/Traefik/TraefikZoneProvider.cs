@@ -18,7 +18,7 @@ namespace Dns.ZoneProvider.Traefik
     /// Various monitoring strategies are implemented to detect IP health.
     /// Health IP addresses are added to the Zone.
     /// </summary>
-    public class TraefikZoneProvider : BaseZoneProvider
+    public partial class TraefikZoneProvider : BaseZoneProvider
     {
         private static IServiceProvider _services;
         //private IPProbeProviderOptions options;
@@ -56,16 +56,16 @@ namespace Dns.ZoneProvider.Traefik
 
             while (!ct.IsCancellationRequested)
             {
-                DateTime batchStartTime = DateTime.UtcNow;
+                var batchStartTime = DateTime.UtcNow;
 
                 Run(() => GetZone(), ct).ContinueWith(t => Notify(t.Result), ct);
 
-                TimeSpan batchDuration = DateTime.UtcNow - batchStartTime;
+                var batchDuration = DateTime.UtcNow - batchStartTime;
                 _services.GetService<ILogger<TraefikZoneProvider>>()?.LogInformation($"Probe batch duration {batchDuration}");
 
                 ct.WaitHandle.WaitOne(10 * 1000);
             }
-            
+
         }
 
         public override void Dispose()
@@ -83,11 +83,11 @@ namespace Dns.ZoneProvider.Traefik
 
         private static async Task<IEnumerable<ZoneRecord>> GetZoneRecords(/*State state*/)
         {
-            TraefikClientService traefik = _services.GetService<TraefikClientService>();
+            var traefik = _services.GetService<TraefikClientService>();
 
             if (traefik == null) return null;
             return  (from host in await traefik.GetRoutes()
-            where (host.Provider.Equals("docker", StringComparison.InvariantCultureIgnoreCase) || host.EntryPoints.Contains("web")) && host.Tls == null && host.Rule.Contains(Zone) 
+            where (host.Provider.Equals("docker", StringComparison.InvariantCultureIgnoreCase) || host.EntryPoints.Contains("web")) && host.Tls == null && host.Rule.Contains(Zone)
             select new ZoneRecord
             {
                 Host = CreateHostName(host),
@@ -100,16 +100,16 @@ namespace Dns.ZoneProvider.Traefik
 
         private static string CreateHostName(Route host)
         {
-            Regex regex = new(@"([a-zA-Z0-9]+)\(\`([a-zA-Z0-9.\']*)\`\)(\ |\|\||\t|\r|\s)*", RegexOptions.IgnoreCase);
+            var regex = MyRegex();
 
-            MatchCollection matches = regex.Matches(host.Rule);
+            var matches = regex.Matches(host.Rule);
 
             return matches.Select(g => g.Groups[2]).FirstOrDefault(x => x.Value.Contains(Zone))?.Value;
         }
 
         private Zone GetZone(/*State state*/)
         {
-            IEnumerable<ZoneRecord> zoneRecords = GetZoneRecords(/*state*/).Result;
+            var zoneRecords = GetZoneRecords(/*state*/).Result;
 
             Zone zone = new() { Suffix = Zone, Serial = _serial };
             zone.Initialize(zoneRecords);
@@ -118,5 +118,8 @@ namespace Dns.ZoneProvider.Traefik
             _serial++;
             return zone;
         }
+
+        [GeneratedRegex(@"([a-zA-Z0-9]+)\(\`([a-zA-Z0-9.\-_\']*)\`\)(\ |\|\||\t|\r|\s)*", RegexOptions.IgnoreCase, "en-US")]
+        private static partial Regex MyRegex();
     }
 }

@@ -27,7 +27,7 @@ namespace Dns.ZoneProvider.IPProbe
             Console.WriteLine("Ping: pinging {0}", address);
             Ping sender = new();
             PingOptions options = new(64, true);
-            PingReply pingReply = sender.Send(address, timeout);
+            var pingReply = sender.Send(address, timeout);
             return pingReply?.Status == IPStatus.Success;
         }
 

@@ -48,11 +48,11 @@ namespace Dns
                 throw new FileNotFoundException(null, configFile);
             }
 
-            AppConfig appConfig = _services.GetService<AppConfig>();
-            IConfiguration configuration = _services.GetService<IConfiguration>();
+            var appConfig = _services.GetService<AppConfig>();
+            var configuration = _services.GetService<IConfiguration>();
             
             Container.Bind<ZoneProvider.BaseZoneProvider>().To(ByName(appConfig.Server.Zone.Provider));
-            IConfigurationSection zoneProviderConfig = configuration.GetSection("zoneprovider");
+            var zoneProviderConfig = configuration.GetSection("zoneprovider");
             _zoneProvider = Container.Get<ZoneProvider.BaseZoneProvider>();
             _zoneProvider.Initialize(_services, zoneProviderConfig, appConfig.Server.Zone.Name);
 
@@ -88,13 +88,13 @@ namespace Dns
 
         private static void _httpServer_OnProcessRequest(HttpListenerContext context)
         {
-            string rawUrl = context.Request.RawUrl;
+            var rawUrl = context.Request.RawUrl;
             switch (rawUrl)
             {
                 case "/dump/dnsresolver":
                 {
                     context.Response.Headers.Add("Content-Type","text/html");
-                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
+                    using var writer = context.Response.OutputStream.CreateWriter();
                     _zoneResolver.DumpHtml(writer);
 
                     break;
@@ -102,21 +102,21 @@ namespace Dns
                 case "/dump/httpserver":
                 {
                     context.Response.Headers.Add("Content-Type", "text/html");
-                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
+                    using var writer = context.Response.OutputStream.CreateWriter();
                     _httpServer.DumpHtml(writer);
                     break;
                 }
                 case "/dump/dnsserver":
                 {
                     context.Response.Headers.Add("Content-Type", "text/html");
-                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
+                    using var writer = context.Response.OutputStream.CreateWriter();
                     _dnsServer.DumpHtml(writer);
                     break;
                 }
                 case "/dump/zoneprovider":
                 {
                     context.Response.Headers.Add("Content-Type", "text/html");
-                    using TextWriter writer = context.Response.OutputStream.CreateWriter();
+                    using var writer = context.Response.OutputStream.CreateWriter();
                     _httpServer.DumpHtml(writer);
                     break;
                 }

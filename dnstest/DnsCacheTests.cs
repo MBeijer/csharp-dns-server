@@ -20,9 +20,9 @@ namespace DnsTest
         public void Test2() {
             Dns.Contracts.IDnsCache cache = new Dns.DnsCache();
 
-            string key = "sampleCacheKey";
-            byte[] data = Encoding.ASCII.GetBytes("test");
-            Int32 ttl = 10;
+            var key = "sampleCacheKey";
+            var data = Encoding.ASCII.GetBytes("test");
+            var ttl = 10;
 
             cache.Set(key, data, ttl);
             var result = cache.Get(key);

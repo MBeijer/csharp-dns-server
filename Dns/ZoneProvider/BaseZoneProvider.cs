@@ -51,11 +51,11 @@ namespace Dns.ZoneProvider
         /// <param name="zone"></param>
         protected void Notify(Zone zone)
         {
-            int remainingRetries = 3;
+            var remainingRetries = 3;
 
             while (remainingRetries > 0)
             {
-                ParallelLoopResult result = Parallel.ForEach(_observers, observer => observer.OnNext(zone));
+                var result = Parallel.ForEach(_observers, observer => observer.OnNext(zone));
                 if (result.IsCompleted)
                     break;
                 remainingRetries--;
@@ -63,6 +63,6 @@ namespace Dns.ZoneProvider
         }
 
         public abstract void Start(CancellationToken ct);
-        
+
     }
 }

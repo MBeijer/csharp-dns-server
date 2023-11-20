@@ -14,13 +14,13 @@ namespace Dns
     {
         public int LoadFrom(byte[] bytes, int offset, ushort count)
         {
-            int currentOffset = offset;
+            var currentOffset = offset;
 
-            for (int index = 0; index < count; index++)
+            for (var index = 0; index < count; index++)
             {
                 // TODO: move this code into the Question object
 
-                Question question = new Question();
+                var question = new Question();
 
                 question.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
 
@@ -33,18 +33,18 @@ namespace Dns
                 this.Add(question);
             }
 
-            int bytesRead = currentOffset - offset;
+            var bytesRead = currentOffset - offset;
             return bytesRead;
         }
 
         public long WriteToStream(Stream stream)
         {
-            long start = stream.Length;
-            foreach (Question question in this)
+            var start = stream.Length;
+            foreach (var question in this)
             {
                 question.WriteToStream(stream);
             }
-            long end = stream.Length;
+            var end = stream.Length;
             return end - start;
         }
     }

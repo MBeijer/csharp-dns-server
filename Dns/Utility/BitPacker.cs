@@ -22,7 +22,7 @@ namespace Dns.Utility
 		{
 			if (count > 8) throw new ArgumentOutOfRangeException("count");
 
-			int bit = _bitOffset;
+			var bit = _bitOffset;
 
 			if (((bit + count) / 8) > _buffer.Length) throw new ArgumentOutOfRangeException("count");
 
@@ -31,10 +31,10 @@ namespace Dns.Utility
 
 			GenerateInitialOffset(out byteNumber, out bitOffset);
 
-			ushort span = BitConverter.ToUInt16(_buffer, byteNumber);
+			var span = BitConverter.ToUInt16(_buffer, byteNumber);
 
-			int mask = GetMask(count, bitOffset);
-			int value = (span & mask) >> bitOffset;
+			var mask = GetMask(count, bitOffset);
+			var value = (span & mask) >> bitOffset;
 
 			_bitOffset += count;
 			return (byte) value;
@@ -50,7 +50,7 @@ namespace Dns.Utility
 		{
 			if (count > 16) throw new ArgumentOutOfRangeException("count");
 
-			int bit = _bitOffset;
+			var bit = _bitOffset;
 
 			if (((bit + count) / 8) > _buffer.Length) throw new ArgumentOutOfRangeException("count");
 
@@ -67,13 +67,13 @@ namespace Dns.Utility
 			else
 			{
 				// buffer too small - clone bytes into an empty buffer
-				byte[] copy = new byte[8];
+				var copy = new byte[8];
 				Array.Copy(_buffer, byteNumber, copy, byteNumber, _buffer.Length - byteNumber);
 				span = BitConverter.ToUInt32(copy, byteNumber);
 			}
 
-			int mask = GetMask(count, bitOffset);
-			ushort value = (ushort) ((span & mask) >> bitOffset);
+			var mask = GetMask(count, bitOffset);
+			var value = (ushort) ((span & mask) >> bitOffset);
 
 			if (endian == Endian.HiLo) SwapEndian(ref value);
 
@@ -83,7 +83,7 @@ namespace Dns.Utility
 
 		private static int GetMask(int count, ushort bitOffset)
 		{
-			int mask = 0;
+			var mask = 0;
 			for (int index = bitOffset; index < bitOffset + count; index++) mask += (int)Math.Pow(2, index);
 			return mask;
 		}
@@ -94,9 +94,9 @@ namespace Dns.Utility
 			ushort bitOffset;
 			
 			GenerateInitialOffset(out byteNumber, out bitOffset);
-			int bitMask = _mask[bitOffset];
+			var bitMask = _mask[bitOffset];
 
-			bool value = (_buffer[byteNumber] & bitMask) > 0;
+			var value = (_buffer[byteNumber] & bitMask) > 0;
 
 			_bitOffset++;
 			return value;

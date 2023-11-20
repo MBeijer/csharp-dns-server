@@ -34,9 +34,9 @@ namespace Dns.ZoneProvider
 
         public override void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName)
         {
-            FileWatcherZoneProviderOptions filewatcherConfig = config.Get<FileWatcherZoneProviderOptions>();
+            var filewatcherConfig = config.Get<FileWatcherZoneProviderOptions>();
 
-            string filename = filewatcherConfig.FileName;
+            var filename = filewatcherConfig.FileName;
 
             if (string.IsNullOrWhiteSpace(filename))
                 throw new ArgumentException("Null or empty", "filename");
@@ -48,8 +48,8 @@ namespace Dns.ZoneProvider
                 throw new FileNotFoundException("filename not found", filename);
 
 
-            string directory = Path.GetDirectoryName(filename); 
-            string fileNameFilter = Path.GetFileName(filename);
+            var directory = Path.GetDirectoryName(filename); 
+            var fileNameFilter = Path.GetFileName(filename);
 
             Filename = filename;
             _fileWatcher = new FileSystemWatcher(directory, fileNameFilter); 

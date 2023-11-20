@@ -57,7 +57,7 @@ namespace Dns
 
             writer.WriteLine("<table>");
             writer.WriteLine("<tr><td>Key</td><td>Value</td></tr>");
-            foreach (string key in _zoneMap.Keys)
+            foreach (var key in _zoneMap.Keys)
             {
                 writer.WriteLine("<tr><td>");
                 writer.WriteLine(key);
@@ -83,7 +83,7 @@ namespace Dns
 
             // lookup locally
             if (resType is ResourceType.ALL or ResourceType.ANY) resType = ResourceType.A;
-            string key = GenerateKey(hostName, resClass, resType);
+            var key = GenerateKey(hostName, resClass, resType);
             IAddressDispenser dispenser;
             if (_zoneMap.TryGetValue(key, out dispenser))
             {

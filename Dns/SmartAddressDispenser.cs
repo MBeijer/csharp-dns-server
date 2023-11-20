@@ -31,14 +31,14 @@ namespace Dns
         /// <returns>Set of IP Addresses</returns>
         public IEnumerable<IPAddress> GetAddresses()
         {
-            IPAddress[] addresses = _zoneRecord.Addresses;
+            var addresses = _zoneRecord.Addresses;
 
             if(addresses.Length == 0)
                 yield break;
 
             // starting position in rollover list
-            int start = (int) (_sequence % (ulong) addresses.Length);
-            int offset = start;
+            var start = (int) (_sequence % (ulong) addresses.Length);
+            var offset = start;
             
             uint count = 0;
             while (true)
@@ -65,7 +65,7 @@ namespace Dns
         public void DumpHtml(TextWriter writer)
         {
             writer.WriteLine("Sequence:{0}", _sequence);
-            foreach (IPAddress address in _zoneRecord.Addresses) writer.WriteLine(address);
+            foreach (var address in _zoneRecord.Addresses) writer.WriteLine(address);
         }
     }
 }

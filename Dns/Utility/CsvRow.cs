@@ -18,7 +18,7 @@ namespace Dns.Utility
         {
             _fieldValues = fieldValues;
             if ((fields == null) || (fields.Count != fieldValues.Length)) return;
-            for (int index = 0; index < fields.Count; index++)
+            for (var index = 0; index < fields.Count; index++)
                 _fieldsByName[fields[index]] = fieldValues[index];
         }
 
@@ -30,6 +30,6 @@ namespace Dns.Utility
         /// <summary>Returns value for specified field name</summary>
         /// <param name="name">Specified field name</param>
         /// <returns>Value of field</returns>
-        public string this[string name] => _fieldsByName.TryGetValue(name, out string fieldValue) ? fieldValue : null;
+        public string this[string name] => _fieldsByName.TryGetValue(name, out var fieldValue) ? fieldValue : null;
     }
 }

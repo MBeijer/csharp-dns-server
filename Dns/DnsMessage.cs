@@ -31,7 +31,7 @@ namespace Dns
             set
             {
                 _flags = value.SwapEndian();
-                byte[] bytes = BitConverter.GetBytes(_flags);
+                var bytes = BitConverter.GetBytes(_flags);
                 bytes.CopyTo(_header, 2);
             }
         }
@@ -189,7 +189,7 @@ namespace Dns
             set
             {
                 _additionalCount = value;
-                byte[] bytes = BitConverter.GetBytes(_additionalCount.SwapEndian());
+                var bytes = BitConverter.GetBytes(_additionalCount.SwapEndian());
                 bytes.CopyTo(_header, 10);
             }
         }
@@ -200,7 +200,7 @@ namespace Dns
             set
             {
                 _answerCount = value;
-                byte[] bytes = BitConverter.GetBytes(_answerCount.SwapEndian());
+                var bytes = BitConverter.GetBytes(_answerCount.SwapEndian());
                 bytes.CopyTo(_header, 6);
             }
         }
@@ -211,7 +211,7 @@ namespace Dns
             set
             {
                 _nameServerCount = value;
-                byte[] bytes = BitConverter.GetBytes(_nameServerCount.SwapEndian());
+                var bytes = BitConverter.GetBytes(_nameServerCount.SwapEndian());
                 bytes.CopyTo(_header, 8);
             }
         }
@@ -222,7 +222,7 @@ namespace Dns
             set
             {
                 _queryIdentifier = value;
-                byte[] bytes = BitConverter.GetBytes(_queryIdentifier.SwapEndian());
+                var bytes = BitConverter.GetBytes(_queryIdentifier.SwapEndian());
                 bytes.CopyTo(_header, 0);
             }
         }
@@ -233,7 +233,7 @@ namespace Dns
             set
             {
                 _questionCount = value;
-                byte[] bytes = BitConverter.GetBytes(_questionCount.SwapEndian());
+                var bytes = BitConverter.GetBytes(_questionCount.SwapEndian());
                 bytes.CopyTo(_header, 4);
             }
         }
@@ -252,9 +252,9 @@ namespace Dns
                 throw new ArgumentNullException("bytes");
             }
 
-            DnsMessage result = new DnsMessage();
+            var result = new DnsMessage();
 
-            int byteOffset = 0;
+            var byteOffset = 0;
             byteOffset = byteOffset + result.ParseHeader(bytes, byteOffset);
             byteOffset += result.Questions.LoadFrom(bytes, byteOffset, result.QuestionCount);
             byteOffset += result.Answers.LoadFrom(bytes, byteOffset, result.AnswerCount);
@@ -305,7 +305,7 @@ namespace Dns
 
             if (Questions != null)
             {
-                foreach (Question question in Questions)
+                foreach (var question in Questions)
                 {
                     Console.WriteLine("QRecord: {0} of type {1} on class {2}", question.Name, question.Type, question.Class);
                 }
@@ -314,7 +314,7 @@ namespace Dns
 
             if (Answers != null)
             {
-                foreach (ResourceRecord resource in Answers)
+                foreach (var resource in Answers)
                 {
                     Console.WriteLine("Record: {0} of type {1} on class {2}", resource.Name, resource.Type, resource.Class);
                     resource.Dump();
@@ -324,7 +324,7 @@ namespace Dns
 
             if (Authorities != null)
             {
-                foreach (ResourceRecord resource in Authorities)
+                foreach (var resource in Authorities)
                 {
                     Console.WriteLine("Record: {0} of type {1} on class {2}", resource.Name, resource.Type, resource.Class);
                     resource.Dump();

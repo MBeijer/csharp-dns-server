@@ -17,7 +17,7 @@ namespace Dns
 
         public void WriteToStream(Stream stream)
         {
-            byte[] name = this.Name.GetResourceBytes();
+            var name = this.Name.GetResourceBytes();
             stream.Write(name, 0, name.Length);
 
             // Type
