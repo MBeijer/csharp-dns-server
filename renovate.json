@@ -6,5 +6,6 @@
   ],
   "baseBranches": [
     "master"
-  ]
+  ],
+  "includeForks": true
 }
