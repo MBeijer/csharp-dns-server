@@ -34,6 +34,7 @@ As written, the server has the following features:
  - round-robin load-balancing.  Distribute load and provide failover with a datacentre without expensive hardware.
  - health-checks.  While maintaining a list of machines in round-robin for a name, the code performs periodic healthchecks against the machines, if necessary removing machines that fail the health checks from rotation.
  - Delegates all other DNS lookup to host machines default DNS server(s)
+ - Automatic set up of zones for docker instances running on a specific docker server, can be used to get `.local` or `.internal` zones, so you can route traffic by hostname via something like Traefik
 
 The DNS server has a built-in Web Server providing operational insight into the current server behaviour.
 - healthcheck for server status
