@@ -26,7 +26,7 @@ internal static class Program
 
         Console.WriteLine("DNS Server - Console Mode");
 
-        if(args.Length == 0) args = new[] { "./appsettings.json" };
+        if(args.Length == 0) args = ["./appsettings.json"];
 
         var builder = Host.CreateDefaultBuilder().ConfigureServices((hostContext, services) =>
         {
