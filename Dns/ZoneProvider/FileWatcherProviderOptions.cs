@@ -1,7 +1,6 @@
-﻿namespace Dns.ZoneProvider
+﻿namespace Dns.ZoneProvider;
+
+public class FileWatcherZoneProviderOptions
 {
-    public class FileWatcherZoneProviderOptions
-    {
-        public string FileName { get; set; }
-    }
+    public string FileName { get; set; }
 }

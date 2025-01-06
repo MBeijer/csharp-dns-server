@@ -1,18 +1,17 @@
 using System.Diagnostics;
 
-namespace Dns.Services
+namespace Dns.Services;
+
+public static class DebuggingService
 {
-	public static class DebuggingService
+	private static bool _debugging;
+
+	public static bool RunningInDebugMode()
 	{
-		private static bool _debugging;
-
-		public static bool RunningInDebugMode()
-		{
-			WellAreWe();
-			return _debugging;
-		}
-
-		[Conditional("DEBUG")]
-		private static void WellAreWe() => _debugging = true;
+		WellAreWe();
+		return _debugging;
 	}
+
+	[Conditional("DEBUG")]
+	private static void WellAreWe() => _debugging = true;
 }

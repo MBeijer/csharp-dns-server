@@ -6,10 +6,9 @@
 
 using System.IO;
 
-namespace Dns.Contracts
+namespace Dns.Contracts;
+
+public interface IHtmlDump
 {
-    public interface IHtmlDump
-    {
-        void DumpHtml(TextWriter writer);
-    }
+    void DumpHtml(TextWriter writer);
 }

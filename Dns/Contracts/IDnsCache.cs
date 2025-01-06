@@ -4,12 +4,11 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
-namespace Dns.Contracts
-{
-    public interface IDnsCache
-    {
-        byte[] Get(string key);
+namespace Dns.Contracts;
 
-        void Set(string key, byte[] bytes, int ttlSeconds);
-    }
+public interface IDnsCache
+{
+    byte[] Get(string key);
+
+    void Set(string key, byte[] bytes, int ttlSeconds);
 }

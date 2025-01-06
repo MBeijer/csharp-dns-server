@@ -6,14 +6,13 @@
 
 using System.Net;
 
-namespace Dns
+namespace Dns;
+
+public class ZoneRecord
 {
-    public class ZoneRecord
-    {
-        public string Host;
-        public ResourceClass Class = ResourceClass.IN;
-        public ResourceType Type = ResourceType.A;
-        public IPAddress[] Addresses;
-        public int Count;
-    }
+    public string        Host;
+    public ResourceClass Class = ResourceClass.IN;
+    public ResourceType  Type  = ResourceType.A;
+    public IPAddress[]   Addresses;
+    public int           Count;
 }

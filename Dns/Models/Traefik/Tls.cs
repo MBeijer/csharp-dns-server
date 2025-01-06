@@ -1,10 +1,9 @@
 using Newtonsoft.Json;
 
-namespace Dns.Models.Traefik
+namespace Dns.Models.Traefik;
+
+public class Tls
 {
-	public class Tls
-	{
-		[JsonProperty("certResolver")]
-		public string CertResolver { get; set; }
-	}
+	[JsonProperty("certResolver")]
+	public string CertResolver { get; set; }
 }

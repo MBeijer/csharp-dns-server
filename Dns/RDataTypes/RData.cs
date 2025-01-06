@@ -1,16 +1,16 @@
 ﻿// // //-------------------------------------------------------------------------------------------------
-// // // <copyright file="ResourceClass.cs" company="stephbu">
+// // // <copyright file="RData.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
-namespace Dns;
+using System.IO;
 
-public enum ResourceClass : ushort
+namespace Dns.RDataTypes;
+
+public abstract class RData
 {
-    None = 0,
-    IN   = 1,
-    CS   = 2,
-    CH   = 3,
-    HS   = 4,
+	public abstract void Dump();
+	public abstract void WriteToStream(Stream stream);
+	public abstract ushort Length { get; }
 }

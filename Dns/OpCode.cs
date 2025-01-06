@@ -1,17 +1,16 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="OpCode.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
-namespace Dns
+namespace Dns;
+
+public enum OpCode
 {
-    public enum OpCode
-    {
-        QUERY = 0,
-        IQUERY = 1,
-        STATUS = 2,
-        NOTIFY = 4,
-        UPDATE = 5,
-    }
+    QUERY  = 0,
+    IQUERY = 1,
+    STATUS = 2,
+    NOTIFY = 4,
+    UPDATE = 5,
 }

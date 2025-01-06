@@ -9,63 +9,62 @@ using System.IO;
 using System.Net;
 using Dns.Contracts;
 
-namespace Dns
+namespace Dns;
+
+/// <summary>Address Dispenser enables round-robin ordering for the specified zone record</summary>
+public class SmartAddressDispenser : IAddressDispenser
 {
-    /// <summary>Address Dispenser enables round-robin ordering for the specified zone record</summary>
-    public class SmartAddressDispenser : IAddressDispenser
+    private ulong _sequence;
+
+    private readonly ZoneRecord _zoneRecord;
+    private readonly ushort     _maxAddressesReturned;
+
+    public SmartAddressDispenser(ZoneRecord record, ushort maxAddressesReturned = 4)
     {
-        private ulong _sequence;
+        _zoneRecord = record;
+        _maxAddressesReturned = maxAddressesReturned;
+    }
 
-        private readonly ZoneRecord _zoneRecord;
-        private readonly ushort _maxAddressesReturned;
+    string IAddressDispenser.HostName => _zoneRecord.Host;
 
-        public SmartAddressDispenser(ZoneRecord record, ushort maxAddressesReturned = 4)
-        {
-            _zoneRecord = record;
-            _maxAddressesReturned = maxAddressesReturned;
-        }
+    /// <summary>Returns round-robin rotated set of IP addresses</summary>
+    /// <returns>Set of IP Addresses</returns>
+    public IEnumerable<IPAddress> GetAddresses()
+    {
+        var addresses = _zoneRecord.Addresses;
 
-        string IAddressDispenser.HostName => _zoneRecord.Host;
+        if(addresses.Length == 0)
+            yield break;
 
-        /// <summary>Returns round-robin rotated set of IP addresses</summary>
-        /// <returns>Set of IP Addresses</returns>
-        public IEnumerable<IPAddress> GetAddresses()
-        {
-            var addresses = _zoneRecord.Addresses;
-
-            if(addresses.Length == 0)
-                yield break;
-
-            // starting position in rollover list
-            var start = (int) (_sequence % (ulong) addresses.Length);
-            var offset = start;
+        // starting position in rollover list
+        var start = (int) (_sequence % (ulong) addresses.Length);
+        var offset = start;
             
-            uint count = 0;
-            while (true)
-            {
-                yield return addresses[offset];
-                offset++;
-
-                // rollover to start of list
-                if (offset == addresses.Length) offset = 0;
-
-                // if back at starting position then exit
-                if (offset == start)
-                    break;
-
-                // manage max number of dns entries returned
-                count++;
-                if (count == _maxAddressesReturned)
-                    break;
-            }
-            // advance sequence
-            _sequence++;
-        }
-
-        public void DumpHtml(TextWriter writer)
+        uint count = 0;
+        while (true)
         {
-            writer.WriteLine("Sequence:{0}", _sequence);
-            foreach (var address in _zoneRecord.Addresses) writer.WriteLine(address);
+            yield return addresses[offset];
+            offset++;
+
+            // rollover to start of list
+            if (offset == addresses.Length) offset = 0;
+
+            // if back at starting position then exit
+            if (offset == start)
+                break;
+
+            // manage max number of dns entries returned
+            count++;
+            if (count == _maxAddressesReturned)
+                break;
         }
+        // advance sequence
+        _sequence++;
+    }
+
+    public void DumpHtml(TextWriter writer)
+    {
+        writer.WriteLine("Sequence:{0}", _sequence);
+        foreach (var address in _zoneRecord.Addresses) writer.WriteLine(address);
     }
 }

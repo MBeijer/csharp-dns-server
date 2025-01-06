@@ -6,19 +6,18 @@
 
 using System.Collections.Generic;
 
-namespace Dns
+namespace Dns;
+
+public class Zone : List<ZoneRecord>
 {
-    public class Zone : List<ZoneRecord>
+    public string Suffix { get; set; }
+
+    public uint Serial { get; set; }
+
+    public void Initialize(IEnumerable<ZoneRecord> nameRecords)
     {
-        public string Suffix { get; set; }
-
-        public uint Serial { get; set; }
-
-        public void Initialize(IEnumerable<ZoneRecord> nameRecords)
-        {
-            Clear();
-            if (nameRecords != null)
-                AddRange(nameRecords);
-        }
+        Clear();
+        if (nameRecords != null)
+            AddRange(nameRecords);
     }
 }

@@ -7,78 +7,67 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Dns.RDataTypes;
 
-namespace Dns
+namespace Dns;
+
+public class ResourceList : List<ResourceRecord>
 {
-	public class ResourceList : List<ResourceRecord>
-    {
-        public int LoadFrom(byte[] bytes, int offset, ushort count)
-        {
-            var currentOffset = offset;
+	public int LoadFrom(byte[] bytes, int offset, ushort count)
+	{
+		var currentOffset = offset;
 
-            for (var index = 0; index < count; index++)
-            {
-                // TODO: move this code into the Resource object
+		for (var index = 0; index < count; index++)
+		{
+			// TODO: move this code into the Resource object
 
-                var resourceRecord = new ResourceRecord();
-                //// extract the domain, question type, question class and Ttl
+			var resourceRecord = new ResourceRecord
+			{
+				//// extract the domain, question type, question class and Ttl
+				Name = DnsProtocol.ReadString(bytes, ref currentOffset), Type = (ResourceType) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian()),
+			};
 
-                resourceRecord.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
+			currentOffset += sizeof (ushort);
 
-                resourceRecord.Type = (ResourceType) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
-                currentOffset += sizeof (ushort);
+			resourceRecord.Class = (ResourceClass) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
+			currentOffset += sizeof (ushort);
 
-                resourceRecord.Class = (ResourceClass) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
-                currentOffset += sizeof (ushort);
+			resourceRecord.TTL = BitConverter.ToUInt32(bytes, currentOffset).SwapEndian();
+			currentOffset += sizeof (uint);
 
-                resourceRecord.TTL = BitConverter.ToUInt32(bytes, currentOffset).SwapEndian();
-                currentOffset += sizeof (uint);
+			resourceRecord.DataLength = BitConverter.ToUInt16(bytes, currentOffset).SwapEndian();
+			currentOffset += sizeof (ushort);
 
-                resourceRecord.DataLength = BitConverter.ToUInt16(bytes, currentOffset).SwapEndian();
-                currentOffset += sizeof (ushort);
+			if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
+			{
+				resourceRecord.RData = ANameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+			}
+			else
+				resourceRecord.RData = resourceRecord.Type switch
+				{
+					ResourceType.CNAME => CNameRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.MX    => MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.SOA   => SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.NS    => NSRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.TEXT  => TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					_                  => GenericRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+				};
 
-                if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
-                {
-                    resourceRecord.RData = ANameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-                }
-                else switch (resourceRecord.Type)
-                {
-	                case ResourceType.CNAME:
-		                resourceRecord.RData = CNameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-		                break;
-	                case ResourceType.MX:
-		                resourceRecord.RData = MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-		                break;
-	                case ResourceType.SOA:
-		                resourceRecord.RData = SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-		                break;
-	                case ResourceType.NS:
-		                resourceRecord.RData = NSRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-		                break;
-	                case ResourceType.TEXT:
-		                resourceRecord.RData = TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-		                break;
-	                default:
-		                resourceRecord.RData = GenericRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-		                break;
-                }
+			// move past resource data record
+			currentOffset += resourceRecord.DataLength;
 
-                // move past resource data record
-                currentOffset = currentOffset + resourceRecord.DataLength;
+			Add(resourceRecord);
+		}
 
-                Add(resourceRecord);
-            }
+		var bytesRead = currentOffset - offset;
+		return bytesRead;
+	}
 
-            var bytesRead = currentOffset - offset;
-            return bytesRead;
-        }
-
-        public void WriteToStream(Stream stream)
-        {
-            foreach (var resource in this)
-            {
-                resource.WriteToStream(stream);
-            }
-        }
-    }
+	public void WriteToStream(Stream stream)
+	{
+		foreach (var resource in this)
+		{
+			resource.WriteToStream(stream);
+		}
+	}
 }

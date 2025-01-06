@@ -4,32 +4,31 @@ using Dns;
 using Dns.Contracts;
 using Xunit;
 
-namespace DnsTest
+namespace DnsTest;
+
+public class DnsCacheTests
 {
-    public class DnsCacheTests
-    {
-        [Fact]
-        public void Test1() {
-            IDnsCache cache = new DnsCache();
-            var invalidKeyResult = cache.Get("invalidTestKey");
-            Assert.Null(invalidKeyResult);
-        }
+    [Fact]
+    public void Test1() {
+        IDnsCache cache = new DnsCache();
+        var invalidKeyResult = cache.Get("invalidTestKey");
+        Assert.Null(invalidKeyResult);
+    }
 
-        [Fact]
-        public void Test2() {
-            IDnsCache cache = new DnsCache();
+    [Fact]
+    public void Test2() {
+        IDnsCache cache = new DnsCache();
 
-            var key = "sampleCacheKey";
-            var data = Encoding.ASCII.GetBytes("test");
-            var ttl = 10;
+        const string key = "sampleCacheKey";
+        var data = Encoding.ASCII.GetBytes("test");
+        const int ttl = 10;
 
-            cache.Set(key, data, ttl);
-            var result = cache.Get(key);
+        cache.Set(key, data, ttl);
+        var result = cache.Get(key);
 
-            Assert.True(data.SequenceEqual(result));
+        Assert.True(data.SequenceEqual(result));
 
-            var invalidKeyResult = cache.Get("invalidTestKey");
-            Assert.Null(invalidKeyResult);
-        }
+        var invalidKeyResult = cache.Get("invalidTestKey");
+        Assert.Null(invalidKeyResult);
     }
 }

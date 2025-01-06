@@ -7,12 +7,11 @@
 using System.Collections.Generic;
 using System.Net;
 
-namespace Dns.Contracts
-{
-    public interface IAddressDispenser : IHtmlDump
-    {
-        string HostName { get; }
+namespace Dns.Contracts;
 
-        IEnumerable<IPAddress> GetAddresses();
-    }
+public interface IAddressDispenser : IHtmlDump
+{
+    string HostName { get; }
+
+    IEnumerable<IPAddress> GetAddresses();
 }

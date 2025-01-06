@@ -12,111 +12,109 @@ using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 
-namespace DnsCli
+namespace DnsCli;
+
+/// <summary>Stub program that enables DNS Server to run from the command line</summary>
+internal static class Program
 {
-    /// <summary>Stub program that enables DNS Server to run from the command line</summary>
+    private static readonly CancellationTokenSource Cts         = new();
+    private static readonly ManualResetEvent        ExitTimeout = new(false);
 
-    internal static class Program
+    public static async Task Main(string[] args)
     {
-        private static readonly CancellationTokenSource Cts = new();
-        private static readonly ManualResetEvent ExitTimeout = new(false);
+        Console.CancelKeyPress += Console_CancelKeyPress;
 
-        public static async Task Main(string[] args)
+        Console.WriteLine("DNS Server - Console Mode");
+
+        if(args.Length == 0) args = new[] { "./appsettings.json" };
+
+        var builder = Host.CreateDefaultBuilder().ConfigureServices((hostContext, services) =>
         {
-            Console.CancelKeyPress += Console_CancelKeyPress;
+            services.AddAutoMapper(typeof(Program).Assembly);
+            services.AddSingleton(services);
+            services.AddSingleton<Dns.Program>();
 
-            Console.WriteLine("DNS Server - Console Mode");
+            //string homePath = Environment.OSVersion.Platform is PlatformID.Unix or PlatformID.MacOSX ? Environment.GetEnvironmentVariable("HOME") + "/.config/tbnotify" : Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            //_settings = Settings.CreateConfig($"{homePath}{Path.DirectorySeparatorChar}{arguments.ConfigurationFile}").Result;
 
-            if(args.Length == 0) args = new[] { "./appsettings.json" };
+            //services.AddSingleton<Settings>(_settings);
+            Console.WriteLine("Read config:");
+            IConfiguration configuration = new ConfigurationBuilder()
+                                           .AddJsonFile(args[0], true, true)
+                                           .Build();
+            Console.WriteLine("Done!");
 
-            var builder = Host.CreateDefaultBuilder().ConfigureServices((hostContext, services) =>
-            {
-                services.AddAutoMapper(typeof(Program).Assembly);
-                services.AddSingleton(services);
-                services.AddSingleton<Dns.Program>();
+            var appConfig = configuration.Get<AppConfig>();
 
-                //string homePath = Environment.OSVersion.Platform is PlatformID.Unix or PlatformID.MacOSX ? Environment.GetEnvironmentVariable("HOME") + "/.config/tbnotify" : Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                //_settings = Settings.CreateConfig($"{homePath}{Path.DirectorySeparatorChar}{arguments.ConfigurationFile}").Result;
+            services.AddSingleton(configuration);
+            services.AddSingleton(appConfig);
+            services.AddTransient<TraefikClientHandler>();
+            services.AddHttpClient<TraefikClientService>().ConfigurePrimaryHttpMessageHandler<TraefikClientHandler>();
 
-                //services.AddSingleton<Settings>(_settings);
-                Console.WriteLine("Read config:");
-                IConfiguration configuration = new ConfigurationBuilder()
-                    .AddJsonFile(args[0], true, true)
-                    .Build();
-                Console.WriteLine("Done!");
-
-                var appConfig = configuration.Get<AppConfig>();
-
-                services.AddSingleton(configuration);
-                services.AddSingleton(appConfig);
-                services.AddTransient<TraefikClientHandler>();
-                services.AddHttpClient<TraefikClientService>().ConfigurePrimaryHttpMessageHandler<TraefikClientHandler>();
-
-                services.AddLogging(
-                    configure =>
-                    {
-                        configure.AddSimpleConsole(options =>
-                        {
-                            options.IncludeScopes = true;
-                            options.SingleLine = true;
-                            options.TimestampFormat = "[hh:mm:ss] ";
-                            options.ColorBehavior = LoggerColorBehavior.Enabled;
-                        });
-
-                       // if (_settings?.General?.Loglevel == Debug)
-                       //     configure.SetMinimumLevel(LogLevel.Debug);
-                    }
-                );
-                services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
-            }).UseConsoleLifetime();
-
-            builder.ConfigureHostConfiguration(config =>
-            {
-                if (args != null)
-                    // environment from command line
-                    // e.g.: dotnet run --environment "Staging"
-                    config.AddCommandLine(args);
-            }).ConfigureAppConfiguration((context, builder) => { builder.SetBasePath(AppContext.BaseDirectory).AddEnvironmentVariables(); });
-
-
-            var host = builder.Build();
-
-            using var serviceScope = host.Services.CreateScope();
-            {
-                var services = serviceScope.ServiceProvider;
-
-                try
+            services.AddLogging(
+                configure =>
                 {
-                    var myService = services.GetRequiredService<Dns.Program>();
-
-                    //myService?.Init(Cts.Token);
-
-                    while (myService is { Running: true })
+                    configure.AddSimpleConsole(options =>
                     {
+                        options.IncludeScopes = true;
+                        options.SingleLine = true;
+                        options.TimestampFormat = "[hh:mm:ss] ";
+                        options.ColorBehavior = LoggerColorBehavior.Enabled;
+                    });
 
-                        /*await*/ myService?.Run(args[0], Cts.Token);
-                        //Thread.Sleep(Engine.DefaultTicks*1000);
-                    }
-
-                    await Task.CompletedTask.ConfigureAwait(false);
+                    // if (_settings?.General?.Loglevel == Debug)
+                    //     configure.SetMinimumLevel(LogLevel.Debug);
                 }
-                catch (Exception ex)
+            );
+            services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
+        }).UseConsoleLifetime();
+
+        builder.ConfigureHostConfiguration(config =>
+        {
+            if (args != null)
+                // environment from command line
+                // e.g.: dotnet run --environment "Staging"
+                config.AddCommandLine(args);
+        }).ConfigureAppConfiguration((context, builder) => { builder.SetBasePath(AppContext.BaseDirectory).AddEnvironmentVariables(); });
+
+
+        var host = builder.Build();
+
+        using var serviceScope = host.Services.CreateScope();
+        {
+            var services = serviceScope.ServiceProvider;
+
+            try
+            {
+                var myService = services.GetRequiredService<Dns.Program>();
+
+                //myService?.Init(Cts.Token);
+
+                while (myService is { Running: true })
                 {
-                    Console.WriteLine($"Error Occured: {ex}");
+
+                    /*await*/ myService?.Run(args[0], Cts.Token);
+                    //Thread.Sleep(Engine.DefaultTicks*1000);
                 }
+
+                await Task.CompletedTask.ConfigureAwait(false);
             }
-
-
-
-            ExitTimeout.Set();
-
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error Occured: {ex}");
+            }
         }
 
-        private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
-        {
-            Console.WriteLine("\r\nShutting Down");
-            Cts.Cancel();
-            ExitTimeout.WaitOne(5000);
-        }
+
+
+        ExitTimeout.Set();
+
+    }
+
+    private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
+    {
+        Console.WriteLine("\r\nShutting Down");
+        Cts.Cancel();
+        ExitTimeout.WaitOne(5000);
     }
 }

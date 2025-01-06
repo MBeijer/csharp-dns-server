@@ -7,24 +7,23 @@
 using System;
 using System.IO;
 
-namespace Dns
+namespace Dns;
+
+public class Question
 {
-    public class Question
+    public ResourceClass Class;
+    public string        Name;
+    public ResourceType  Type;
+
+    public void WriteToStream(Stream stream)
     {
-        public ResourceClass Class;
-        public string Name;
-        public ResourceType Type;
+        var name = Name.GetResourceBytes();
+        stream.Write(name, 0, name.Length);
 
-        public void WriteToStream(Stream stream)
-        {
-            var name = Name.GetResourceBytes();
-            stream.Write(name, 0, name.Length);
+        // Type
+        stream.Write(BitConverter.GetBytes(((ushort) (Type)).SwapEndian()), 0, 2);
 
-            // Type
-            stream.Write(BitConverter.GetBytes(((ushort) (Type)).SwapEndian()), 0, 2);
-
-            // Class
-            stream.Write(BitConverter.GetBytes(((ushort) Class).SwapEndian()), 0, 2);
-        }
+        // Class
+        stream.Write(BitConverter.GetBytes(((ushort) Class).SwapEndian()), 0, 2);
     }
 }

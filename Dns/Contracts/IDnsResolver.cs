@@ -6,15 +6,14 @@
 
 using System.Net;
 
-namespace Dns.Contracts
+namespace Dns.Contracts;
+
+/// <summary>Provides domain name resolver capabilities</summary>
+internal interface IDnsResolver : IHtmlDump
 {
-    /// <summary>Provides domain name resolver capabilities</summary>
-    internal interface IDnsResolver : IHtmlDump
-    {
-        string GetZoneName();
+    string GetZoneName();
 
-        uint GetZoneSerial();
+    uint GetZoneSerial();
 
-        bool TryGetHostEntry(string hostname, ResourceClass resClass, ResourceType resType, out IPHostEntry entry);
-    }
+    bool TryGetHostEntry(string hostname, ResourceClass resClass, ResourceType resType, out IPHostEntry entry);
 }
