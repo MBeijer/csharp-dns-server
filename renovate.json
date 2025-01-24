@@ -7,5 +7,5 @@
   "baseBranches": [
     "master"
   ],
-  "includeForks": true
+  "forkProcessing": "enabled"
 }
