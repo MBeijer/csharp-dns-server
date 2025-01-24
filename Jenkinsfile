@@ -45,14 +45,17 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 
 		def buildenv = '';
 		def tag = '';
+		def publish = false;
 		if (env.BRANCH_NAME.equals('master')) {
 			buildenv = 'production';
 			tag = "${DOCKERTAG}";
+			publish = true;
 		} else if (env.BRANCH_NAME.equals('dev')) {
 			buildenv = 'development';
 			tag = "${DOCKERTAG}-dev";
+			publish = true;
 		} else {
-			throw new Exception("Invalid branch, stopping build!");
+			tag = "${env.BRANCH_NAME.replace('/','-')}";
 		}
 
 		docker.withRegistry("https://index.docker.io/v1/", "dockerhub") {
@@ -61,8 +64,10 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 				customImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}", "--build-arg BUILDENV=${buildenv} --network=host --pull -f ${DOCKERFILE} .");
 			}
 
-			stage("Pushing to docker hub registry...") {
-				customImage.push();
+			if (publish) {
+				stage("Pushing to docker hub registry...") {
+					customImage.push();
+				}
 			}
 		}
 
@@ -81,22 +86,21 @@ node('master') {
 	killall_jobs();
 	def fixed_job_name = env.JOB_NAME.replace('%2F','/');
 	slackSend color: "good", channel: "#jenkins", message: "Build Started: ${fixed_job_name} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)";
-	
+
 	checkout scm;
 
 	def branches = [:]
 	def project = readJSON file: "JenkinsEnv.json";
 
 	project.builds.each { v ->
-		branches["Build ${v.DockerRoot}/${v.DockerImage}:${v.DockerTag}"] = { 
+		branches["Build ${v.DockerRoot}/${v.DockerImage}:${v.DockerTag}"] = {
 			node {
 				buildStep(v.DockerRoot, v.DockerImage, v.DockerTag, v.Dockerfile, v.BuildIfSuccessful)
 			}
 		}
 	}
-	
+
 	sh "rm -rf ./*"
 
 	parallel branches;
 }
-
