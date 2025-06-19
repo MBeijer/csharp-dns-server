@@ -5,21 +5,23 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using Dns.Config;
+using Dns.Contracts;
 
 namespace Dns.ZoneProvider;
 
-public abstract class FileWatcherZoneProvider : BaseZoneProvider
+public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resolver)
 {
     public delegate void FileWatcherDelegate(object sender, FileSystemEventArgs e);
 
-    public event FileWatcherDelegate OnCreated    = delegate { };
-    public event FileWatcherDelegate OnDeleted    = delegate { };
-    public event FileWatcherDelegate OnRenamed    = delegate { };
-    public event FileWatcherDelegate OnChanged    = delegate { };
+    public event FileWatcherDelegate OnCreated    = delegate {};
+    public event FileWatcherDelegate OnDeleted    = delegate {};
+    public event FileWatcherDelegate OnRenamed    = delegate {};
+    public event FileWatcherDelegate OnChanged    = delegate {};
     public event FileWatcherDelegate OnSettlement = delegate {};
 
     private FileSystemWatcher _fileWatcher;
@@ -32,14 +34,13 @@ public abstract class FileWatcherZoneProvider : BaseZoneProvider
 
     protected string Filename { get; private set; }
 
-    public override void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName)
+    public override void Initialize(ZoneOptions zoneOptions)
     {
-        var filewatcherConfig = config.Get<FileWatcherZoneProviderOptions>();
+        var fileWatcherConfig = zoneOptions.ProviderSettings;
 
-        var filename = filewatcherConfig.FileName;
+        var filename = fileWatcherConfig.GetValueOrDefault("FileName");
 
-        if (string.IsNullOrWhiteSpace(filename))
-            throw new ArgumentException("Null or empty", "filename");
+        ArgumentException.ThrowIfNullOrEmpty(filename, "filename");
 
         filename = Environment.ExpandEnvironmentVariables(filename);
         filename = Path.GetFullPath(filename);
@@ -66,7 +67,9 @@ public abstract class FileWatcherZoneProvider : BaseZoneProvider
         _fileWatcher.Renamed += FileChange;
         _fileWatcher.Deleted += FileChange;
 
-        Zone = zoneName;
+        Zone = zoneOptions.Name;
+        
+        base.Initialize(zoneOptions);
     }
 
     /// <summary>Start watching and generating zone files</summary>

@@ -4,14 +4,16 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
+using System;
 using System.Net;
 
 namespace Dns.Contracts;
 
 /// <summary>Provides domain name resolver capabilities</summary>
-internal interface IDnsResolver : IHtmlDump
+public interface IDnsResolver : IObserver<Zone>, IHtmlDump
 {
-    string GetZoneName();
+    public void SubscribeTo(IObservable<Zone> zoneProvider);
+    string      GetZoneName();
 
     uint GetZoneSerial();
 

@@ -5,10 +5,11 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using Dns.Contracts;
 
 namespace Dns.ZoneProvider.Bind;
 
-public class BindZoneProvider : FileWatcherZoneProvider
+public class BindZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(resolver)
 {
     public override Zone GenerateZone()
     {

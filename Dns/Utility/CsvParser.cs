@@ -13,8 +13,8 @@ namespace Dns.Utility;
 /// <summary>Parses CSV files</summary>
 public class CsvParser
 {
-    private static readonly char[] CSVDELIMITER   = {','};
-    private static readonly char[] COLONDELIMITER = {':'};
+    private static readonly char[] CSVDELIMITER   = [','];
+    private static readonly char[] COLONDELIMITER = [':'];
 
     private readonly string _filePath;
 

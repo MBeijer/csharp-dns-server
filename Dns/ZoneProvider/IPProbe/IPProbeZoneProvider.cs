@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using Dns.Config;
+using Dns.Contracts;
 using static System.Threading.Tasks.Task;
 
 namespace Dns.ZoneProvider.IPProbe;
@@ -13,7 +14,7 @@ namespace Dns.ZoneProvider.IPProbe;
 /// Various monitoring strategies are implemented to detect IP health.
 /// Health IP addresses are added to the Zone.
 /// </summary>
-public class IPProbeZoneProvider : BaseZoneProvider
+public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resolver)
 {
     private IPProbeProviderOptions options;
 
@@ -25,9 +26,9 @@ public class IPProbeZoneProvider : BaseZoneProvider
     /// <param name="serviceCollection"></param>
     /// <param name="config">ZoneProvider Configuration Section</param>
     /// <param name="zoneName">Zone suffix</param>
-    public override void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName)
+    public override void Initialize(ZoneOptions zoneOptions)
     {
-        options = config.Get<IPProbeProviderOptions>();
+        options = new();//TODO: FIXME zoneOptions.ProviderSettings;
         if (options == null)
         {
             throw new("Error loading IPProbeProviderOptions");
@@ -35,7 +36,9 @@ public class IPProbeZoneProvider : BaseZoneProvider
 
         // load up initial state from options
         state = new(options);
-        Zone = zoneName;
+        Zone  = zoneOptions.Name;
+        
+        base.Initialize(zoneOptions);
     }
 
     public void ProbeLoop(CancellationToken ct)
@@ -91,9 +94,9 @@ public class IPProbeZoneProvider : BaseZoneProvider
             if(host.AvailabilityMode == AvailabilityMode.First) availableAddresses = availableAddresses.Take(1);
 
             // materialize query
-            var addresses = availableAddresses.ToArray();
+            var addresses = availableAddresses.Select(s => s.ToString()).ToList();
 
-            if (addresses.Length == 0)
+            if (addresses.Count == 0)
             {
                 // no hosts with empty recordsets
                 continue;
@@ -104,7 +107,7 @@ public class IPProbeZoneProvider : BaseZoneProvider
             {
                 Host = host.Name + Zone,
                 Addresses = addresses,
-                Count = addresses.Length,
+                Count = addresses.Count,
                 Type = ResourceType.A,
                 Class = ResourceClass.IN,
             };
@@ -115,11 +118,11 @@ public class IPProbeZoneProvider : BaseZoneProvider
     {
         var zoneRecords = GetZoneRecords(state);
 
-        Zone zone = new() { Suffix = Zone, Serial = _serial };
+        Zone zone = new() { Suffix = Zone, Serial = Serial };
         zone.Initialize(zoneRecords);
 
         // increment serial number
-        _serial++;
+        Serial++;
         return zone;
     }
 }

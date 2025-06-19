@@ -200,7 +200,7 @@ public class DnsProtocolTest
             AnswerCount = 0,
             NameServerCount = 0,
             AdditionalCount = 0,
-            Questions = new() { new() {Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A} },
+            Questions = [new() { Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A }],
         };
 
         DnsMessage outMessage;
@@ -250,7 +250,7 @@ public class DnsProtocolTest
             AnswerCount = 2,
             NameServerCount = 0,
             AdditionalCount = 0,
-            Questions = new() { new() {Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A} },
+            Questions = [new() { Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A }],
         };
         message.Answers.Add(new() {Name = "8.8.8.8", Class = ResourceClass.IN, Type = ResourceType.NS, TTL = 468, DataLength = 0, RData = null});
         RData data = new ANameRData {Address = IPAddress.Parse("8.8.8.9")};

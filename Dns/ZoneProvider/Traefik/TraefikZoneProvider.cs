@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Dns.Config;
+using Dns.Contracts;
 using Dns.Models.Traefik;
 using Dns.Services;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using static System.Threading.Tasks.Task;
 
@@ -18,39 +18,25 @@ namespace Dns.ZoneProvider.Traefik;
 /// Various monitoring strategies are implemented to detect IP health.
 /// Health IP addresses are added to the Zone.
 /// </summary>
-public partial class TraefikZoneProvider : BaseZoneProvider
+public partial class TraefikZoneProvider(ILogger<TraefikZoneProvider> logger, TraefikClientService traefikClientService, IDnsResolver dnsResolver)
+    : BaseZoneProvider(dnsResolver)
 {
-    private static IServiceProvider _services;
-    //private IPProbeProviderOptions options;
-
-    //private State state { get; set; }
     private CancellationToken ct          { get; set; }
     private Task              RunningTask { get; set; }
 
     /// <summary>Initialize ZoneProvider</summary>
-    /// <param name="serviceCollection"></param>
-    /// <param name="services"></param>
-    /// <param name="config">ZoneProvider Configuration Section</param>
-    /// <param name="zoneName">Zone suffix</param>
-    public override void Initialize(IServiceProvider services, IConfiguration config, string zoneName)
+    /// <param name="zoneOptions">ZoneProvider Configuration Section</param>
+    public override void Initialize(ZoneOptions zoneOptions)
     {
-/*
-            this.options = config.Get<IPProbeProviderOptions>();
-            if (options == null)
-            {
-                throw new Exception("Error loading IPProbeProviderOptions");
-            }
-
-            // load up initial state from options
-            this.state = new State(options);
-*/
-        _services = services;
-        Zone = zoneName;
+        Zone = zoneOptions.Name;
+        traefikClientService.Initialize(zoneOptions);
+        
+        base.Initialize(zoneOptions);
     }
 
     private void ProbeLoop(CancellationToken ct)
     {
-        _services.GetService<ILogger<TraefikZoneProvider>>()?.LogInformation("Probe loop started");
+        logger.LogInformation("Probe loop started");
 
         ParallelOptions options = new() { CancellationToken = ct, MaxDegreeOfParallelism = 4 };
 
@@ -58,14 +44,13 @@ public partial class TraefikZoneProvider : BaseZoneProvider
         {
             var batchStartTime = DateTime.UtcNow;
 
-            Run(() => GetZone(), ct).ContinueWith(t => Notify(t.Result), ct);
+            Run(GetZone, ct).ContinueWith(t => Notify(t.Result), ct);
 
             var batchDuration = DateTime.UtcNow - batchStartTime;
-            _services.GetService<ILogger<TraefikZoneProvider>>()?.LogInformation($"Probe batch duration {batchDuration}");
+            logger.LogInformation("Probe batch duration {BatchDuration}", batchDuration);
 
             ct.WaitHandle.WaitOne(10 * 1000);
         }
-
     }
 
     public override void Dispose()
@@ -81,20 +66,18 @@ public partial class TraefikZoneProvider : BaseZoneProvider
 
     private void Stop() => RunningTask.Wait(ct);
 
-    private static async Task<IEnumerable<ZoneRecord>> GetZoneRecords(/*State state*/)
+    private async Task<IEnumerable<ZoneRecord>> GetZoneRecords(/*State state*/)
     {
-        var traefik = _services.GetService<TraefikClientService>();
 
-        if (traefik == null) return null;
-        return  (from host in await traefik.GetRoutes()
+        return  (from host in await traefikClientService.GetRoutes()
             where (host.Provider.Equals("docker", StringComparison.InvariantCultureIgnoreCase) || host.EntryPoints.Contains("web")) && host.Tls == null && host.Rule.Contains(Zone)
             select new ZoneRecord
             {
-                Host = CreateHostName(host),
-                Addresses = new[] { traefik.GetDockerHostInternalIp() },
-                Count = 1,
-                Type = ResourceType.A,
-                Class = ResourceClass.IN,
+                Host      = CreateHostName(host),
+                Addresses = [traefikClientService.GetDockerHostInternalIp().ToString()],
+                Count     = 1,
+                Type      = ResourceType.A,
+                Class     = ResourceClass.IN,
             }).ToList();
     }
 
@@ -111,11 +94,11 @@ public partial class TraefikZoneProvider : BaseZoneProvider
     {
         var zoneRecords = GetZoneRecords(/*state*/).Result;
 
-        Zone zone = new() { Suffix = Zone, Serial = _serial };
+        Zone zone = new() { Suffix = Zone, Serial = Serial };
         zone.Initialize(zoneRecords);
 
         // increment serial number
-        _serial++;
+        Serial++;
         return zone;
     }
 

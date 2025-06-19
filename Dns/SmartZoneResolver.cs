@@ -9,12 +9,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading;
 using Dns.Contracts;
 
 namespace Dns;
 
-public class SmartZoneResolver : IObserver<Zone>, IDnsResolver
+public class SmartZoneResolver : IDnsResolver
 {
     private long                                  _hits;
     private long                                  _misses;
@@ -22,7 +23,11 @@ public class SmartZoneResolver : IObserver<Zone>, IDnsResolver
     private IDisposable                           _subscription;
     private Zone                                  _zone;
     private Dictionary<string, IAddressDispenser> _zoneMap;
-    private DateTime                              _zoneReload = DateTime.MinValue;
+    
+    private static JsonSerializerOptions SerializerOptions { get; } = new()
+    {
+        WriteIndented = true,
+    };
 
     public string GetZoneName() => Zone?.Suffix;
 
@@ -34,13 +39,13 @@ public class SmartZoneResolver : IObserver<Zone>, IDnsResolver
         set
         {
             _zone = value ?? throw new ArgumentNullException(nameof(value));
-            _zoneReload = DateTime.Now;
-            _zoneMap = _zone.ToDictionary(GenerateKey, zoneRecord => new SmartAddressDispenser(zoneRecord) as IAddressDispenser, StringComparer.CurrentCultureIgnoreCase);
+            LastZoneReload = DateTime.Now;
+            _zoneMap = _zone.Records.ToDictionary(GenerateKey, IAddressDispenser (zoneRecord) => new SmartAddressDispenser(zoneRecord), StringComparer.CurrentCultureIgnoreCase);
             Console.WriteLine("Zone reloaded");
         }
     }
 
-    public DateTime LastZoneReload => _zoneReload;
+    public DateTime LastZoneReload { get; private set; } = DateTime.MinValue;
 
     void IObserver<Zone>.OnCompleted() => throw new NotImplementedException();
 
@@ -55,6 +60,21 @@ public class SmartZoneResolver : IObserver<Zone>, IDnsResolver
         writer.WriteLine("Hits:{0}<br/>", _hits);
         writer.WriteLine("Misses:{0}<br/>", _misses);
 
+        writer.WriteLine("<pre>");
+
+        writer.WriteLine($"{_zone.Suffix}                               IN SOA          ns1.eevul.net. marlon.eevul.net. (\n                                                {GetZoneSerial()}      ; serial (d. adams)\n                                                1H              ; refresh\n                                                15M             ; retry\n                                                1W              ; expiry\n                                                1D )            ; minimum\n");
+        foreach (var record in _zoneMap.Select(s => s.Value.ZoneRecord))
+        {
+            foreach (var ipAddress in record.Addresses)
+            {
+                writer.WriteLine($"{record.Host}\t{record.Class} {record.Type}\t{ipAddress}");   
+            }
+        }
+        writer.WriteLine("</pre>");
+        writer.WriteLine("<pre>");
+        writer.WriteLine(JsonSerializer.Serialize(_zone, SerializerOptions));
+        writer.WriteLine("</pre>");
+
         writer.WriteLine("<table>");
         writer.WriteLine("<tr><td>Key</td><td>Value</td></tr>");
         foreach (var key in _zoneMap.Keys)
@@ -67,6 +87,7 @@ public class SmartZoneResolver : IObserver<Zone>, IDnsResolver
         }
         writer.WriteLine("</table>");
     }
+
 
     public bool TryGetHostEntry(string hostName, ResourceClass resClass, ResourceType resType, out IPHostEntry entry)
     {
@@ -87,7 +108,7 @@ public class SmartZoneResolver : IObserver<Zone>, IDnsResolver
         if (_zoneMap.TryGetValue(key, out var dispenser))
         {
             Interlocked.Increment(ref _hits);
-            entry = new() {AddressList = dispenser.GetAddresses().ToArray(), Aliases = new string[] {}, HostName = hostName};
+            entry = new() {AddressList = dispenser.GetAddresses().ToArray(), Aliases = [], HostName = hostName};
             return true;
         }
 

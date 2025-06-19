@@ -8,16 +8,18 @@ using System.Collections.Generic;
 
 namespace Dns;
 
-public class Zone : List<ZoneRecord>
+public class Zone
 {
     public string Suffix { get; set; }
 
     public uint Serial { get; set; }
+    
+    public List<ZoneRecord>  Records { get; } = [];
 
     public void Initialize(IEnumerable<ZoneRecord> nameRecords)
     {
-        Clear();
+        Records.Clear();
         if (nameRecords != null)
-            AddRange(nameRecords);
+            Records.AddRange(nameRecords);
     }
 }

@@ -12,7 +12,7 @@ public class BitPacker
 {
 	private readonly byte[] _buffer;
 	private          int    _bitOffset;
-	private readonly int[]  _mask = {1, 2, 4, 8, 16, 32, 64, 128};
+	private readonly int[]  _mask = [1, 2, 4, 8, 16, 32, 64, 128];
 
 	public BitPacker(byte[] buffer) => _buffer = buffer;
 

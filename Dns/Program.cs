@@ -5,64 +5,43 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
 using Dns.Config;
+using Dns.Contracts;
 using Dns.ZoneProvider;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Ninject;
 
 namespace Dns;
 
-public class Program
+public class Program(IServiceProvider services, AppConfig appConfig, DnsServer dnsServer)
 {
-    private static IServiceProvider _services;
-    public Program(IServiceProvider services)
-    {
-        _services = services;
-    }
-
-    private static readonly IKernel Container = new StandardKernel();
-
-    private static BaseZoneProvider  _zoneProvider; // reloads Zones from machineinfo.csv changes
-    private static SmartZoneResolver _zoneResolver; // resolver and delegated lookup for unsupported zones;
-    private static DnsServer         _dnsServer; // resolver and delegated lookup for unsupported zones;
-    private static HttpServer        _httpServer;
-    public         bool              Running { get; set; } = true;
+    private static readonly List<IDnsResolver> ZoneResolvers = []; // reloads Zones from machineinfo.csv changes
+    private static          HttpServer         _httpServer;
+    public                  bool               Running { get; set; } = true;
 
     /// <summary>
     /// DNS Server entrypoint
     /// </summary>
-    /// <param name="configFile">Fully qualified configuration filename</param>
-    /// <param name="cts">Cancellation Token Source</param>
-    public void Run(string configFile, CancellationToken ct)
+    /// <param name="ct">Cancellation Token Source</param>
+    public void Run(CancellationToken ct)
     {
-
-        if (!File.Exists(configFile))
+        foreach (var zone in appConfig.Server.Zones)
         {
-            throw new FileNotFoundException(null, configFile);
+            var zoneProvider = (IZoneProvider)services.GetRequiredService(ByName(zone.Provider));
+            zoneProvider.Initialize(zone);
+            
+            ZoneResolvers.Add(zoneProvider.Resolver);
+            
+            zoneProvider.Start(ct);
         }
 
-        var appConfig = _services.GetService<AppConfig>();
-        var configuration = _services.GetService<IConfiguration>();
-
-        Container.Bind<BaseZoneProvider>().To(ByName(appConfig.Server.Zone.Provider));
-        var zoneProviderConfig = configuration.GetSection("zoneprovider");
-        _zoneProvider = Container.Get<BaseZoneProvider>();
-        _zoneProvider.Initialize(_services, zoneProviderConfig, appConfig.Server.Zone.Name);
-
-        _zoneResolver = new();
-        _zoneResolver.SubscribeTo(_zoneProvider);
-
-        _dnsServer = new(appConfig.Server.DnsListener.Port);
+        dnsServer.Initialize(ZoneResolvers);
 
         _httpServer = new();
-
-        _dnsServer.Initialize(_zoneResolver);
-
+        
         if(appConfig.Server.WebServer.Enabled)
         {
             _httpServer.Initialize($"http://+:{appConfig.Server.WebServer.Port}/");
@@ -70,18 +49,17 @@ public class Program
             _httpServer.OnHealthProbe += _httpServer_OnHealthProbe;
             _httpServer.Start(ct);
         }
-        _zoneProvider.Start(ct);
-        _dnsServer.Start(ct);
+        
+        dnsServer.Start(ct);
 
         ct.WaitHandle.WaitOne();
-
     }
 
     private static void _httpServer_OnHealthProbe(HttpListenerContext context)
     {
     }
 
-    private static void _httpServer_OnProcessRequest(HttpListenerContext context)
+    private void _httpServer_OnProcessRequest(HttpListenerContext context)
     {
         var rawUrl = context.Request.RawUrl;
         switch (rawUrl)
@@ -90,7 +68,8 @@ public class Program
             {
                 context.Response.Headers.Add("Content-Type","text/html");
                 using var writer = context.Response.OutputStream.CreateWriter();
-                _zoneResolver.DumpHtml(writer);
+                foreach (var zoneResolver in ZoneResolvers)
+                    zoneResolver.DumpHtml(writer);
 
                 break;
             }
@@ -105,7 +84,7 @@ public class Program
             {
                 context.Response.Headers.Add("Content-Type", "text/html");
                 using var writer = context.Response.OutputStream.CreateWriter();
-                _dnsServer.DumpHtml(writer);
+                dnsServer.DumpHtml(writer);
                 break;
             }
             case "/dump/zoneprovider":

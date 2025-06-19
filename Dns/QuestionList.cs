@@ -37,10 +37,7 @@ public class QuestionList : List<Question>
     public long WriteToStream(Stream stream)
     {
         var start = stream.Length;
-        foreach (var question in this)
-        {
-            question.WriteToStream(stream);
-        }
+        foreach (var question in this) question.WriteToStream(stream);
         var end = stream.Length;
         return end - start;
     }

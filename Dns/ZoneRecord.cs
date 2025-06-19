@@ -4,15 +4,15 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
-using System.Net;
+using System.Collections.Generic;
 
 namespace Dns;
 
 public class ZoneRecord
 {
-    public string        Host;
-    public ResourceClass Class = ResourceClass.IN;
-    public ResourceType  Type  = ResourceType.A;
-    public IPAddress[]   Addresses;
-    public int           Count;
+    public string        Host      { get; set; }
+    public ResourceClass Class     { get; set; } = ResourceClass.IN;
+    public ResourceType  Type      { get; set; } = ResourceType.A;
+    public List<string>  Addresses { get; set; }
+    public int           Count     { get; set; }
 }

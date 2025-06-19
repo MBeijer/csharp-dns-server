@@ -1,9 +1,15 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Dns;
 using Dns.Config;
+using Dns.Contracts;
 using Dns.Handlers;
 using Dns.Services;
+using Dns.ZoneProvider.AP;
+using Dns.ZoneProvider.Bind;
+using Dns.ZoneProvider.IPProbe;
+using Dns.ZoneProvider.Traefik;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -48,8 +54,25 @@ internal static class Program
 
             services.AddSingleton(configuration);
             services.AddSingleton(appConfig);
+            services.AddSingleton<DnsServer>();
             services.AddTransient<TraefikClientHandler>();
             services.AddHttpClient<TraefikClientService>().ConfigurePrimaryHttpMessageHandler<TraefikClientHandler>();
+
+            #region Providers
+
+            services.AddTransient<IPProbeZoneProvider>();
+            services.AddTransient<BindZoneProvider>();
+            services.AddTransient<APZoneProvider>();
+            services.AddTransient<TraefikZoneProvider>();
+
+            #endregion
+            
+            #region Resolvers
+
+            services.AddTransient<IDnsResolver, SmartZoneResolver>();
+            
+            #endregion
+            
 
             services.AddLogging(
                 configure =>
@@ -93,7 +116,7 @@ internal static class Program
                 while (myService is { Running: true })
                 {
 
-                    /*await*/ myService?.Run(args[0], Cts.Token);
+                    /*await*/ myService?.Run(Cts.Token);
                     //Thread.Sleep(Engine.DefaultTicks*1000);
                 }
 

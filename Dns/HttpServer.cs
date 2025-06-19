@@ -104,10 +104,10 @@ internal class HttpServer : IHtmlDump
         {
             // TODO: log exception
             OnHandledException?.Invoke(ex);
-            context.Response.StatusCode = 500;
+            //context.Response.StatusCode = 500;
         }
 
-        context.Response.OutputStream.Dispose();
+        //context.Response.OutputStream.Dispose();
 
         var statusCode = context.Response.StatusCode;
 

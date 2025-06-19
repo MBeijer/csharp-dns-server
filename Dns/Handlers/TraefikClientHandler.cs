@@ -1,6 +1,3 @@
 namespace Dns.Handlers;
 
-public class TraefikClientHandler : MyHttpClientHandler
-{
-	public TraefikClientHandler() : base(new()) { }
-}
+public class TraefikClientHandler() : MyHttpClientHandler(new());

@@ -32,7 +32,7 @@ public static class Extensions
         return value;
     }
 
-    private static readonly char[] separator = new[] {'.'};
+    private static readonly char[] separator = ['.'];
 
     public static byte[] GetResourceBytes(this string str, char delimiter = '.')
     {
