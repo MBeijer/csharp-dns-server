@@ -94,7 +94,7 @@ node('master') {
 
 	project.builds.each { v ->
 		branches["Build ${v.DockerRoot}/${v.DockerImage}:${v.DockerTag}"] = {
-			node {
+			node("amd64") {
 				buildStep(v.DockerRoot, v.DockerImage, v.DockerTag, v.Dockerfile, v.BuildIfSuccessful)
 			}
 		}
