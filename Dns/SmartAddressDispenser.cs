@@ -1,4 +1,4 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="SmartAddressDispenser.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
@@ -31,7 +31,7 @@ public class SmartAddressDispenser(ZoneRecord record, ushort maxAddressesReturne
         // starting position in rollover list
         var start  = (int) (_sequence % (ulong) addresses.Length);
         var offset = start;
-            
+
         uint count = 0;
         while (true)
         {
@@ -59,4 +59,6 @@ public class SmartAddressDispenser(ZoneRecord record, ushort maxAddressesReturne
         writer.WriteLine("Sequence:{0}", _sequence);
         foreach (var address in ZoneRecord.Addresses) writer.WriteLine(address);
     }
+
+    public object GetObject() => ZoneRecord.Addresses;
 }

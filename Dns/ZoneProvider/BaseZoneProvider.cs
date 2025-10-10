@@ -9,11 +9,9 @@ namespace Dns.ZoneProvider;
 
 public abstract class BaseZoneProvider(IDnsResolver resolver) : IZoneProvider, IDisposable
 {
-    internal       uint   Serial = 0;
+    protected Zone Zone { get; } = new() { Suffix = "", Serial = 0 };
 
-    protected static string Zone { get; set; }
-
-    public          IDnsResolver Resolver => resolver;
+    public    IDnsResolver Resolver => resolver;
 
     public virtual void Initialize(ZoneOptions zoneOptions) => resolver.SubscribeTo(this);
 
@@ -51,5 +49,5 @@ public abstract class BaseZoneProvider(IDnsResolver resolver) : IZoneProvider, I
     }
 
     public abstract void         Start(CancellationToken ct);
-    
+
 }

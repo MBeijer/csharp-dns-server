@@ -36,8 +36,8 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
 
         // load up initial state from options
         state = new(options);
-        Zone  = zoneOptions.Name;
-        
+        Zone.Suffix  = zoneOptions.Name;
+
         base.Initialize(zoneOptions);
     }
 
@@ -83,9 +83,9 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
 
     private void Stop() => runningTask.Wait(ct);
 
-    internal static IEnumerable<ZoneRecord> GetZoneRecords(State state)
+    private IEnumerable<ZoneRecord> GetZoneRecords(State s)
     {
-        foreach(var host in state.Hosts)
+        foreach(var host in s.Hosts)
         {
             var availableAddresses = host.AddressProbes
                                          .Where(addr => addr.IsAvailable)
@@ -102,7 +102,6 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
                 continue;
             }
 
-
             yield return new()
             {
                 Host = host.Name + Zone,
@@ -114,15 +113,13 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
         }
     }
 
-    private Zone GetZone(State state)
+    private Zone GetZone(State s)
     {
-        var zoneRecords = GetZoneRecords(state);
+        var zoneRecords = GetZoneRecords(s);
 
-        Zone zone = new() { Suffix = Zone, Serial = Serial };
-        zone.Initialize(zoneRecords);
+        Zone.Initialize(zoneRecords);
+        Zone.Serial++;
 
-        // increment serial number
-        Serial++;
-        return zone;
+        return Zone;
     }
 }

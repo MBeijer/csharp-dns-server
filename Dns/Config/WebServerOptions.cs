@@ -1,7 +1,6 @@
 namespace Dns.Config;
 
-public class WebServerOptions 
+public class WebServerOptions
 {
-	public bool Enabled { get; set; }
-	public int  Port    { get; set; }
+	public string JwtSecretKey { get; set; }
 }

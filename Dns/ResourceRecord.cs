@@ -6,6 +6,7 @@
 
 using System;
 using System.IO;
+using Dns.Extensions;
 using Dns.RDataTypes;
 
 namespace Dns;

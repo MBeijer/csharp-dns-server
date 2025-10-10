@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Dns.Extensions;
 
 namespace Dns.RDataTypes;
 

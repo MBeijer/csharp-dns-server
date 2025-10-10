@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration.Json;
 using Xunit;
 
-namespace DnsTest;
+namespace Dns.UnitTests;
 
 public class ConfigTests
 {

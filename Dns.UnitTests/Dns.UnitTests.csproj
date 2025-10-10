@@ -3,7 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
         <IsPackable>false</IsPackable>
-        <RootNamespace>DnsTest</RootNamespace>
+        <RootNamespace>Dns.UnitTests</RootNamespace>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
 

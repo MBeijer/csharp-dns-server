@@ -1,4 +1,4 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="ZoneProvider.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
@@ -27,7 +27,7 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
     private FileSystemWatcher _fileWatcher;
     private Timer             _timer;
 
-    public abstract Zone GenerateZone();
+    protected abstract Zone GenerateZone();
 
     /// <summary>Timespan between last file change and zone generation</summary>
     private TimeSpan FileSettlementPeriod { get; set; } = TimeSpan.FromSeconds(10);
@@ -49,11 +49,11 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
             throw new FileNotFoundException("filename not found", filename);
 
 
-        var directory = Path.GetDirectoryName(filename); 
+        var directory = Path.GetDirectoryName(filename);
         var fileNameFilter = Path.GetFileName(filename);
 
         Filename = filename;
-        _fileWatcher = new(directory, fileNameFilter); 
+        _fileWatcher = new(directory, fileNameFilter);
 
         _fileWatcher.Created += (s, e) => OnCreated(s, e);
         _fileWatcher.Changed += (s, e) => OnChanged(s, e);
@@ -67,8 +67,8 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
         _fileWatcher.Renamed += FileChange;
         _fileWatcher.Deleted += FileChange;
 
-        Zone = zoneOptions.Name;
-        
+        Zone.Suffix = zoneOptions.Name;
+
         base.Initialize(zoneOptions);
     }
 
@@ -95,7 +95,7 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
     private void OnTimer(object state)
     {
         _timer.Change(Timeout.Infinite, Timeout.Infinite);
-        Task.Run(() => GenerateZone()).ContinueWith(t => Notify(t.Result));
+        Task.Run(GenerateZone).ContinueWith(t => Notify(t.Result));
     }
 
 

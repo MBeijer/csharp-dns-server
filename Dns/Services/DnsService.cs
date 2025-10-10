@@ -9,55 +9,36 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
+using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
+using Dns.Extensions;
 using Dns.ZoneProvider;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Dns;
+namespace Dns.Services;
 
-public class Program(IServiceProvider services, AppConfig appConfig, DnsServer dnsServer)
+public class DnsService(IServiceProvider services, AppConfig appConfig, IDnsServer dnsServer) : IDnsService
 {
     private static readonly List<IDnsResolver> ZoneResolvers = []; // reloads Zones from machineinfo.csv changes
-    private static          HttpServer         _httpServer;
     public                  bool               Running { get; set; } = true;
 
-    /// <summary>
-    /// DNS Server entrypoint
-    /// </summary>
-    /// <param name="ct">Cancellation Token Source</param>
-    public void Run(CancellationToken ct)
+    public  List<IDnsResolver> Resolvers => ZoneResolvers;
+    public async Task StartAsync(CancellationToken ct)
     {
         foreach (var zone in appConfig.Server.Zones)
         {
             var zoneProvider = (IZoneProvider)services.GetRequiredService(ByName(zone.Provider));
             zoneProvider.Initialize(zone);
-            
-            ZoneResolvers.Add(zoneProvider.Resolver);
-            
             zoneProvider.Start(ct);
+            ZoneResolvers.Add(zoneProvider.Resolver);
         }
 
         dnsServer.Initialize(ZoneResolvers);
-
-        _httpServer = new();
-        
-        if(appConfig.Server.WebServer.Enabled)
-        {
-            _httpServer.Initialize($"http://+:{appConfig.Server.WebServer.Port}/");
-            _httpServer.OnProcessRequest += _httpServer_OnProcessRequest;
-            _httpServer.OnHealthProbe += _httpServer_OnHealthProbe;
-            _httpServer.Start(ct);
-        }
-        
-        dnsServer.Start(ct);
-
-        ct.WaitHandle.WaitOne();
+        await dnsServer.Start(ct).ConfigureAwait(false);
     }
 
-    private static void _httpServer_OnHealthProbe(HttpListenerContext context)
-    {
-    }
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     private void _httpServer_OnProcessRequest(HttpListenerContext context)
     {
@@ -73,13 +54,6 @@ public class Program(IServiceProvider services, AppConfig appConfig, DnsServer d
 
                 break;
             }
-            case "/dump/httpserver":
-            {
-                context.Response.Headers.Add("Content-Type", "text/html");
-                using var writer = context.Response.OutputStream.CreateWriter();
-                _httpServer.DumpHtml(writer);
-                break;
-            }
             case "/dump/dnsserver":
             {
                 context.Response.Headers.Add("Content-Type", "text/html");
@@ -87,16 +61,8 @@ public class Program(IServiceProvider services, AppConfig appConfig, DnsServer d
                 dnsServer.DumpHtml(writer);
                 break;
             }
-            case "/dump/zoneprovider":
-            {
-                context.Response.Headers.Add("Content-Type", "text/html");
-                using var writer = context.Response.OutputStream.CreateWriter();
-                _httpServer.DumpHtml(writer);
-                break;
-            }
         }
     }
 
     private static Type ByName(string name) => AppDomain.CurrentDomain.GetAssemblies().Reverse().Select(assembly => assembly.GetType(name)).FirstOrDefault(tt => tt != null);
-
 }

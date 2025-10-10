@@ -12,6 +12,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
 using Dns.RDataTypes;
@@ -19,7 +20,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dns;
 
-public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IHtmlDump
+public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IDnsServer
 {
     private IPAddress[]        _defaultDns;
     private UdpListener        _udpListener; // listener for UDP53 traffic
@@ -30,7 +31,7 @@ public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IHtmlDu
 
     private readonly Dictionary<string, EndPoint> _requestResponseMap     = new();
     private readonly ReaderWriterLockSlim         _requestResponseMapLock = new();
-    
+
     /// <summary>Initialize server with specified domain name resolver</summary>
     /// <param name="resolvers"></param>
     public void Initialize(List<IDnsResolver> resolvers)
@@ -45,11 +46,12 @@ public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IHtmlDu
         _defaultDns = GetDefaultDNS().ToArray();
     }
 
-    /// <summary>Start DNS listener</summary>
-    public void Start(CancellationToken ct)
+    public Task Start(CancellationToken ct)
     {
         _udpListener.Start();
         ct.Register(_udpListener.Stop);
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Process UDP Request</summary>
@@ -69,7 +71,7 @@ public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IHtmlDu
         if (message.IsQuery())
         {
             if (message.Questions.Count <= 0) return;
-            
+            IPHostEntry entry = null;
             foreach (var question in message.Questions)
             {
                 logger.LogInformation(
@@ -100,12 +102,12 @@ public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IHtmlDu
                         );
                     }
                 }
-                else if (_resolvers[0].TryGetHostEntry(
-                             question.Name,
-                             question.Class,
-                             question.Type,
-                             out var entry
-                         )) // Right zone, hostname/machine function does exist
+                else if (_resolvers.FirstOrDefault(x => x.TryGetHostEntry(
+                                                                        question.Name,
+                                                                        question.Class,
+                                                                        question.Type,
+                                                                        out entry
+                                                                    )) != null) // Right zone, hostname/machine function does exist
                 {
                     message.QR    = true;
                     message.AA    = true;
@@ -127,8 +129,8 @@ public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IHtmlDu
                     }
                 }
                 else if
-                    (question.Name.EndsWith(
-                            _resolvers[0].GetZoneName()
+                    (_resolvers.Any(x => question.Name.EndsWith(
+                                        x.GetZoneName())
                         )) // Right zone, but the hostname/machine function doesn't exist
                 {
                     message.QR          = true;
@@ -291,4 +293,6 @@ public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IHtmlDu
         }
         writer.WriteLine("DNS Server Status<br/>");
     }
+
+    public object GetObject() => _defaultDns;
 }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Dns.Extensions;
 using Newtonsoft.Json;
 
 namespace Dns.RDataTypes;

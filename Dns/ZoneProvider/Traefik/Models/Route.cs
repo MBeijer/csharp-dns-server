@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace Dns.Models.Traefik;
+namespace Dns.ZoneProvider.Traefik.Models;
 
 public class Route
 {

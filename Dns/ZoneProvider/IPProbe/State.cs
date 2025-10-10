@@ -6,7 +6,7 @@ namespace Dns.ZoneProvider.IPProbe;
 internal class State
 {
     internal readonly HashSet<Target> Targets = new(new Target.Comparer());
-    internal readonly HashSet<Host>   Hosts   = new();
+    internal readonly HashSet<Host>   Hosts   = [];
 
     internal State(IPProbeProviderOptions options)
     {

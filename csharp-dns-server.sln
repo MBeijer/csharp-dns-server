@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dns", "Dns\Dns.csproj", "{6804468B-333A-4A7C-BFC1-FD4E498AB4A6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dnstest", "dnstest\dnstest.csproj", "{126A266A-FF89-4516-BF36-37774EA35CD6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dns.UnitTests", "Dns.UnitTests\Dns.UnitTests.csproj", "{126A266A-FF89-4516-BF36-37774EA35CD6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dns-cli", "dns-cli\dns-cli.csproj", "{57BD1660-D9B3-4ABD-8F5F-9C89F4F1F8AE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dns.Cli", "Dns.Cli\Dns.Cli.csproj", "{57BD1660-D9B3-4ABD-8F5F-9C89F4F1F8AE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

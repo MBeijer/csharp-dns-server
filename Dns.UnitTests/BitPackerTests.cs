@@ -2,7 +2,7 @@
 using Dns.Utility;
 using Xunit;
 
-namespace DnsTest;
+namespace Dns.UnitTests;
 
 public class BitPackerTests
 {

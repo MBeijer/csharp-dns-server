@@ -1,20 +1,23 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="DnsProtocolTest.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
 using System.IO;
-using System.Linq;
 using System.Net;
-using Dns;
 using Dns.RDataTypes;
 using Xunit;
+using Xunit.Abstractions;
 
-namespace DnsTest;
+namespace Dns.UnitTests;
 
 public class DnsProtocolTest
 {
+    public DnsProtocolTest(ITestOutputHelper testOutputHelper)
+    {
+
+    }
     [Fact]
     public void DnsQuery()
     {
@@ -47,7 +50,7 @@ public class DnsProtocolTest
         Assert.Equal(0x0000, query.AdditionalCount);
 
         // Question Checks
-        Assert.Equal(query.QuestionCount, query.Questions.Count());
+        Assert.Equal(query.QuestionCount, query.Questions.Count);
 
         // Q1
         Assert.Equal("www.msn.com.redmond.corp.microsoft.com", query.Questions[0].Name);
@@ -66,12 +69,17 @@ public class DnsProtocolTest
         query.Dump();
     }
 
-    // Response Contains Compression information
     [Fact]
-    public void DnsResponse2()
+    public void DnsMessage_Given_sample_query_Then_response_contains_compression_information()
     {
+        //Arrange
         var sampleQuery = new byte[] {0x00, 0x04, 0x81, 0x80, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x77, 0x77, 0x77, 0x03, 0x6D, 0x73, 0x6E, 0x03, 0x63, 0x6F, 0x6D, 0x00, 0x00, 0x01, 0x00, 0x01, 0xC0, 0x0C, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x02, 0x35, 0x00, 0x1E, 0x02, 0x75, 0x73, 0x03, 0x63, 0x6F, 0x31, 0x03, 0x63, 0x62, 0x33, 0x06, 0x67, 0x6C, 0x62, 0x64, 0x6E, 0x73, 0x09, 0x6D, 0x69, 0x63, 0x72, 0x6F, 0x73, 0x6F, 0x66, 0x74, 0xC0, 0x14, 0xC0, 0x29, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x53, 0x00, 0x04, 0x83, 0xFD, 0x0D, 0x8C};
-        Assert.True(DnsMessage.TryParse(sampleQuery, out var query));
+
+        //Act
+        var result = DnsMessage.TryParse(sampleQuery, out var query);
+
+        //Assert
+        Assert.True(result);
 
         // Header Checks
         Assert.Equal(0x4, query.QueryIdentifier);
@@ -91,7 +99,7 @@ public class DnsProtocolTest
         Assert.Equal(0x0000, query.AdditionalCount);
 
         // Question Checks
-        Assert.Equal(query.QuestionCount, query.Questions.Count());
+        Assert.Equal(query.QuestionCount, query.Questions.Count);
 
         // Q1
         Assert.Equal("www.msn.com", query.Questions[0].Name);
@@ -127,7 +135,7 @@ public class DnsProtocolTest
         Assert.Equal(0x0000, query.AdditionalCount);
 
         // Question Checks
-        Assert.Equal(query.QuestionCount, query.Questions.Count());
+        Assert.Equal(query.QuestionCount, query.Questions.Count);
 
         // Q1
         Assert.Equal("api.bing.com", query.Questions[0].Name);
@@ -135,7 +143,7 @@ public class DnsProtocolTest
         Assert.Equal(ResourceClass.IN, query.Questions[0].Class);
 
         // Answer Checks
-        Assert.Equal(query.AnswerCount, query.Answers.Count());
+        Assert.Equal(query.AnswerCount, query.Answers.Count);
 
         // A1
         Assert.Equal("api.bing.com", query.Answers[0].Name);
@@ -174,7 +182,7 @@ public class DnsProtocolTest
         Assert.Equal(0x0000, query.AdditionalCount);
 
         // Question Checks
-        Assert.Equal(query.QuestionCount, query.Questions.Count());
+        Assert.Equal(query.QuestionCount, query.Questions.Count);
 
         // Q1
         Assert.Equal("secure-us.imrworldwide.com", query.Questions[0].Name);
@@ -188,6 +196,7 @@ public class DnsProtocolTest
     [Fact]
     public void TransitiveQueryTest()
     {
+        //Arrange
         var message = new DnsMessage { QueryIdentifier = 0xFEED, QR = false, Opcode = (byte)OpCode.QUERY, AA = false,
             TC = false,
             RD = true,
@@ -203,13 +212,14 @@ public class DnsProtocolTest
             Questions = [new() { Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A }],
         };
 
-        DnsMessage outMessage;
-        using (var stream = new MemoryStream())
-        {
-            message.WriteToStream(stream);
-            Assert.True(DnsMessage.TryParse(stream.GetBuffer(), out outMessage));
-        }
+        using var  stream = new MemoryStream();
+        message.WriteToStream(stream);
 
+        //Act
+        var result = DnsMessage.TryParse(stream.GetBuffer(), out var outMessage);
+
+        //Assert
+        Assert.True(result);
         Assert.Equal(0xFEED, outMessage.QueryIdentifier);
         Assert.False(outMessage.QR);
         Assert.Equal((byte) OpCode.QUERY, outMessage.Opcode);
@@ -227,7 +237,7 @@ public class DnsProtocolTest
         Assert.Equal(0x0000, outMessage.AdditionalCount);
 
         // Question Checks
-        Assert.Equal(outMessage.QuestionCount, outMessage.Questions.Count());
+        Assert.Equal(outMessage.QuestionCount, outMessage.Questions.Count);
 
         // Q1
         Assert.Equal("www.msn.com", outMessage.Questions[0].Name);
@@ -253,7 +263,7 @@ public class DnsProtocolTest
             Questions = [new() { Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A }],
         };
         message.Answers.Add(new() {Name = "8.8.8.8", Class = ResourceClass.IN, Type = ResourceType.NS, TTL = 468, DataLength = 0, RData = null});
-        RData data = new ANameRData {Address = IPAddress.Parse("8.8.8.9")};
+        var data = new ANameRData {Address = IPAddress.Parse("8.8.8.9")};
         message.Answers.Add(new() {Name = "8.8.8.9", Class = ResourceClass.IN, Type = ResourceType.NS, TTL = 468, RData = data, DataLength = data.Length});
 
         DnsMessage outMessage;
@@ -280,15 +290,15 @@ public class DnsProtocolTest
         Assert.Equal(0x0000, outMessage.AdditionalCount);
 
         // Question Checks
-        Assert.Equal(outMessage.QuestionCount, outMessage.Questions.Count());
+        Assert.Equal(outMessage.QuestionCount, outMessage.Questions.Count);
 
         // Q1
         Assert.Equal("www.msn.com", outMessage.Questions[0].Name);
         Assert.Equal(ResourceType.A, outMessage.Questions[0].Type);
         Assert.Equal(ResourceClass.IN, outMessage.Questions[0].Class);
 
-        Assert.Equal(outMessage.AnswerCount, outMessage.Answers.Count());
-        Assert.Equal(outMessage.AnswerCount, outMessage.Answers.Count());
+        Assert.Equal(outMessage.AnswerCount, outMessage.Answers.Count);
+        Assert.Equal(outMessage.AnswerCount, outMessage.Answers.Count);
         Assert.Equal("8.8.8.8", outMessage.Answers[0].Name);
         Assert.Equal("8.8.8.9", outMessage.Answers[1].Name);
     }

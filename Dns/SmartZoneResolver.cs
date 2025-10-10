@@ -12,6 +12,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using Dns.Contracts;
+using Dns.ZoneProvider;
 
 namespace Dns;
 
@@ -23,7 +24,8 @@ public class SmartZoneResolver : IDnsResolver
     private IDisposable                           _subscription;
     private Zone                                  _zone;
     private Dictionary<string, IAddressDispenser> _zoneMap;
-    
+    private IZoneProvider                         _provider;
+
     private static JsonSerializerOptions SerializerOptions { get; } = new()
     {
         WriteIndented = true,
@@ -55,10 +57,12 @@ public class SmartZoneResolver : IDnsResolver
 
     public void DumpHtml(TextWriter writer)
     {
-        writer.WriteLine("Type:{0}<br/>", GetType().Name);
+        writer.WriteLine("Type:{0}<br/>", _provider.GetType().Name);
         writer.WriteLine("Queries:{0}<br/>", _queries);
         writer.WriteLine("Hits:{0}<br/>", _hits);
         writer.WriteLine("Misses:{0}<br/>", _misses);
+
+        if (_zone == null) return;
 
         writer.WriteLine("<pre>");
 
@@ -67,7 +71,7 @@ public class SmartZoneResolver : IDnsResolver
         {
             foreach (var ipAddress in record.Addresses)
             {
-                writer.WriteLine($"{record.Host}\t{record.Class} {record.Type}\t{ipAddress}");   
+                writer.WriteLine($"{record.Host}\t{record.Class} {record.Type}\t{ipAddress}");
             }
         }
         writer.WriteLine("</pre>");
@@ -88,11 +92,12 @@ public class SmartZoneResolver : IDnsResolver
         writer.WriteLine("</table>");
     }
 
+    public object GetObject() => _zone;
 
     public bool TryGetHostEntry(string hostName, ResourceClass resClass, ResourceType resType, out IPHostEntry entry)
     {
-        if (hostName == null) throw new ArgumentNullException("hostName");
-        if (hostName.Length > 126) throw new ArgumentOutOfRangeException("hostName");
+        if (hostName == null) throw new ArgumentNullException(nameof(hostName));
+        if (hostName.Length > 126) throw new ArgumentOutOfRangeException(nameof(hostName));
 
         entry = null;
 
@@ -128,6 +133,9 @@ public class SmartZoneResolver : IDnsResolver
             _subscription.Dispose();
             _subscription = null;
         }
+
+        if (zoneProvider is IZoneProvider provider)
+            _provider = provider;
 
         _subscription = zoneProvider.Subscribe(this);
     }

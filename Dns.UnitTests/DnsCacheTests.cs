@@ -1,10 +1,9 @@
 using System.Linq;
 using System.Text;
-using Dns;
 using Dns.Contracts;
 using Xunit;
 
-namespace DnsTest;
+namespace Dns.UnitTests;
 
 public class DnsCacheTests
 {

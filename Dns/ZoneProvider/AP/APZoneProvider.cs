@@ -1,4 +1,4 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="ZoneProvider.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
@@ -15,8 +15,7 @@ namespace Dns.ZoneProvider.AP;
 /// <summary>Source of Zone records</summary>
 public class APZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(resolver)
 {
-
-    public override Zone GenerateZone()
+    protected override Zone GenerateZone()
     {
         if (!File.Exists(Filename))
         {
@@ -31,11 +30,9 @@ public class APZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(res
                           .Select(group => new ZoneRecord {Host = group.Key, Count = group.Count(), Addresses = group.Select(address => address.ToString()).ToList()})
                           .ToArray();
 
-        Zone zone = new() { Suffix = Zone, Serial = Serial };
-        zone.Initialize(zoneRecords);
+        Zone.Initialize(zoneRecords);
+        Zone.Serial++;
 
-        // increment serial number
-        Serial++;
-        return zone;
+        return Zone;
     }
 }
