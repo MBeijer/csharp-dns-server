@@ -1,11 +1,11 @@
-using System;
-using System.IO;
 using System.Linq;
 using Dns.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Dns.Cli.Controllers;
+
+#pragma warning disable CS9113
 
 [ApiController]
 [Route("dns/")]
@@ -20,11 +20,7 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer) : Contr
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[HttpGet("resolvers")]
 	public IActionResult? GetDnsResolverData()
-	{
-		using var writer = new StringWriter();
-		foreach (var zoneResolver in dnsService.Resolvers)
-			zoneResolver.DumpHtml(writer);
-
-		return Ok(dnsService.Resolvers.Select(s => s.GetObject()));
-	}
+		=> Ok(dnsService.Resolvers.Select(s => s.GetObject()));
 }
+
+#pragma warning restore CS9113

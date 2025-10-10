@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Dns.Config;
 
 namespace Dns.ZoneProvider.IPProbe;
 
