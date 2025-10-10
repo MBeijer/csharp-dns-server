@@ -7,5 +7,12 @@
   "baseBranches": [
     "master"
   ],
-  "forkProcessing": "enabled"
+  "forkProcessing": "enabled",
+  "packageRules": [
+    {
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["AutoMapper"],
+      "allowedVersions": "<15.0.0"
+    }
+  ]
 }
