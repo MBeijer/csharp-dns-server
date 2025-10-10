@@ -36,9 +36,9 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
 
     public override void Initialize(ZoneOptions zoneOptions)
     {
-        var fileWatcherConfig = zoneOptions.ProviderSettings;
+        var fileWatcherConfig = zoneOptions.ProviderSettings as FileWatcherZoneProviderSettings;
 
-        var filename = fileWatcherConfig.GetValueOrDefault("FileName");
+        var filename = fileWatcherConfig!.FileName;
 
         ArgumentException.ThrowIfNullOrEmpty(filename, "filename");
 

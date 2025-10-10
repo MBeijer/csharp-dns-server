@@ -8,9 +8,9 @@ internal class State
     internal readonly HashSet<Target> Targets = new(new Target.Comparer());
     internal readonly HashSet<Host>   Hosts   = [];
 
-    internal State(IPProbeProviderOptions options)
+    internal State(IPProbeProviderSettings settings)
     {
-        foreach (var host in options.Hosts)
+        foreach (var host in settings.Hosts)
         {
             Host hostResult = new() { Name = host.Name, AvailabilityMode = host.AvailabilityMode };
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
@@ -16,7 +17,7 @@ namespace Dns.ZoneProvider.IPProbe;
 /// </summary>
 public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resolver)
 {
-    private IPProbeProviderOptions options;
+    private IPProbeProviderSettings _settings;
 
     private State             state       { get; set; }
     private CancellationToken ct          { get; set; }
@@ -28,14 +29,15 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
     /// <param name="zoneName">Zone suffix</param>
     public override void Initialize(ZoneOptions zoneOptions)
     {
-        options = new();//TODO: FIXME zoneOptions.ProviderSettings;
-        if (options == null)
+        _settings = zoneOptions.ProviderSettings as IPProbeProviderSettings;
+
+        if (_settings == null)
         {
             throw new("Error loading IPProbeProviderOptions");
         }
 
         // load up initial state from options
-        state = new(options);
+        state = new(_settings);
         Zone.Suffix  = zoneOptions.Name;
 
         base.Initialize(zoneOptions);
@@ -65,7 +67,7 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
             Console.WriteLine("Probe batch duration {0}", batchDuration);
 
             // wait remainder of Polling Interval
-            var remainingWaitTimeout = (this.options.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
+            var remainingWaitTimeout = (this._settings.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
             if(remainingWaitTimeout > 0) ct.WaitHandle.WaitOne(remainingWaitTimeout);
         }
     }

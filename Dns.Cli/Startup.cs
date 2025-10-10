@@ -1,6 +1,10 @@
 ﻿using System;
+using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Xml;
 using Dns.Cli.Extensions;
 using Dns.Cli.Middleware;
@@ -24,6 +28,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -38,7 +43,27 @@ public class Startup(IConfiguration configuration)
         services.AddAutoMapper(typeof(Startup).Assembly);
 
 		services.AddOptions();
-		services.AddOptions<ServerOptions>().Bind(_configuration.GetSection("server"));
+		services.Configure<JsonSerializerOptions>(opts =>
+		{
+			opts.Converters.Add(new JsonStringEnumConverter());
+			opts.TypeInfoResolverChain.Add(new DefaultJsonTypeInfoResolver());
+			opts.NumberHandling = JsonNumberHandling.AllowReadingFromString;
+		});
+		services.AddOptions<ServerOptions>()
+		           .Configure<IConfiguration, IOptions<JsonSerializerOptions>>(
+			           (opt, cfg, json) =>
+			           {
+				           var section = cfg.GetRequiredSection("server");
+
+				           var element = section.ReadJsonElement();
+
+				           var parsed = element.Deserialize<ServerOptions>(json.Value)
+				                        ?? throw new InvalidOperationException("Failed to deserialize ServerOptions.");
+
+				           opt.Zones       = parsed.Zones;
+				           opt.DnsListener = parsed.DnsListener;
+				           opt.WebServer   = parsed.WebServer;
+			           });
 		/*
 		services.AddOptions<DatabaseSettings>().Bind(_configuration.GetSection(nameof(DatabaseSettings)));
 

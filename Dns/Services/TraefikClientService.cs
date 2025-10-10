@@ -4,18 +4,17 @@ using System.Net.Http;
 using System.Security.Authentication;
 using System.Threading.Tasks;
 using Dns.Config;
+using Dns.ZoneProvider.Traefik;
 using Dns.ZoneProvider.Traefik.Models;
 
 namespace Dns.Services;
 
 public class TraefikClientService(HttpClient client)
 {
-	private          ZoneOptions _zoneOptions;
-
-	private string GetSetting(string setting) => !_zoneOptions.ProviderSettings.ContainsKey(setting) ? throw new($"Setting \"{setting}\" is missing from your appsettings.json file") : _zoneOptions.ProviderSettings[setting];
+	private          TraefikZoneProviderSettings _providerSettings;
 
 	// ReSharper disable once MemberCanBeMadeStatic.Global
-	public IPAddress GetDockerHostInternalIp() => IPAddress.Parse(GetSetting("dockerHostInternalIp"));
+	public IPAddress GetDockerHostInternalIp() => IPAddress.Parse(_providerSettings.DockerHostInternalIp);
 
 	public async Task<IEnumerable<Route>> GetRoutes()
 	{
@@ -31,13 +30,13 @@ public class TraefikClientService(HttpClient client)
 
 	public void Initialize(ZoneOptions zoneOptions)
 	{
-		_zoneOptions = zoneOptions;
-		if (!_zoneOptions.ProviderSettings.ContainsKey("traefikUrl") || !_zoneOptions.ProviderSettings.ContainsKey("username") || !_zoneOptions.ProviderSettings.ContainsKey("password"))
+		if (zoneOptions.ProviderSettings is not TraefikZoneProviderSettings providerSettings)
 			throw new("Missing settings for Traefik provider, please update your appsettings.json file");
+		_providerSettings = providerSettings;
 
-		client.BaseAddress = new(GetSetting("traefikUrl"));
-		client.DefaultRequestHeaders.Referrer = new(GetSetting("traefikUrl"));
-		client.DefaultRequestHeaders.Authorization = new BasicAuthenticationHeaderValue(GetSetting("username"), GetSetting("password"));
+		client.BaseAddress = new(_providerSettings.TraefikUrl);
+		client.DefaultRequestHeaders.Referrer = new(_providerSettings.TraefikUrl);
+		client.DefaultRequestHeaders.Authorization = new BasicAuthenticationHeaderValue(_providerSettings.Username, _providerSettings.Password);
 		client.DefaultRequestHeaders.Add("Accept-language", "en");
 	}
 }

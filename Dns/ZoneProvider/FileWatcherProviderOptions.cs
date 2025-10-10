@@ -1,6 +1,9 @@
-﻿namespace Dns.ZoneProvider;
+﻿using System.Text.Json.Serialization;
 
-public class FileWatcherZoneProviderOptions
+namespace Dns.ZoneProvider;
+
+public class FileWatcherZoneProviderSettings : ProviderSettings
 {
+	[JsonPropertyName("fileName")]
     public string FileName { get; set; }
 }

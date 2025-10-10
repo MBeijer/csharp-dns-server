@@ -1,10 +1,16 @@
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using Dns.ZoneProvider;
 
 namespace Dns.Config;
 
 public class ZoneOptions
 {
-	public string                             Name             { get; set; }
-	public string                             Provider         { get; set; }
-	public IReadOnlyDictionary<string,string> ProviderSettings { get; set; }
+	[JsonPropertyName("name")]
+	public string           Name             { get; set; }
+	[JsonPropertyName("provider")]
+	public string           Provider         { get; set; }
+	[JsonPropertyName("providerSettings")]
+	public ProviderSettings ProviderSettings { get; set; }
 }

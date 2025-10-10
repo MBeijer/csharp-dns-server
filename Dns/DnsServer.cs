@@ -17,10 +17,11 @@ using Dns.Config;
 using Dns.Contracts;
 using Dns.RDataTypes;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Dns;
 
-public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IDnsServer
+public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> serverOptions) : IDnsServer
 {
     private IPAddress[]        _defaultDns;
     private UdpListener        _udpListener; // listener for UDP53 traffic
@@ -40,7 +41,7 @@ public class DnsServer(ILogger<DnsServer> logger, AppConfig appConfig) : IDnsSer
 
         _udpListener = new();
 
-        _udpListener.Initialize(appConfig.Server.DnsListener.Port);
+        _udpListener.Initialize(serverOptions.Value.DnsListener.Port);
         _udpListener.OnRequest += ProcessUdpRequest;
 
         _defaultDns = GetDefaultDNS().ToArray();

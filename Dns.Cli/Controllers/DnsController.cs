@@ -19,7 +19,6 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer) : Contr
 	[ProducesResponseType(StatusCodes.Status404NotFound)]
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[HttpGet("resolvers")]
-	[Obsolete("Only available for backwards compatibility")]
 	public IActionResult? GetDnsResolverData()
 	{
 		using var writer = new StringWriter();

@@ -7,26 +7,25 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
-using Dns.Extensions;
 using Dns.ZoneProvider;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Dns.Services;
 
-public class DnsService(IServiceProvider services, AppConfig appConfig, IDnsServer dnsServer) : IDnsService
+public class DnsService(IServiceProvider services, IOptions<ServerOptions> serverOptions, IDnsServer dnsServer) : IDnsService
 {
-    private static readonly List<IDnsResolver> ZoneResolvers = []; // reloads Zones from machineinfo.csv changes
+    private static readonly List<IDnsResolver> ZoneResolvers = [];
     public                  bool               Running { get; set; } = true;
 
     public  List<IDnsResolver> Resolvers => ZoneResolvers;
     public async Task StartAsync(CancellationToken ct)
     {
-        foreach (var zone in appConfig.Server.Zones)
+        foreach (var zone in serverOptions.Value.Zones)
         {
             var zoneProvider = (IZoneProvider)services.GetRequiredService(ByName(zone.Provider));
             zoneProvider.Initialize(zone);
@@ -39,30 +38,6 @@ public class DnsService(IServiceProvider services, AppConfig appConfig, IDnsServ
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    private void _httpServer_OnProcessRequest(HttpListenerContext context)
-    {
-        var rawUrl = context.Request.RawUrl;
-        switch (rawUrl)
-        {
-            case "/dump/dnsresolver":
-            {
-                context.Response.Headers.Add("Content-Type","text/html");
-                using var writer = context.Response.OutputStream.CreateWriter();
-                foreach (var zoneResolver in ZoneResolvers)
-                    zoneResolver.DumpHtml(writer);
-
-                break;
-            }
-            case "/dump/dnsserver":
-            {
-                context.Response.Headers.Add("Content-Type", "text/html");
-                using var writer = context.Response.OutputStream.CreateWriter();
-                dnsServer.DumpHtml(writer);
-                break;
-            }
-        }
-    }
 
     private static Type ByName(string name) => AppDomain.CurrentDomain.GetAssemblies().Reverse().Select(assembly => assembly.GetType(name)).FirstOrDefault(tt => tt != null);
 }
