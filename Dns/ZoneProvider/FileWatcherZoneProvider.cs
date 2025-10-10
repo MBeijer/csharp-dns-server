@@ -1,45 +1,46 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="ZoneProvider.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using Dns.Config;
+using Dns.Contracts;
 
 namespace Dns.ZoneProvider;
 
-public abstract class FileWatcherZoneProvider : BaseZoneProvider
+public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resolver)
 {
     public delegate void FileWatcherDelegate(object sender, FileSystemEventArgs e);
 
-    public event FileWatcherDelegate OnCreated    = delegate { };
-    public event FileWatcherDelegate OnDeleted    = delegate { };
-    public event FileWatcherDelegate OnRenamed    = delegate { };
-    public event FileWatcherDelegate OnChanged    = delegate { };
+    public event FileWatcherDelegate OnCreated    = delegate {};
+    public event FileWatcherDelegate OnDeleted    = delegate {};
+    public event FileWatcherDelegate OnRenamed    = delegate {};
+    public event FileWatcherDelegate OnChanged    = delegate {};
     public event FileWatcherDelegate OnSettlement = delegate {};
 
     private FileSystemWatcher _fileWatcher;
     private Timer             _timer;
 
-    public abstract Zone GenerateZone();
+    protected abstract Zone GenerateZone();
 
     /// <summary>Timespan between last file change and zone generation</summary>
     private TimeSpan FileSettlementPeriod { get; set; } = TimeSpan.FromSeconds(10);
 
     protected string Filename { get; private set; }
 
-    public override void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName)
+    public override void Initialize(ZoneOptions zoneOptions)
     {
-        var filewatcherConfig = config.Get<FileWatcherZoneProviderOptions>();
+        var fileWatcherConfig = zoneOptions.ProviderSettings as FileWatcherZoneProviderSettings;
 
-        var filename = filewatcherConfig.FileName;
+        var filename = fileWatcherConfig!.FileName;
 
-        if (string.IsNullOrWhiteSpace(filename))
-            throw new ArgumentException("Null or empty", "filename");
+        ArgumentException.ThrowIfNullOrEmpty(filename, "filename");
 
         filename = Environment.ExpandEnvironmentVariables(filename);
         filename = Path.GetFullPath(filename);
@@ -48,11 +49,11 @@ public abstract class FileWatcherZoneProvider : BaseZoneProvider
             throw new FileNotFoundException("filename not found", filename);
 
 
-        var directory = Path.GetDirectoryName(filename); 
+        var directory = Path.GetDirectoryName(filename);
         var fileNameFilter = Path.GetFileName(filename);
 
         Filename = filename;
-        _fileWatcher = new(directory, fileNameFilter); 
+        _fileWatcher = new(directory, fileNameFilter);
 
         _fileWatcher.Created += (s, e) => OnCreated(s, e);
         _fileWatcher.Changed += (s, e) => OnChanged(s, e);
@@ -66,7 +67,9 @@ public abstract class FileWatcherZoneProvider : BaseZoneProvider
         _fileWatcher.Renamed += FileChange;
         _fileWatcher.Deleted += FileChange;
 
-        Zone = zoneName;
+        Zone.Suffix = zoneOptions.Name;
+
+        base.Initialize(zoneOptions);
     }
 
     /// <summary>Start watching and generating zone files</summary>
@@ -92,7 +95,7 @@ public abstract class FileWatcherZoneProvider : BaseZoneProvider
     private void OnTimer(object state)
     {
         _timer.Change(Timeout.Infinite, Timeout.Infinite);
-        Task.Run(() => GenerateZone()).ContinueWith(t => Notify(t.Result));
+        Task.Run(GenerateZone).ContinueWith(t => Notify(t.Result));
     }
 
 

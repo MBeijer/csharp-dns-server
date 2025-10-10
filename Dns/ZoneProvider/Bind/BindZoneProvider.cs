@@ -1,16 +1,17 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="BindZoneProvider.cs" >
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using Dns.Contracts;
 
 namespace Dns.ZoneProvider.Bind;
 
-public class BindZoneProvider : FileWatcherZoneProvider
+public class BindZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(resolver)
 {
-    public override Zone GenerateZone()
+    protected override Zone GenerateZone()
     {
         // RFC 1035 - https://tools.ietf.org/html/rfc1035
         // Forward scanning parser

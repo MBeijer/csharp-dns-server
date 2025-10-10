@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using Dns.Config;
+using Dns.Contracts;
 using static System.Threading.Tasks.Task;
 
 namespace Dns.ZoneProvider.IPProbe;
@@ -13,9 +15,9 @@ namespace Dns.ZoneProvider.IPProbe;
 /// Various monitoring strategies are implemented to detect IP health.
 /// Health IP addresses are added to the Zone.
 /// </summary>
-public class IPProbeZoneProvider : BaseZoneProvider
+public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resolver)
 {
-    private IPProbeProviderOptions options;
+    private IPProbeProviderSettings _settings;
 
     private State             state       { get; set; }
     private CancellationToken ct          { get; set; }
@@ -25,17 +27,20 @@ public class IPProbeZoneProvider : BaseZoneProvider
     /// <param name="serviceCollection"></param>
     /// <param name="config">ZoneProvider Configuration Section</param>
     /// <param name="zoneName">Zone suffix</param>
-    public override void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName)
+    public override void Initialize(ZoneOptions zoneOptions)
     {
-        options = config.Get<IPProbeProviderOptions>();
-        if (options == null)
+        _settings = zoneOptions.ProviderSettings as IPProbeProviderSettings;
+
+        if (_settings == null)
         {
             throw new("Error loading IPProbeProviderOptions");
         }
 
         // load up initial state from options
-        state = new(options);
-        Zone = zoneName;
+        state = new(_settings);
+        Zone.Suffix  = zoneOptions.Name;
+
+        base.Initialize(zoneOptions);
     }
 
     public void ProbeLoop(CancellationToken ct)
@@ -62,7 +67,7 @@ public class IPProbeZoneProvider : BaseZoneProvider
             Console.WriteLine("Probe batch duration {0}", batchDuration);
 
             // wait remainder of Polling Interval
-            var remainingWaitTimeout = (this.options.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
+            var remainingWaitTimeout = (this._settings.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
             if(remainingWaitTimeout > 0) ct.WaitHandle.WaitOne(remainingWaitTimeout);
         }
     }
@@ -80,9 +85,9 @@ public class IPProbeZoneProvider : BaseZoneProvider
 
     private void Stop() => runningTask.Wait(ct);
 
-    internal static IEnumerable<ZoneRecord> GetZoneRecords(State state)
+    private IEnumerable<ZoneRecord> GetZoneRecords(State s)
     {
-        foreach(var host in state.Hosts)
+        foreach(var host in s.Hosts)
         {
             var availableAddresses = host.AddressProbes
                                          .Where(addr => addr.IsAvailable)
@@ -91,35 +96,32 @@ public class IPProbeZoneProvider : BaseZoneProvider
             if(host.AvailabilityMode == AvailabilityMode.First) availableAddresses = availableAddresses.Take(1);
 
             // materialize query
-            var addresses = availableAddresses.ToArray();
+            var addresses = availableAddresses.Select(s => s.ToString()).ToList();
 
-            if (addresses.Length == 0)
+            if (addresses.Count == 0)
             {
                 // no hosts with empty recordsets
                 continue;
             }
 
-
             yield return new()
             {
                 Host = host.Name + Zone,
                 Addresses = addresses,
-                Count = addresses.Length,
+                Count = addresses.Count,
                 Type = ResourceType.A,
                 Class = ResourceClass.IN,
             };
         }
     }
 
-    private Zone GetZone(State state)
+    private Zone GetZone(State s)
     {
-        var zoneRecords = GetZoneRecords(state);
+        var zoneRecords = GetZoneRecords(s);
 
-        Zone zone = new() { Suffix = Zone, Serial = _serial };
-        zone.Initialize(zoneRecords);
+        Zone.Initialize(zoneRecords);
+        Zone.Serial++;
 
-        // increment serial number
-        _serial++;
-        return zone;
+        return Zone;
     }
 }

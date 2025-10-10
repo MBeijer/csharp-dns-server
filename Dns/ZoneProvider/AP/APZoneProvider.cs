@@ -1,4 +1,4 @@
-﻿// // //------------------------------------------------------------------------------------------------- 
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="ZoneProvider.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
@@ -7,15 +7,15 @@
 using System.IO;
 using System.Linq;
 using System.Net;
+using Dns.Contracts;
 using Dns.Utility;
 
 namespace Dns.ZoneProvider.AP;
 
 /// <summary>Source of Zone records</summary>
-public class APZoneProvider : FileWatcherZoneProvider
+public class APZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(resolver)
 {
-
-    public override Zone GenerateZone()
+    protected override Zone GenerateZone()
     {
         if (!File.Exists(Filename))
         {
@@ -27,14 +27,12 @@ public class APZoneProvider : FileWatcherZoneProvider
 
         var zoneRecords = machines
                           .GroupBy(machine => machine.MachineFunction + Zone, machine => IPAddress.Parse(machine.StaticIP))
-                          .Select(group => new ZoneRecord {Host = group.Key, Count = group.Count(), Addresses = group.Select(address => address).ToArray()})
+                          .Select(group => new ZoneRecord {Host = group.Key, Count = group.Count(), Addresses = group.Select(address => address.ToString()).ToList()})
                           .ToArray();
 
-        Zone zone = new() { Suffix = Zone, Serial = _serial };
-        zone.Initialize(zoneRecords);
+        Zone.Initialize(zoneRecords);
+        Zone.Serial++;
 
-        // increment serial number
-        _serial++;
-        return zone;
+        return Zone;
     }
 }

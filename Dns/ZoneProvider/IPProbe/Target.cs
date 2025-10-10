@@ -6,10 +6,10 @@ namespace Dns.ZoneProvider.IPProbe;
 
 internal class Target
 {
-    internal          IPAddress         Address;
-    internal          Strategy.Probe    ProbeFunction;
-    internal          ushort            TimeoutMilliseconds;
-    internal readonly List<ProbeResult> Results = new();
+    internal          IPAddress         Address             { get; init; }
+    internal          Strategy.Probe    ProbeFunction       { get; init; }
+    internal          ushort            TimeoutMilliseconds { get; init; }
+    internal readonly List<ProbeResult> Results = [];
 
     public override int GetHashCode() => $"{Address}|{ProbeFunction}|{TimeoutMilliseconds}".GetHashCode();
 
@@ -36,7 +36,7 @@ internal class Target
     {
         public bool Equals(Target x, Target y)
         {
-            //Check whether the objects are the same object. 
+            //Check whether the objects are the same object.
             if (x.Equals(y)) return true;
 
             return x.GetHashCode() == y.GetHashCode();

@@ -2,24 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using Dns.Config;
+using Dns.Contracts;
 
 namespace Dns.ZoneProvider;
 
-public abstract class BaseZoneProvider : IObservable<Zone>, IDisposable
+public abstract class BaseZoneProvider(IDnsResolver resolver) : IZoneProvider, IDisposable
 {
-    internal       uint   _serial = 0;
-    private static string _zone;
+    protected Zone Zone { get; } = new() { Suffix = "", Serial = 0 };
 
-    protected static string Zone
-    {
-        get => _zone;
-        set => _zone = value;
-    }
+    public    IDnsResolver Resolver => resolver;
 
-    public abstract void Initialize(IServiceProvider serviceCollection, IConfiguration config, string zoneName);
+    public virtual void Initialize(ZoneOptions zoneOptions) => resolver.SubscribeTo(this);
 
-    private readonly List<IObserver<Zone>> _observers = new();
+    private readonly List<IObserver<Zone>> _observers = [];
 
     public IDisposable Subscribe(IObserver<Zone> observer)
     {
@@ -32,18 +28,9 @@ public abstract class BaseZoneProvider : IObservable<Zone>, IDisposable
     public abstract void Dispose();
 
     /// <summary>Subscription memento for IObservable interface</summary>
-    public class Subscription : IDisposable
+    public class Subscription(BaseZoneProvider provider, IObserver<Zone> observer) : IDisposable
     {
-        private readonly IObserver<Zone>  _observer;
-        private readonly BaseZoneProvider _provider;
-
-        public Subscription(BaseZoneProvider provider, IObserver<Zone> observer)
-        {
-            _provider = provider;
-            _observer = observer;
-        }
-
-        void IDisposable.Dispose() => _provider.Unsubscribe(_observer);
+        public void Dispose() => provider.Unsubscribe(observer);
     }
 
     /// <summary>Publish zone to all subscribers</summary>
@@ -61,6 +48,6 @@ public abstract class BaseZoneProvider : IObservable<Zone>, IDisposable
         }
     }
 
-    public abstract void Start(CancellationToken ct);
+    public abstract void         Start(CancellationToken ct);
 
 }

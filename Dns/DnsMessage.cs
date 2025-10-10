@@ -6,15 +6,16 @@
 
 using System;
 using System.IO;
+using Dns.Extensions;
 
 namespace Dns;
 
 public class DnsMessage
 {
-    public ResourceList Additionals = new();
-    public ResourceList Answers     = new();
-    public ResourceList Authorities = new();
-    public QuestionList Questions   = new();
+    public ResourceList Additionals = [];
+    public ResourceList Answers     = [];
+    public ResourceList Authorities = [];
+    public QuestionList Questions   = [];
 
     private          ushort _additionalCount;
     private          ushort _answerCount;

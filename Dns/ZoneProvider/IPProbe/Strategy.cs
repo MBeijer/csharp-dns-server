@@ -11,16 +11,16 @@ public class Strategy
     public delegate bool Probe(IPAddress addr, ushort timeout);
 
     // Probe Strategy Dictionary, maps configuration to implemented functions
-    private static Dictionary<string, Probe> probeFunctions = new();
+    private static readonly Dictionary<string, Probe> ProbeFunctions = new();
 
     static Strategy()
     {
         // New probe strategies and enhancements can be added here
-        probeFunctions["ping"] = Ping;
-        probeFunctions["noop"] = NoOp;
+        ProbeFunctions["ping"] = Ping;
+        ProbeFunctions["noop"] = NoOp;
     }
 
-    public static Probe Get(string name) => probeFunctions.GetValueOrDefault(name, NoOp);
+    public static Probe Get(string name) => ProbeFunctions.GetValueOrDefault(name, NoOp);
 
     private static bool Ping(IPAddress address, ushort timeout)
     {

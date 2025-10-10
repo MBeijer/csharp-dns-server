@@ -31,7 +31,7 @@ public class DnsProtocol
         return ret;
     }
 
-    private static readonly char[] trimChars = new[] {'.'};
+    private static readonly char[] trimChars = ['.'];
 
     public static string ReadString(byte[] bytes, ref int currentOffset)
     {
