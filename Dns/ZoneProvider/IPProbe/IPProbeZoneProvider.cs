@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
+using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models;
+using Microsoft.Extensions.Logging;
 using static System.Threading.Tasks.Task;
 
 namespace Dns.ZoneProvider.IPProbe;
@@ -14,7 +17,7 @@ namespace Dns.ZoneProvider.IPProbe;
 /// Various monitoring strategies are implemented to detect IP health.
 /// Health IP addresses are added to the Zone.
 /// </summary>
-public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resolver)
+public class IPProbeZoneProvider(ILogger<IPProbeZoneProvider> logger, IDnsResolver resolver) : BaseZoneProvider(resolver)
 {
     private IPProbeProviderSettings _settings;
 
@@ -44,7 +47,7 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
 
     public void ProbeLoop(CancellationToken ct)
     {
-        Console.WriteLine("Probe loop started");
+        logger.LogInformation("Probe loop started");
 
         ParallelOptions options = new() { CancellationToken = ct, MaxDegreeOfParallelism = 4 };
 
@@ -55,15 +58,15 @@ public class IPProbeZoneProvider(IDnsResolver resolver) : BaseZoneProvider(resol
             Parallel.ForEach(state.Targets, options, probe =>
             {
                 var startTime = DateTime.UtcNow;
-                var result = probe.ProbeFunction(probe.Address, probe.TimeoutMilliseconds);
+                var result = probe.ProbeFunction(logger, probe.Address, probe.TimeoutMilliseconds);
                 var duration = DateTime.UtcNow - startTime;
                 probe.AddResult(new() { StartTime = startTime, Duration = duration, Available = result });
             });
 
-            Run(() => GetZone(state), ct).ContinueWith(t => Notify(t.Result), ct);
+            Run(() => GetZone(state), ct).ContinueWith(t => Notify([t.Result]), ct);
 
             var batchDuration = DateTime.UtcNow - batchStartTime;
-            Console.WriteLine("Probe batch duration {0}", batchDuration);
+            logger.LogInformation("Probe batch duration {BatchDuration}", batchDuration);
 
             // wait remainder of Polling Interval
             var remainingWaitTimeout = (this._settings.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;

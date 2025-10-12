@@ -6,6 +6,8 @@
 
 using System.IO;
 using System.Net;
+using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models.Enums;
 using Dns.RDataTypes;
 using Xunit;
 using Xunit.Abstractions;

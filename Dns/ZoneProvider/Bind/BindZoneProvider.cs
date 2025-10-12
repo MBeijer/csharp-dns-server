@@ -6,6 +6,7 @@
 
 using System;
 using Dns.Contracts;
+using Dns.Models;
 
 namespace Dns.ZoneProvider.Bind;
 

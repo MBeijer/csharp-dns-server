@@ -4,7 +4,7 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
-namespace Dns;
+namespace Dns.Models.Enums;
 
 public enum OpCode
 {

@@ -6,6 +6,7 @@
 
 using System;
 using System.IO;
+using Dns.Db.Models.EntityFramework.Enums;
 using Dns.Extensions;
 
 namespace Dns;

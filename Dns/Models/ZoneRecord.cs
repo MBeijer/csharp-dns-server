@@ -6,8 +6,9 @@
 
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Dns.Db.Models.EntityFramework.Enums;
 
-namespace Dns;
+namespace Dns.Models;
 
 public class ZoneRecord
 {

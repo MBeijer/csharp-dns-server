@@ -5,15 +5,24 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
-using System.Net;
+using System.Collections.Generic;
+using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models;
 
 namespace Dns.Contracts;
 
 /// <summary>Provides domain name resolver capabilities</summary>
-public interface IDnsResolver : IObserver<Zone>, IHtmlDump
+public interface IDnsResolver : IObserver<List<Zone>>, IHtmlDump
 {
-    public void SubscribeTo(IObservable<Zone> zoneProvider);
-    string      GetZoneName();
-    uint        GetZoneSerial();
-    bool        TryGetHostEntry(string hostname, ResourceClass resClass, ResourceType resType, out IPHostEntry entry);
+    public void         SubscribeTo(IObservable<List<Zone>> zoneProvider);
+    IEnumerable<Zone> GetZones();
+
+    bool TryGetZoneRecords(
+        string hostname,
+        ResourceClass resClass,
+        ResourceType resType,
+        out KeyValuePair<Zone, List<ZoneRecord>> entry
+    );
+
+    bool TryGetZone(string hostname, out Zone zone);
 }

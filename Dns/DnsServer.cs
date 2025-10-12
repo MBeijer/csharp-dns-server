@@ -15,6 +15,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
+using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models;
+using Dns.Models.Enums;
 using Dns.RDataTypes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -72,7 +75,8 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
         if (message.IsQuery())
         {
             if (message.Questions.Count <= 0) return;
-            IPHostEntry entry = null;
+            KeyValuePair<Zone, List<ZoneRecord>> zoneRecords = new();
+            Zone zone = null;
             foreach (var question in message.Questions)
             {
                 logger.LogInformation(
@@ -103,36 +107,64 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
                         );
                     }
                 }
-                else if (_resolvers.FirstOrDefault(x => x.TryGetHostEntry(
-                                                                        question.Name,
-                                                                        question.Class,
-                                                                        question.Type,
-                                                                        out entry
-                                                                    )) != null) // Right zone, hostname/machine function does exist
+                else if (_resolvers.FirstOrDefault(x => x.TryGetZoneRecords(
+                                                       question.Name,
+                                                       question.Class,
+                                                       question.Type,
+                                                       out zoneRecords
+                                                   )
+                         ) != null) // Right zone, hostname/machine function does exist
                 {
                     message.QR    = true;
                     message.AA    = true;
                     message.RA    = false;
                     message.RCode = (byte)RCode.NOERROR;
-                    foreach (var address in entry.AddressList)
+                    foreach (var zoneRecord in zoneRecords.Value)
                     {
+                        var answer = new ResourceRecord()
+                        {
+                            Name  = question.Name,
+                            Class = zoneRecord.Class,
+                            Type  = zoneRecord.Type,
+                            TTL   = 10,
+                        };
+
+                        switch (zoneRecord.Type)
+                        {
+                            case ResourceType.A:
+                                answer.RData = new ANameRData { Address = IPAddress.Parse(zoneRecord.Addresses[0]) };
+                                break;
+                            case ResourceType.CNAME:
+                                answer.RData = new CNameRData { Name = zoneRecord.Addresses[0] };
+                                break;
+                            case ResourceType.SOA:
+                                answer.RData = new StatementOfAuthorityRData
+                                {
+                                    PrimaryNameServer               = Environment.MachineName,
+                                    ResponsibleAuthoritativeMailbox = zoneRecord.Addresses[0],
+                                    Serial                          = zoneRecords.Key.Serial,
+                                    ExpirationLimit                 = 86400,
+                                    RetryInterval                   = 300,
+                                    RefreshInterval                 = 300,
+                                    MinimumTTL                      = 300,
+                                };
+                                answer.TTL = (answer.RData as StatementOfAuthorityRData).MinimumTTL;
+                                break;
+                            case ResourceType.TEXT:
+                                answer.RData = new TXTRData { Name = zoneRecord.Addresses[0] };
+                                break;
+                        }
+
                         message.AnswerCount++;
-                        message.Answers.Add(
-                            new()
-                            {
-                                Name  = question.Name,
-                                Class = ResourceClass.IN,
-                                Type  = ResourceType.A,
-                                TTL   = 10,
-                                RData = new ANameRData { Address = address },
-                            }
-                        );
+                        message.Answers.Add(answer);
                     }
                 }
                 else if
-                    (_resolvers.Any(x => question.Name.EndsWith(
-                                        x.GetZoneName())
-                        )) // Right zone, but the hostname/machine function doesn't exist
+                    (_resolvers.FirstOrDefault(x => x.TryGetZone(
+                                                   question.Name,
+                                                   out zone
+                                               )
+                     ) != null) // Right zone, but the hostname/machine function doesn't exist
                 {
                     message.QR          = true;
                     message.AA          = true;
@@ -145,7 +177,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
                     {
                         PrimaryNameServer               = Environment.MachineName,
                         ResponsibleAuthoritativeMailbox = "stephbu." + Environment.MachineName,
-                        Serial                          = _resolvers[0].GetZoneSerial(),
+                        Serial                          = zone.Serial,
                         ExpirationLimit                 = 86400,
                         RetryInterval                   = 300,
                         RefreshInterval                 = 300,

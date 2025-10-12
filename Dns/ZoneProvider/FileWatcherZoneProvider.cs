@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
+using Dns.Models;
 
 namespace Dns.ZoneProvider;
 
@@ -94,7 +95,7 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
     private void OnTimer(object state)
     {
         _timer.Change(Timeout.Infinite, Timeout.Infinite);
-        Task.Run(GenerateZone).ContinueWith(t => Notify(t.Result));
+        Task.Run(GenerateZone).ContinueWith(t => Notify([t.Result]));
     }
 
 

@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using Dns.Contracts;
+using Dns.Models;
 
 namespace Dns;
 

@@ -4,7 +4,7 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
-namespace Dns;
+namespace Dns.Db.Models.EntityFramework.Enums;
 
 public enum ResourceType : ushort
 {

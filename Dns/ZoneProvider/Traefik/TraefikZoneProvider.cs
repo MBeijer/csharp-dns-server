@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
+using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models;
 using Dns.Services;
 using Dns.ZoneProvider.Traefik.Models;
 using Microsoft.Extensions.Logging;
@@ -44,7 +46,7 @@ public partial class TraefikZoneProvider(ILogger<TraefikZoneProvider> logger, Tr
         {
             var batchStartTime = DateTime.UtcNow;
 
-            Run(GetZone, ct).ContinueWith(t => Notify(t.Result), ct);
+            Run(GetZone, ct).ContinueWith(t => Notify([t.Result]), ct);
 
             var batchDuration = DateTime.UtcNow - batchStartTime;
             logger.LogInformation("Probe batch duration {BatchDuration}", batchDuration);

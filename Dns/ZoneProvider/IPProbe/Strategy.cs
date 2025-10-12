@@ -2,34 +2,31 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
+using Microsoft.Extensions.Logging;
 
 namespace Dns.ZoneProvider.IPProbe;
 
 public class Strategy
 {
+    public delegate bool Probe(ILogger logger, IPAddress addr, ushort timeout);
 
-    public delegate bool Probe(IPAddress addr, ushort timeout);
-
-    // Probe Strategy Dictionary, maps configuration to implemented functions
     private static readonly Dictionary<string, Probe> ProbeFunctions = new();
 
     static Strategy()
     {
-        // New probe strategies and enhancements can be added here
         ProbeFunctions["ping"] = Ping;
         ProbeFunctions["noop"] = NoOp;
     }
 
     public static Probe Get(string name) => ProbeFunctions.GetValueOrDefault(name, NoOp);
 
-    private static bool Ping(IPAddress address, ushort timeout)
+    private static bool Ping(ILogger logger, IPAddress address, ushort timeout)
     {
-        Console.WriteLine("Ping: pinging {0}", address);
-        Ping sender = new();
-        PingOptions options = new(64, true);
-        var pingReply = sender.Send(address, timeout);
+        logger.LogInformation("Ping: pinging {Address}", address);
+        Ping sender    = new();
+        var  pingReply = sender.Send(address, timeout);
         return pingReply?.Status == IPStatus.Success;
     }
 
-    private static bool NoOp(IPAddress address, ushort _) => true;
+    private static bool NoOp(ILogger logger, IPAddress address, ushort _) => true;
 }

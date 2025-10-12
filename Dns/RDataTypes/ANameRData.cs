@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using Dns.Db.Models.EntityFramework.Enums;
 
 namespace Dns.RDataTypes;
 

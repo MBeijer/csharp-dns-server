@@ -6,6 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Dns.Cli.Controllers;
 
+/// <summary>
+///
+/// </summary>
+/// <param name="dnsService"></param>
+/// <param name="dnsServer"></param>
 [ApiController]
 [Route("dump/")]
 [Obsolete("Only available for backwards compatibility")]
