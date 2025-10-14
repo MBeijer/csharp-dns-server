@@ -1,19 +1,13 @@
-version: "3"
 services:
   dns-service:
     #image: mbeijer/dns-traefik:latest
     build: .
     restart: always
     volumes:
-      - $PWD/appsettings.json:/app/appsettings.json
+      - ./appsettings.json:/app/appsettings.json
+      - ./data:/data
     ports:
       - "53:5335/udp"
+      - "80:80/tcp"
     dns:
       - 8.8.8.8
-    networks:
-      - traefik
-
-networks:
-  traefik:
-    external:
-      name: traefik_default

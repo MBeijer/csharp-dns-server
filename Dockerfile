@@ -14,13 +14,12 @@ FROM build AS publish
 RUN dotnet publish "Dns.Cli.csproj" -c Release -o /app/publish
 
 FROM base AS final
-RUN useradd -ms /bin/bash tbnotify
-RUN sed "s|MinProtocol = TLSv1.2|MinProtocol = TLSv1.1|" -i /etc/ssl/openssl.cnf
-RUN sed "s|DEFAULT@SECLEVEL=2|DEFAULT@SECLEVEL=1|" -i /etc/ssl/openssl.cnf
+RUN useradd -ms /bin/bash dns
 
-USER tbnotify
+USER dns
 WORKDIR /app
 COPY --from=publish /app/publish .
+ENV ASPNETCORE_URLS="http://*:80"
 ENTRYPOINT ["dotnet", "Dns.Cli.dll"]
 EXPOSE 5335/udp
 EXPOSE 80/tcp
