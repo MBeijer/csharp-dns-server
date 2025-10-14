@@ -5,6 +5,7 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY ["Dns/Dns.csproj", "Dns/"]
 COPY ["Dns.Cli/Dns.Cli.csproj", "Dns.Cli/"]
+COPY ["Dns.Db/Dns.Db.csproj", "Dns.Db/"]
 RUN dotnet restore "Dns.Cli/Dns.Cli.csproj"
 COPY . .
 WORKDIR "/src/Dns.Cli"
