@@ -39,8 +39,17 @@ using Microsoft.OpenApi.Models;
 
 namespace Dns.Cli;
 
+/// <summary>
+///
+/// </summary>
+/// <param name="configuration"></param>
 public class Startup(IConfiguration configuration)
 {
+	/// <summary>
+	///
+	/// </summary>
+	/// <param name="services"></param>
+	/// <exception cref="InvalidOperationException"></exception>
 	public void ConfigureServices(IServiceCollection services)
 	{
 		services.AddAutoMapper(typeof(Startup).Assembly);

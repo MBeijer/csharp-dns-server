@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Dns.Db.Repositories;
 
+#pragma warning disable CS9113
+
 public class UserRepository(ILogger<UserRepository> logger, DnsServerDbContext dbContext) : IUserRepository
 {
 	public Task<List<User>> GetUsers() => dbContext.Users!.AsNoTracking().ToListAsync();
@@ -19,3 +21,5 @@ public class UserRepository(ILogger<UserRepository> logger, DnsServerDbContext d
 		await dbContext.SaveChangesAsync().ConfigureAwait(false);
 	}
 }
+
+#pragma warning restore CS9113

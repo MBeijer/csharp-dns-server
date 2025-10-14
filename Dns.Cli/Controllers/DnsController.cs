@@ -15,6 +15,7 @@ namespace Dns.Cli.Controllers;
 /// </summary>
 /// <param name="dnsService"></param>
 /// <param name="dnsServer"></param>
+/// <param name="zoneRepository"></param>
 [ApiController]
 [Route("dns/")]
 public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRepository zoneRepository) : ControllerBase

@@ -35,6 +35,10 @@ public class DumpController(IDnsService dnsService, IDnsServer dnsServer) : Cont
 		return Content(writer.ToString(), "text/html");
 	}
 
+	/// <summary>
+	///     Dump DnsServer data
+	/// </summary>
+	/// <returns></returns>
 	[ProducesResponseType(StatusCodes.Status200OK)]
 	[ProducesResponseType(StatusCodes.Status404NotFound)]
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]

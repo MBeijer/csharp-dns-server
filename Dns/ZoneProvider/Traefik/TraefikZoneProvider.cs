@@ -68,8 +68,8 @@ public partial class TraefikZoneProvider(ILogger<TraefikZoneProvider> logger, Tr
 
     private void Stop() => RunningTask.Wait(Ct);
 
-    private async Task<IEnumerable<ZoneRecord>> GetZoneRecords(/*State state*/) =>
-        (from host in await traefikClientService.GetRoutes()
+    private async Task<IEnumerable<ZoneRecord>> GetZoneRecords() =>
+        (from host in await traefikClientService.GetRoutes().ConfigureAwait(false)
          where (host.Provider.Equals("docker", StringComparison.InvariantCultureIgnoreCase) || host.EntryPoints.Contains("web")) && host.Tls == null && host.Rule.Contains(Zone.Suffix)
          select new ZoneRecord
          {

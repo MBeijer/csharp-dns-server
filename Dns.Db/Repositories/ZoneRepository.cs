@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Dns.Db.Repositories;
 
+#pragma warning disable CS9113
+
 public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext dbContext) : IZoneRepository
 {
 	public Task<List<Zone>> GetZones()                => dbContext.Zones!.AsNoTracking().ToListAsync();
@@ -20,3 +22,5 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 		await dbContext.SaveChangesAsync().ConfigureAwait(false);
 	}
 }
+
+#pragma warning restore CS9113

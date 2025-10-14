@@ -18,12 +18,12 @@ public class TraefikClientService(HttpClient client)
 
 	public async Task<IEnumerable<Route>> GetRoutes()
 	{
-		using var response = await client.GetAsync("/api/http/routers?search=&status=&per_page=1000&page=1");
+		using var response = await client.GetAsync("/api/http/routers?search=&status=&per_page=1000&page=1").ConfigureAwait(false);
 
-		if (response.StatusCode is not HttpStatusCode.OK) throw new AuthenticationException(await response.Content.ReadAsStringAsync());
+		if (response.StatusCode is not HttpStatusCode.OK) throw new AuthenticationException(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
 
-		var str = await response.Content.ReadAsStringAsync();
-		var routes = await response.Content.ReadAsAsync<IEnumerable<Route>>();
+		var str = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+		var routes = await response.Content.ReadAsAsync<IEnumerable<Route>>().ConfigureAwait(false);
 
 		return routes;
 	}
