@@ -6,6 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Dns.Cli.Controllers;
 
+/// <summary>
+///
+/// </summary>
+/// <param name="dnsService"></param>
+/// <param name="dnsServer"></param>
 [ApiController]
 [Route("dump/")]
 [Obsolete("Only available for backwards compatibility")]
@@ -30,6 +35,10 @@ public class DumpController(IDnsService dnsService, IDnsServer dnsServer) : Cont
 		return Content(writer.ToString(), "text/html");
 	}
 
+	/// <summary>
+	///     Dump DnsServer data
+	/// </summary>
+	/// <returns></returns>
 	[ProducesResponseType(StatusCodes.Status200OK)]
 	[ProducesResponseType(StatusCodes.Status404NotFound)]
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]

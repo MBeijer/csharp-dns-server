@@ -1,6 +1,9 @@
+using System.Text.Json.Serialization;
+
 namespace Dns.Config;
 
 public class AppConfig
 {
-   public ServerOptions Server { get; set; } 
+   [JsonPropertyName("server")]
+   public ServerOptions Server { get; set; }
 }

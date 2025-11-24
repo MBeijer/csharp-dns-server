@@ -5,8 +5,16 @@ using Microsoft.AspNetCore.Http;
 
 namespace Dns.Cli.Middleware;
 
+/// <summary>
+///
+/// </summary>
+/// <param name="next"></param>
 public class PrependBearerSchemeMiddleware(RequestDelegate next)
 {
+	/// <summary>
+	///
+	/// </summary>
+	/// <param name="context"></param>
 	public async Task Invoke(HttpContext context)
 	{
 		var authorizationHeader = context.Request.Headers.Authorization.FirstOrDefault();

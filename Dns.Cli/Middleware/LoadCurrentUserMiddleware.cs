@@ -3,10 +3,21 @@ using Microsoft.AspNetCore.Http;
 
 namespace Dns.Cli.Middleware;
 
+/// <summary>
+///
+/// </summary>
+/// <param name="next"></param>
 public sealed class LoadCurrentUserMiddleware(RequestDelegate next)
 {
+	/// <summary>
+	///
+	/// </summary>
 	public const string HttpContextItemKey = "CurrentUser";
 
+	/// <summary>
+	///
+	/// </summary>
+	/// <param name="context"></param>
 	public async Task InvokeAsync(HttpContext context/*, IUserRepository userRepository*/)
 	{
 		var ct = context.RequestAborted;

@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using Dns.Contracts;
+using Dns.Models;
 using Dns.Utility;
 
 namespace Dns.ZoneProvider.AP;

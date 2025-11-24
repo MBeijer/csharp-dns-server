@@ -6,7 +6,7 @@
 
 using System.Net.Sockets;
 
-namespace Dns;
+namespace Dns.Extensions;
 
 public static class SocketExtensions
 {

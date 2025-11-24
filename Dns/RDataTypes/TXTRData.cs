@@ -15,6 +15,7 @@ public class TXTRData : RData
 		(ushort) (Name.Length + 1);
 
 	// ReSharper disable once IdentifierTypo
+	public TXTRData() {}
 	private TXTRData(byte[] bytes, int offset, int size) => Name = DnsProtocol.ReadString(bytes, ref offset)[..(size-1)].Trim();
 
 

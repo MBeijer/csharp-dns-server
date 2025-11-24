@@ -6,6 +6,7 @@
 
 using System.Collections.Generic;
 using System.Net;
+using Dns.Models;
 
 namespace Dns.Contracts;
 

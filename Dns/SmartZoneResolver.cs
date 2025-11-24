@@ -12,48 +12,47 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using Dns.Contracts;
+using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models;
 using Dns.ZoneProvider;
+using Microsoft.Extensions.Logging;
 
 namespace Dns;
 
-public class SmartZoneResolver : IDnsResolver
+public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 {
-    private long                                  _hits;
-    private long                                  _misses;
-    private long                                  _queries;
-    private IDisposable                           _subscription;
-    private Zone                                  _zone;
-    private Dictionary<string, IAddressDispenser> _zoneMap;
-    private IZoneProvider                         _provider;
+    private long          _hits;
+    private long          _misses;
+    private long          _queries;
+    private IDisposable   _subscription;
+    private List<Zone>    _zones = [];
+    private IZoneProvider _provider;
 
     private static JsonSerializerOptions SerializerOptions { get; } = new()
     {
         WriteIndented = true,
     };
 
-    public string GetZoneName() => Zone?.Suffix;
+    public IEnumerable<Zone> GetZones() => Zones;
 
-    public uint GetZoneSerial() => _zone.Serial;
-
-    private Zone Zone
+    private List<Zone> Zones
     {
-        get => _zone;
+        get => _zones;
         set
         {
-            _zone = value ?? throw new ArgumentNullException(nameof(value));
+            _zones = value ?? throw new ArgumentNullException(nameof(value));
             LastZoneReload = DateTime.Now;
-            _zoneMap = _zone.Records.ToDictionary(GenerateKey, IAddressDispenser (zoneRecord) => new SmartAddressDispenser(zoneRecord), StringComparer.CurrentCultureIgnoreCase);
-            Console.WriteLine("Zone reloaded");
+            logger.LogInformation("Zone reloaded");
         }
     }
 
     public DateTime LastZoneReload { get; private set; } = DateTime.MinValue;
 
-    void IObserver<Zone>.OnCompleted() => throw new NotImplementedException();
+    void IObserver<List<Zone>>.OnCompleted() => throw new NotImplementedException();
 
-    void IObserver<Zone>.OnError(Exception error) => throw new NotImplementedException();
+    void IObserver<List<Zone>>.OnError(Exception error) => throw new NotImplementedException();
 
-    void IObserver<Zone>.OnNext(Zone value) => Zone = value;
+    void IObserver<List<Zone>>.OnNext(List<Zone> value) => Zones = value;
 
     public void DumpHtml(TextWriter writer)
     {
@@ -62,58 +61,27 @@ public class SmartZoneResolver : IDnsResolver
         writer.WriteLine("Hits:{0}<br/>", _hits);
         writer.WriteLine("Misses:{0}<br/>", _misses);
 
-        if (_zone == null) return;
-
-        writer.WriteLine("<pre>");
-
-        writer.WriteLine($"{_zone.Suffix}                               IN SOA          ns1.eevul.net. marlon.eevul.net. (\n                                                {GetZoneSerial()}      ; serial (d. adams)\n                                                1H              ; refresh\n                                                15M             ; retry\n                                                1W              ; expiry\n                                                1D )            ; minimum\n");
-        foreach (var record in _zoneMap.Select(s => s.Value.ZoneRecord))
-        {
-            foreach (var ipAddress in record.Addresses)
-            {
-                writer.WriteLine($"{record.Host}\t{record.Class} {record.Type}\t{ipAddress}");
-            }
-        }
-        writer.WriteLine("</pre>");
-        writer.WriteLine("<pre>");
-        writer.WriteLine(JsonSerializer.Serialize(_zone, SerializerOptions));
-        writer.WriteLine("</pre>");
-
-        writer.WriteLine("<table>");
-        writer.WriteLine("<tr><td>Key</td><td>Value</td></tr>");
-        foreach (var key in _zoneMap.Keys)
-        {
-            writer.WriteLine("<tr><td>");
-            writer.WriteLine(key);
-            writer.WriteLine("</td><td>");
-            _zoneMap[key].DumpHtml(writer);
-            writer.WriteLine("</td></tr>");
-        }
-        writer.WriteLine("</table>");
+        if (_zones == null) return;
     }
 
-    public object GetObject() => _zone;
+    public object GetObject() => _zones;
 
-    public bool TryGetHostEntry(string hostName, ResourceClass resClass, ResourceType resType, out IPHostEntry entry)
+    public bool TryGetZone(string hostName, out Zone zone)
     {
-        if (hostName == null) throw new ArgumentNullException(nameof(hostName));
+        zone = null;
+        ArgumentNullException.ThrowIfNull(hostName);
         if (hostName.Length > 126) throw new ArgumentOutOfRangeException(nameof(hostName));
-
-        entry = null;
 
         Interlocked.Increment(ref _queries);
 
-        // fail fasts
-        if (!IsZoneLoaded()) return false;
-        if (!hostName.EndsWith(_zone.Suffix)) return false;
+        if (!AreZonesLoaded()) return false;
 
-        // lookup locally
-        if (resType is ResourceType.ALL or ResourceType.ANY) resType = ResourceType.A;
-        var key = GenerateKey(hostName, resClass, resType);
-        if (_zoneMap.TryGetValue(key, out var dispenser))
+        zone = _zones.FirstOrDefault(zone => hostName.EndsWith(zone.Suffix));
+
+        if (zone != null)
         {
             Interlocked.Increment(ref _hits);
-            entry = new() {AddressList = dispenser.GetAddresses().ToArray(), Aliases = [], HostName = hostName};
+
             return true;
         }
 
@@ -121,11 +89,53 @@ public class SmartZoneResolver : IDnsResolver
         return false;
     }
 
-    public bool IsZoneLoaded() => _zone != null;
+    public bool TryGetZoneRecords(string hostName, ResourceClass resClass, ResourceType resType, out KeyValuePair<Zone, List<ZoneRecord>> entry)
+    {
+        entry = new();
+		ArgumentNullException.ThrowIfNull(hostName);
+		if (hostName.Length > 126) throw new ArgumentOutOfRangeException(nameof(hostName));
+
+        Interlocked.Increment(ref _queries);
+
+        if (!AreZonesLoaded()) return false;
+
+        foreach (var zone in _zones.Where(zone => hostName.EndsWith(zone.Suffix)))
+        {
+            if (resType is ResourceType.ALL or ResourceType.ANY)
+            {
+                if (zone.Records.FindAll(x => x.Host == hostName.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "") && x.Class == resClass) is
+                    {
+                        Count: > 0,
+                    } records1)
+                {
+                    Interlocked.Increment(ref _hits);
+
+                    entry = new(zone, records1);
+                    return true;
+                }
+            }
+
+            if (zone.Records.FindAll(x => x.Host == hostName.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "") && x.Class == resClass && x.Type == resType) is
+                {
+                    Count: > 0,
+                } records)
+            {
+                Interlocked.Increment(ref _hits);
+
+                entry = new(zone, records);
+                return true;
+            }
+        }
+
+        Interlocked.Increment(ref _misses);
+        return false;
+    }
+
+    public bool AreZonesLoaded() => _zones.Count > 0;
 
     /// <summary>Subscribe to specified zone provider</summary>
     /// <param name="zoneProvider"></param>
-    public void SubscribeTo(IObservable<Zone> zoneProvider)
+    public void SubscribeTo(IObservable<List<Zone>> zoneProvider)
     {
         // release previous subscription
         if (_subscription != null)
@@ -139,8 +149,4 @@ public class SmartZoneResolver : IDnsResolver
 
         _subscription = zoneProvider.Subscribe(this);
     }
-
-    private static string GenerateKey(ZoneRecord record) => GenerateKey(record.Host, record.Class, record.Type);
-
-    private static string GenerateKey(string host, ResourceClass resClass, ResourceType resType) => $"{host}|{resClass}|{resType}";
 }

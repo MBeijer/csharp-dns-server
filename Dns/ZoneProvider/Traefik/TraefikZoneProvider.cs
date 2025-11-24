@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
 using Dns.Contracts;
+using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models;
 using Dns.Services;
 using Dns.ZoneProvider.Traefik.Models;
 using Microsoft.Extensions.Logging;
@@ -44,7 +46,7 @@ public partial class TraefikZoneProvider(ILogger<TraefikZoneProvider> logger, Tr
         {
             var batchStartTime = DateTime.UtcNow;
 
-            Run(GetZone, ct).ContinueWith(t => Notify(t.Result), ct);
+            Run(GetZone, ct).ContinueWith(t => Notify([t.Result]), ct);
 
             var batchDuration = DateTime.UtcNow - batchStartTime;
             logger.LogInformation("Probe batch duration {BatchDuration}", batchDuration);
@@ -66,8 +68,8 @@ public partial class TraefikZoneProvider(ILogger<TraefikZoneProvider> logger, Tr
 
     private void Stop() => RunningTask.Wait(Ct);
 
-    private async Task<IEnumerable<ZoneRecord>> GetZoneRecords(/*State state*/) =>
-        (from host in await traefikClientService.GetRoutes()
+    private async Task<IEnumerable<ZoneRecord>> GetZoneRecords() =>
+        (from host in await traefikClientService.GetRoutes().ConfigureAwait(false)
          where (host.Provider.Equals("docker", StringComparison.InvariantCultureIgnoreCase) || host.EntryPoints.Contains("web")) && host.Tls == null && host.Rule.Contains(Zone.Suffix)
          select new ZoneRecord
          {

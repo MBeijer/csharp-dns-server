@@ -6,7 +6,7 @@
 
 using System.Collections.Generic;
 
-namespace Dns;
+namespace Dns.Models;
 
 public class Zone
 {
