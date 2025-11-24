@@ -69,7 +69,7 @@ public class IPProbeZoneProvider(ILogger<IPProbeZoneProvider> logger, IDnsResolv
             logger.LogInformation("Probe batch duration {BatchDuration}", batchDuration);
 
             // wait remainder of Polling Interval
-            var remainingWaitTimeout = (this._settings.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
+            var remainingWaitTimeout = (_settings.PollingIntervalSeconds * 1000) -(int)batchDuration.TotalMilliseconds;
             if(remainingWaitTimeout > 0) ct.WaitHandle.WaitOne(remainingWaitTimeout);
         }
     }

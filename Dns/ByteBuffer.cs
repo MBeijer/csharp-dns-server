@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+
 // ReSharper disable NonReadonlyMemberInGetHashCode
 
 namespace Dns;
@@ -10,7 +11,7 @@ namespace Dns;
 public class ByteBuffer
 {
 	private readonly List<byte> _mBuffer       = [];
-	private          int        _mReadPosition = 0;
+	private          int        _mReadPosition;
 
 	public ByteBuffer(string buffer = "") => Write(Encoding.Default.GetBytes(buffer));
 	private ByteBuffer(IEnumerable<byte> str) => _mBuffer = str.ToList();

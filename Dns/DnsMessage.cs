@@ -6,7 +6,6 @@
 
 using System;
 using System.IO;
-using Dns.Db.Models.EntityFramework.Enums;
 using Dns.Extensions;
 using Dns.Models.Enums;
 
@@ -241,7 +240,7 @@ public class DnsMessage
         }
     }
 
-    public bool IsQuery() => QR == false;
+    public bool IsQuery() => !QR;
 
     /// <summary></summary>
     /// <param name="bytes"></param>
@@ -328,7 +327,6 @@ public class DnsMessage
                 Console.WriteLine();
             }
         }
-
     }
 
     public byte[] GetBytes()

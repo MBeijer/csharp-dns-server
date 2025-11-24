@@ -20,6 +20,6 @@ public class NSRData : RData
 
 	public override void Dump()
 	{
-		Console.WriteLine("CName:   {0}", Name);
+		Console.WriteLine("NameServer:   {0}", Name);
 	}
 }

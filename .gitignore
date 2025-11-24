@@ -7,6 +7,7 @@ Dns.Cli/dns.db*
 *.suo
 *.user
 *.sln.docstates
+*.orig
 
 # Build results
 

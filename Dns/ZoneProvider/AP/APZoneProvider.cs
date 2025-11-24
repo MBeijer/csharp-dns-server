@@ -16,7 +16,7 @@ namespace Dns.ZoneProvider.AP;
 /// <summary>Source of Zone records</summary>
 public class APZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(resolver)
 {
-    protected override Zone GenerateZone()
+    public override Zone GenerateZone()
     {
         if (!File.Exists(Filename))
         {
@@ -27,7 +27,7 @@ public class APZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(res
         var machines = parser.Rows.Select(row => new {MachineFunction = row["MachineFunction"], StaticIP = row["StaticIP"], MachineName = row["MachineName"]}).ToArray();
 
         var zoneRecords = machines
-                          .GroupBy(machine => machine.MachineFunction + Zone, machine => IPAddress.Parse(machine.StaticIP))
+                          .GroupBy(machine => machine.MachineFunction, machine => IPAddress.Parse(machine.StaticIP))
                           .Select(group => new ZoneRecord {Host = group.Key, Count = group.Count(), Addresses = group.Select(address => address.ToString()).ToList()})
                           .ToArray();
 
