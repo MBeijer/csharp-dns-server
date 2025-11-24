@@ -35,7 +35,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace Dns.Cli;
 
@@ -147,23 +147,26 @@ public class Startup(IConfiguration configuration)
 					Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml")
 				);
 				c.SwaggerDoc("v1", new() { Title = "DNS Api", Version = "v1" });
-				var jwtSecurityScheme = new OpenApiSecurityScheme
-				{
-					BearerFormat = "JWT",
-					Name         = "Authorization",
-					In           = ParameterLocation.Header,
-					Type         = SecuritySchemeType.ApiKey,
-					Scheme       = JwtBearerDefaults.AuthenticationScheme,
-					Description  = "Put **_ONLY_** your JWT Bearer token on textbox below!",
-					Reference = new()
+				c.AddSecurityDefinition(
+					JwtBearerDefaults.AuthenticationScheme,
+					new OpenApiSecurityScheme
 					{
-						Id = JwtBearerDefaults.AuthenticationScheme, Type = ReferenceType.SecurityScheme,
+						BearerFormat = "JWT",
+						Name         = "Authorization",
+						In           = ParameterLocation.Header,
+						Type         = SecuritySchemeType.ApiKey,
+						Scheme       = JwtBearerDefaults.AuthenticationScheme,
+						Description  = "Put **_ONLY_** your JWT Bearer token on textbox below!",
+					}
+				);
+
+				c.AddSecurityRequirement(_ => new()
+				{
+					{
+						new(JwtBearerDefaults.AuthenticationScheme),
+						[] // must be List<string>
 					},
-				};
-
-				c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
-
-				c.AddSecurityRequirement(new() { { jwtSecurityScheme, Array.Empty<string>() } });
+				});
 			}
 		);
 

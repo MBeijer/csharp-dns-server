@@ -7,8 +7,10 @@
 using System.IO;
 using System.Net;
 using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models.Dns.Packets;
 using Dns.Models.Enums;
 using Dns.RDataTypes;
+using Dns.Serializers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -196,6 +198,21 @@ public class DnsProtocolTest
     }
 
     [Fact]
+    public void SerializerTest()
+    {
+        var       question = new Question(name: "www.msn.com", pClass: ResourceClass.IN, type: ResourceType.A);
+        using var stream   = new MemoryStream();
+        question.WriteToStream(stream);
+
+        var streamBuffer = stream.GetBuffer();
+        var serializerBuffer = question.Serialize().Buffer.ToArray();
+
+
+        var ret = ((ByteBuffer)streamBuffer).Deserialize<Question>();
+        Assert.Equal(streamBuffer, serializerBuffer);
+    }
+
+    [Fact]
     public void TransitiveQueryTest()
     {
         //Arrange
@@ -211,7 +228,7 @@ public class DnsProtocolTest
             AnswerCount = 0,
             NameServerCount = 0,
             AdditionalCount = 0,
-            Questions = [new() { Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A }],
+            Questions = [new("www.msn.com", ResourceType.A, ResourceClass.IN)],
         };
 
         using var  stream = new MemoryStream();
@@ -262,7 +279,7 @@ public class DnsProtocolTest
             AnswerCount = 2,
             NameServerCount = 0,
             AdditionalCount = 0,
-            Questions = [new() { Name = "www.msn.com", Class = ResourceClass.IN, Type = ResourceType.A }],
+            Questions = [new("www.msn.com", ResourceType.A, ResourceClass.IN)],
         };
         message.Answers.Add(new() {Name = "8.8.8.8", Class = ResourceClass.IN, Type = ResourceType.NS, TTL = 468, DataLength = 0, RData = null});
         var data = new ANameRData {Address = IPAddress.Parse("8.8.8.9")};

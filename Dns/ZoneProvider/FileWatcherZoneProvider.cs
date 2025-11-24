@@ -22,7 +22,9 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
     public event FileWatcherDelegate OnDeleted    = delegate {};
     public event FileWatcherDelegate OnRenamed    = delegate {};
     public event FileWatcherDelegate OnChanged    = delegate {};
+#pragma warning disable CS0067 // Event is never used
     public event FileWatcherDelegate OnSettlement = delegate {};
+#pragma warning restore CS0067 // Event is never used
 
     private FileSystemWatcher _fileWatcher;
     private Timer             _timer;
