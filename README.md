@@ -1,6 +1,8 @@
 # csharp-dns-server
 
-Fully functional DNS server written in C#.
+[![GitHub Actions Status](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml)
+
+Fully functional DNS server written in C# targeting .NET 8. Ensure the .NET 8 SDK is installed before building or testing.
 
 The project was conceived while working to reduce the cost of datacentre "stamps" while providing robust services within a datacentre, specifically to remove the need for an expensive load-balancer device by providing round-robin DNS services, and retrying connectivity instead.
 
@@ -21,10 +23,18 @@ This software is licenced under MIT terms that permits reuse within proprietary 
 // check that the tests run
 >> dotnet test
 
+// use DIG query appconfig'd local server
+>> dig -p 5335 @127.0.0.1 www.google.com A 
+
 ```
 
+> **Note:** The solution targets `net8.0`; all commands above assume the .NET 8 SDK is available on your PATH.
+
 ## Gotchas
-- if you're running on Windows 10 with Docker Tools installed, Docker uses the ICS SharedAccess service to provide DNS resolution for Docker containers - this listens on UDP:53, and will conflict with the DNS project.  Either turn off the the service (```net stop SharedAccess```), or change the UDP port.
+- if you're running on Windows with Docker Tools installed, Docker uses the ICS SharedAccess service to provide DNS resolution for Docker containers - this listens on UDP:53, and will conflict with the DNS project.  Either turn off the the service (```net stop SharedAccess```), or change the UDP port.
+
+## Continuous Integration
+All pushes and pull requests against `main` run through `.github/workflows/ci.yml`, a GitHub Actions pipeline that restores, builds, and tests the full `csharp-dns-server.sln` on both Ubuntu and Windows runners using the .NET 8 SDK.
 
 ## Features
 
@@ -40,6 +50,40 @@ The DNS server has a built-in Web Server providing operational insight into the 
 - healthcheck for server status
 - counters
 - zone information
+
+## Zone Providers
+The server ships with several pluggable providers that publish authoritative data into `SmartZoneResolver`:
+
+- **CSV/AP provider** – watches a simple CSV file (`MachineFunction`, `StaticIP`) and publishes grouped A records for each function. See `docs/providers/AP_provider.md` for schema details.
+- **IPProbe provider** – continuously probes configured endpoints (ping/noop today) and only emits healthy addresses. Configuration and behavior live in `docs/providers/IPProbe_provider.md`.
+- **BIND zone provider** – watches a BIND-style forward zone file, parses `$ORIGIN`, `$TTL`, SOA/NS/A/AAAA/CNAME/MX/TXT records, and emits address records once the zone validates successfully.  Any lexical or semantic validation error (missing SOA/NS, malformed TTLs, unsupported record types, duplicate CNAMEs, etc.) is surfaced with line numbers and the previous zone continues serving traffic.
+  - See `docs/providers/BIND_provider.md` for configuration details, validation rules, and troubleshooting tips.
+
+### BIND Provider Configuration
+Add the provider via `appsettings.json` (both `Dns` and `dns-cli` hosts read the same shape):
+
+```json
+{
+  "server": {
+    "zone": {
+      "name": ".example.com",
+      "provider": "Dns.ZoneProvider.Bind.BindZoneProvider"
+    }
+  },
+  "zoneprovider": {
+    "FileName": "C:/zones/example.com.zone"
+  }
+}
+```
+
+The provider reads the file whenever it changes (a 10-second settlement window avoids partial writes), validates the directives/records, and only publishes `A`/`AAAA` data to SmartZoneResolver when the parse succeeds.  All other record types are parsed/validated so that zone files failing to meet RFC expectations never poison the active zone.
+
+## Documentation
+- [Product requirements](docs/product_requirements.md) describe the current roadmap, observability goals, and .NET maintenance plans.
+- [Project priorities & plan](docs/priorities.md) outline the P0/P1/P2 focus areas plus execution notes (DI migration, OpenTelemetry instrumentation).
+- [Task list](docs/task_list.md) captures the prioritized backlog that tracks to those priorities.
+- [Protocol references](docs/references.md) list the RFCs and supporting standards that guide implementation.
+- [AGENTS guide](AGENTS.md) explains how automation/AI contributors should work within this repository.
 
 ## Interesting Possible Uses
 Time-based constraints such as parental controls to block a site, e.g. Facebook.
@@ -72,6 +116,7 @@ Suggested workflow for PRs is
 4. Squash your commits into a single change [(Find out how to squash here)](http://stackoverflow.com/questions/616556/how-do-you-squash-commits-into-one-patch-with-git-format-patch)
 5. Submit a PR, and put in comments anything that you think I'll need to help merge and evaluate the changes
 
+If you are using automated tooling or AI agents, please review [AGENTS.md](AGENTS.md) to ensure you follow the approved scope and workflow.
+
 ### Licence Reminder
 All contributions must be licenced under the same MIT terms, do include a header file to that effect.
-

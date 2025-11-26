@@ -29,7 +29,7 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
     private FileSystemWatcher _fileWatcher;
     private Timer             _timer;
 
-    protected abstract Zone GenerateZone();
+    public abstract Zone GenerateZone();
 
     /// <summary>Timespan between last file change and zone generation</summary>
     private TimeSpan FileSettlementPeriod { get; set; } = TimeSpan.FromSeconds(10);
@@ -42,7 +42,7 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
 
         var filename = fileWatcherConfig!.FileName;
 
-        ArgumentException.ThrowIfNullOrEmpty(filename, "filename");
+        ArgumentException.ThrowIfNullOrEmpty(filename);
 
         filename = Environment.ExpandEnvironmentVariables(filename);
         filename = Path.GetFullPath(filename);
@@ -97,7 +97,26 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
     private void OnTimer(object state)
     {
         _timer.Change(Timeout.Infinite, Timeout.Infinite);
-        Task.Run(GenerateZone).ContinueWith(t => Notify([t.Result]));
+        Task.Run(GenerateZone)
+            .ContinueWith(
+                t =>
+                {
+                    if (t.Status == TaskStatus.RanToCompletion)
+                    {
+                        var generatedZone = t.Result;
+                        if (generatedZone != null)
+                        {
+                            Notify([generatedZone]);
+                        }
+                    }
+                    else if (t.IsFaulted)
+                    {
+                        var ex = t.Exception.GetBaseException();
+                        Console.WriteLine("Zone generation failed: {0}", ex.Message);
+                    }
+                },
+                TaskScheduler.Default
+            );
     }
 
 

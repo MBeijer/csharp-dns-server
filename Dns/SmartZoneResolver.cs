@@ -8,7 +8,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text.Json;
 using System.Threading;
 using Dns.Contracts;
@@ -42,7 +41,7 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
         {
             _zones = value ?? throw new ArgumentNullException(nameof(value));
             LastZoneReload = DateTime.Now;
-            logger.LogInformation("Zone reloaded");
+            logger.LogInformation("Zone reloaded: {Zones}", string.Join(',', _zones.Select(z => z.Suffix)));
         }
     }
 

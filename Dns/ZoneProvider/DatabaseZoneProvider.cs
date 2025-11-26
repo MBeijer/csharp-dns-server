@@ -18,7 +18,7 @@ namespace Dns.ZoneProvider;
 /// Various monitoring strategies are implemented to detect IP health.
 /// Health IP addresses are added to the Zone.
 /// </summary>
-public partial class DatabaseZoneProvider(ILogger<DatabaseZoneProvider> logger, IServiceProvider services, IDnsResolver dnsResolver)
+public class DatabaseZoneProvider(ILogger<DatabaseZoneProvider> logger, IServiceProvider services, IDnsResolver dnsResolver)
     : BaseZoneProvider(dnsResolver)
 {
     private CancellationToken Ct          { get; set; }
@@ -87,7 +87,7 @@ public partial class DatabaseZoneProvider(ILogger<DatabaseZoneProvider> logger, 
                 {
                     var zone = new Zone
                     {
-                        Suffix = s.Suffix, Serial = s.Serial
+                        Suffix = s.Suffix, Serial = s.Serial,
                     };
 
                     zone.Initialize(GetZoneRecords(s.Records));

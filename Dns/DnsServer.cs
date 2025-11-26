@@ -113,7 +113,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
                                                        question.Type,
                                                        out zoneRecords
                                                    )
-                         ) != null) // Right zone, hostname/machine function does exist
+                         ) != null)
                 {
                     message.QR    = true;
                     message.AA    = true;
@@ -121,42 +121,76 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
                     message.RCode = (byte)RCode.NOERROR;
                     foreach (var zoneRecord in zoneRecords.Value)
                     {
-                        var answer = new ResourceRecord()
-                        {
-                            Name  = question.Name,
-                            Class = zoneRecord.Class,
-                            Type  = zoneRecord.Type,
-                            TTL   = 10,
-                        };
+
 
                         switch (zoneRecord.Type)
                         {
                             case ResourceType.A:
-                                answer.RData = new ANameRData { Address = IPAddress.Parse(zoneRecord.Addresses[0]) };
+                                foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+                                         {
+                                             Name  = question.Name,
+                                             Class = zoneRecord.Class,
+                                             Type  = zoneRecord.Type,
+                                             TTL   = 10,
+                                             RData = new ANameRData { Address = IPAddress.Parse(address) },
+                                         }))
+                                {
+                                    message.AnswerCount++;
+                                    message.Answers.Add(answer);
+                                }
                                 break;
                             case ResourceType.CNAME:
-                                answer.RData = new CNameRData { Name = zoneRecord.Addresses[0] };
+                                foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+                                         {
+                                             Name  = question.Name,
+                                             Class = zoneRecord.Class,
+                                             Type  = zoneRecord.Type,
+                                             TTL   = 10,
+                                             RData = new CNameRData { Name = address },
+                                         }))
+                                {
+                                    message.AnswerCount++;
+                                    message.Answers.Add(answer);
+                                }
                                 break;
                             case ResourceType.SOA:
-                                answer.RData = new StatementOfAuthorityRData
+                                var soaAnswer = new ResourceRecord
                                 {
-                                    PrimaryNameServer               = Environment.MachineName,
-                                    ResponsibleAuthoritativeMailbox = zoneRecord.Addresses[0],
-                                    Serial                          = zoneRecords.Key.Serial,
-                                    ExpirationLimit                 = 86400,
-                                    RetryInterval                   = 300,
-                                    RefreshInterval                 = 300,
-                                    MinimumTTL                      = 300,
+                                    Name  = question.Name,
+                                    Class = zoneRecord.Class,
+                                    Type  = zoneRecord.Type,
+                                    TTL   = 10,
+                                    RData = new SOARData
+                                    {
+                                        PrimaryNameServer               = Environment.MachineName,
+                                        ResponsibleAuthoritativeMailbox = zoneRecord.Addresses[0],
+                                        Serial                          = zoneRecords.Key.Serial,
+                                        ExpirationLimit                 = 86400,
+                                        RetryInterval                   = 300,
+                                        RefreshInterval                 = 300,
+                                        MinimumTTL                      = 300,
+                                    },
                                 };
-                                answer.TTL = (answer.RData as StatementOfAuthorityRData).MinimumTTL;
+                                soaAnswer.TTL = (soaAnswer.RData as SOARData).MinimumTTL;
+
+                                message.AnswerCount++;
+                                message.Answers.Add(soaAnswer);
                                 break;
                             case ResourceType.TEXT:
-                                answer.RData = new TXTRData { Name = zoneRecord.Addresses[0] };
+                                foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+                                         {
+                                             Name  = question.Name,
+                                             Class = zoneRecord.Class,
+                                             Type  = zoneRecord.Type,
+                                             TTL   = 10,
+                                             RData = new TXTRData { Name = address },
+                                         }))
+                                {
+                                    message.AnswerCount++;
+                                    message.Answers.Add(answer);
+                                }
                                 break;
                         }
-
-                        message.AnswerCount++;
-                        message.Answers.Add(answer);
                     }
                 }
                 else if
@@ -173,7 +207,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
                     message.AnswerCount = 0;
                     message.Answers.Clear();
 
-                    var soaResourceData = new StatementOfAuthorityRData
+                    var soaResourceData = new SOARData
                     {
                         PrimaryNameServer               = Environment.MachineName,
                         ResponsibleAuthoritativeMailbox = "stephbu." + Environment.MachineName,

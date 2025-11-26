@@ -1,8 +1,5 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using Dns.Models.Dns.Packets;
@@ -330,24 +327,6 @@ public static class PacketSerializer
 					}
 
 					output.Write(val?.ToString() ?? "");
-
-					break;
-				}
-				default:
-				{
-					/*
-					if (val!.GetType().GetCustomAttribute<TokenizeAttribute>() is not null)
-					{
-						var subType = val.GetType();
-						var stringList = subType.GetProperties()
-						                        .Select(subProp => subProp.GetValue(val))
-						                        .OfType<object>()
-						                        .Select(subVal => subVal?.ToString() ?? "")
-						                        .ToList();
-
-						output.Write(stringList.Tokenize());
-					}
-					*/
 
 					break;
 				}
