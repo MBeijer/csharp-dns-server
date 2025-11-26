@@ -120,9 +120,9 @@ public class UdpListener
 			return;
 		}
 
-            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
+            var args = new SocketAsyncEventArgs();
             args.SetBuffer(new byte[0x1000], 0, 0x1000);
-            SocketAwaitable awaitable = new SocketAwaitable(args);
+            var awaitable = new SocketAwaitable(args);
 
 		try
 		{

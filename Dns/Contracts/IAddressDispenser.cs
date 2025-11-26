@@ -12,8 +12,8 @@ namespace Dns.Contracts;
 
 public interface IAddressDispenser : IHtmlDump
 {
-    string HostName { get; }
-    ZoneRecord ZoneRecord { get; }
+	string     HostName   { get; }
+	ZoneRecord ZoneRecord { get; }
 
-    IEnumerable<IPAddress> GetAddresses();
+	IEnumerable<IPAddress> GetAddresses();
 }

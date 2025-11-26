@@ -12,11 +12,14 @@ namespace Dns.Models;
 
 public class ZoneRecord
 {
-    public string        Host      { get; set; }
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public ResourceClass Class     { get; set; } = ResourceClass.IN;
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public ResourceType  Type      { get; set; } = ResourceType.A;
-    public List<string>  Addresses { get; set; }
-    public int           Count     { get; set; }
+	public string Host { get; set; }
+
+	[JsonConverter(typeof(JsonStringEnumConverter))]
+	public ResourceClass Class { get; set; } = ResourceClass.IN;
+
+	[JsonConverter(typeof(JsonStringEnumConverter))]
+	public ResourceType Type { get; set; } = ResourceType.A;
+
+	public List<string> Addresses { get; set; }
+	public int          Count     { get; set; }
 }

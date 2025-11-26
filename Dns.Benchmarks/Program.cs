@@ -5,7 +5,7 @@
 // //-------------------------------------------------------------------------------------------------
 
 using BenchmarkDotNet.Running;
-using DnsBench;
+using Dns.Benchmarks;
 
 // Run all benchmarks
 BenchmarkSwitcher.FromAssembly(typeof(DnsProtocolBenchmarks).Assembly).Run(args);

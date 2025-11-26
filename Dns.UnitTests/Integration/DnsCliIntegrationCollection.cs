@@ -11,5 +11,5 @@ namespace Dns.UnitTests.Integration;
 [CollectionDefinition(Name)]
 public sealed class DnsCliIntegrationCollection : ICollectionFixture<DnsCliHostFixture>
 {
-    public const string Name = "DnsCliIntegration";
+	public const string Name = "DnsCliIntegration";
 }

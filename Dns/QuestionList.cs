@@ -17,38 +17,33 @@ namespace Dns;
 
 public class QuestionList : List<Question>
 {
-    public int LoadFrom(byte[] bytes, int offset, ushort count)
-    {
-        var currentOffset = offset;
+	public int LoadFrom(byte[] bytes, int offset, ushort count)
+	{
+		var currentOffset = offset;
 
-        for (var index = 0; index < count; index++)
-        {
-            // TODO: move this code into the Question object
+		for (var index = 0; index < count; index++)
+		{
+			var name = DnsProtocol.ReadString(bytes, ref currentOffset);
 
-                Question question = new Question();
+			var span = bytes.AsSpan(currentOffset);
+			var type = (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
+			currentOffset += 2;
 
-                question.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
+			var lClass = (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
+			currentOffset += 2;
 
-                // Phase 5: Use BinaryPrimitives for zero-allocation reads
-                var span = bytes.AsSpan(currentOffset);
-                question.Type = (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
-                currentOffset += 2;
+			Add(new(name, type, lClass));
+		}
 
-                question.Class = (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span.Slice(2));
-                currentOffset += 2;
+		var bytesRead = currentOffset - offset;
+		return bytesRead;
+	}
 
-            Add(new(name, type, lClass));
-        }
-
-        var bytesRead = currentOffset - offset;
-        return bytesRead;
-    }
-
-    public long WriteToStream(Stream stream)
-    {
-        var start = stream.Length;
-        foreach (var question in this) stream.Write(question.Serialize().Buffer);
-        var end = stream.Length;
-        return end - start;
-    }
+	public long WriteToStream(Stream stream)
+	{
+		var start = stream.Length;
+		foreach (var question in this) stream.Write(question.Serialize().Buffer);
+		var end = stream.Length;
+		return end - start;
+	}
 }

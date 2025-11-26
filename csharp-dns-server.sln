@@ -20,7 +20,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dns.Db", "Dns.Db\Dns.Db.csproj", "{B1BFEC51-D2B2-41D6-9B2D-74B21403CB70}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dnsbench", "dnsbench\dnsbench.csproj", "{2505E862-4384-4D64-9DC6-F25F0C49B835}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dns.Benchmarks", "Dns.Benchmarks\Dns.Benchmarks.csproj", "{2505E862-4384-4D64-9DC6-F25F0C49B835}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

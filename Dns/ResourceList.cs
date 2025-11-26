@@ -27,29 +27,28 @@ public class ResourceList : List<ResourceRecord>
 			var resourceRecord = new ResourceRecord
 			{
 				//// extract the domain, question type, question class and Ttl
-				Name = DnsProtocol.ReadString(bytes, ref currentOffset), Type = (ResourceType) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian()),
+				Name = DnsProtocol.ReadString(bytes, ref currentOffset),
+				Type = (ResourceType)BitConverter.ToUInt16(bytes, currentOffset).SwapEndian(),
 			};
 
-                resourceRecord.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
+			resourceRecord.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
 
-                // Phase 5: Use BinaryPrimitives for zero-allocation reads
-                var span = bytes.AsSpan(currentOffset);
-                resourceRecord.Type = (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
-                currentOffset += sizeof(ushort);
+			// Phase 5: Use BinaryPrimitives for zero-allocation reads
+			var span = bytes.AsSpan(currentOffset);
+			resourceRecord.Type =  (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
+			currentOffset       += sizeof(ushort);
 
-                resourceRecord.Class = (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span.Slice(2));
-                currentOffset += sizeof(ushort);
+			resourceRecord.Class =  (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span.Slice(2));
+			currentOffset        += sizeof(ushort);
 
-                resourceRecord.TTL = BinaryPrimitives.ReadUInt32BigEndian(span.Slice(4));
-                currentOffset += sizeof(uint);
+			resourceRecord.TTL =  BinaryPrimitives.ReadUInt32BigEndian(span.Slice(4));
+			currentOffset      += sizeof(uint);
 
-                resourceRecord.DataLength = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(8));
-                currentOffset += sizeof(ushort);
+			resourceRecord.DataLength =  BinaryPrimitives.ReadUInt16BigEndian(span.Slice(8));
+			currentOffset             += sizeof(ushort);
 
 			if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
-			{
 				resourceRecord.RData = ANameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-			}
 			else
 				resourceRecord.RData = resourceRecord.Type switch
 				{
@@ -73,9 +72,6 @@ public class ResourceList : List<ResourceRecord>
 
 	public void WriteToStream(Stream stream)
 	{
-		foreach (var resource in this)
-		{
-			resource.WriteToStream(stream);
-		}
+		foreach (var resource in this) resource.WriteToStream(stream);
 	}
 }

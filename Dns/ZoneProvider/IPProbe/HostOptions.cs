@@ -16,10 +16,9 @@ public class HostOptions
 	[JsonPropertyName("timeout")]
 	public ushort Timeout { get; set; }
 
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+	[JsonConverter(typeof(JsonStringEnumConverter))]
 	[JsonPropertyName("availabilityMode")]
 	public AvailabilityMode AvailabilityMode { get; set; }
 
-	[JsonPropertyName("ip")]
-	public string[] Ip { get; set; }
+	[JsonPropertyName("ip")] public string[] Ip { get; set; }
 }

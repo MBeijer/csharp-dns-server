@@ -9,12 +9,10 @@ namespace Dns.Db.Repositories;
 
 public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext dbContext) : IZoneRepository
 {
-	public Task<List<Zone>> GetZones()                => dbContext.Zones!.AsNoTracking().ToListAsync();
+	public Task<List<Zone>> GetZones() => dbContext.Zones!.AsNoTracking().ToListAsync();
 
 	public Task<Zone?> GetZone(string suffix) =>
-		dbContext.Zones!
-		         .Where(x => x.Suffix! == suffix)
-		         .SingleOrDefaultAsync();
+		dbContext.Zones!.Where(x => x.Suffix! == suffix).SingleOrDefaultAsync();
 
 	public async Task AddZone(Zone zone)
 	{

@@ -7,9 +7,9 @@ public class MyHttpClientHandler : HttpClientHandler
 {
 	protected MyHttpClientHandler(CookieContainer cookieContainer)
 	{
-		ClientCertificateOptions = ClientCertificateOption.Manual;
+		ClientCertificateOptions                  = ClientCertificateOption.Manual;
 		ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
-		AllowAutoRedirect = false;
-		CookieContainer = cookieContainer;
+		AllowAutoRedirect                         = false;
+		CookieContainer                           = cookieContainer;
 	}
 }

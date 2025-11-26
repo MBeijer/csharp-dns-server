@@ -7,18 +7,19 @@ namespace Dns.RDataTypes;
 
 public class MXRData : RData
 {
+	private readonly string _name;
 	private readonly ushort _preference;
 	private readonly int    _size;
-	private readonly string _name;
-
 
 	private MXRData(byte[] bytes, int offset, int size)
 	{
-		_preference = BitConverter.ToUInt16(bytes, offset).SwapEndian();
-		offset += 2;
-		_name = DnsProtocol.ReadString(bytes, ref offset);
-		_size = size;
+		_preference =  BitConverter.ToUInt16(bytes, offset).SwapEndian();
+		offset      += 2;
+		_name       =  DnsProtocol.ReadString(bytes, ref offset);
+		_size       =  size;
 	}
+
+	public override ushort Length => (ushort)(_name.Length + 2 + 2);
 
 	public static MXRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
 
@@ -29,8 +30,6 @@ public class MXRData : RData
 		stream.Write(bytes, 0, bytes.Length);
 		_name.WriteToStream(stream);
 	}
-
-	public override ushort Length => (ushort)(_name.Length + 2 + 2);
 
 	public override void Dump()
 	{
