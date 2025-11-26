@@ -14,15 +14,7 @@ namespace Dns.Contracts;
 /// <summary>Provides domain name resolver capabilities</summary>
 public interface IDnsResolver : IObserver<List<Zone>>, IHtmlDump
 {
-    public void         SubscribeTo(IObservable<List<Zone>> zoneProvider);
-    IEnumerable<Zone> GetZones();
-
-    bool TryGetZoneRecords(
-        string hostname,
-        ResourceClass resClass,
-        ResourceType resType,
-        out KeyValuePair<Zone, List<ZoneRecord>> entry
-    );
-
-    bool TryGetZone(string hostname, out Zone zone);
+	public void       SubscribeTo(IObservable<List<Zone>> zoneProvider);
+	IEnumerable<Zone> GetZones();
+	bool TryGetZone(string hostname, out Zone zone);
 }

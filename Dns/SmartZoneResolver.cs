@@ -20,132 +20,87 @@ namespace Dns;
 
 public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 {
-    private long          _hits;
-    private long          _misses;
-    private long          _queries;
-    private IDisposable   _subscription;
-    private List<Zone>    _zones = [];
-    private IZoneProvider _provider;
+	private long          _hits;
+	private long          _misses;
+	private IZoneProvider _provider;
+	private long          _queries;
+	private IDisposable   _subscription;
+	private List<Zone>    _zones = [];
 
-    private static JsonSerializerOptions SerializerOptions { get; } = new()
-    {
-        WriteIndented = true,
-    };
+	private static JsonSerializerOptions SerializerOptions { get; } = new() { WriteIndented = true };
 
-    public IEnumerable<Zone> GetZones() => Zones;
+	private List<Zone> Zones
+	{
+		get => _zones;
+		set
+		{
+			_zones         = value ?? throw new ArgumentNullException(nameof(value));
+			LastZoneReload = DateTime.Now;
+			logger.LogInformation("Zone reloaded: {Zones}", string.Join(',', _zones.Select(z => z.Suffix)));
+		}
+	}
 
-    private List<Zone> Zones
-    {
-        get => _zones;
-        set
-        {
-            _zones = value ?? throw new ArgumentNullException(nameof(value));
-            LastZoneReload = DateTime.Now;
-            logger.LogInformation("Zone reloaded: {Zones}", string.Join(',', _zones.Select(z => z.Suffix)));
-        }
-    }
+	public DateTime LastZoneReload { get; private set; } = DateTime.MinValue;
 
-    public DateTime LastZoneReload { get; private set; } = DateTime.MinValue;
+	public IEnumerable<Zone> GetZones() => Zones;
 
-    void IObserver<List<Zone>>.OnCompleted() => throw new NotImplementedException();
+	void IObserver<List<Zone>>.OnCompleted() => throw new NotImplementedException();
 
-    void IObserver<List<Zone>>.OnError(Exception error) => throw new NotImplementedException();
+	void IObserver<List<Zone>>.OnError(Exception error) => throw new NotImplementedException();
 
-    void IObserver<List<Zone>>.OnNext(List<Zone> value) => Zones = value;
+	void IObserver<List<Zone>>.OnNext(List<Zone> value) => Zones = value;
 
-    public void DumpHtml(TextWriter writer)
-    {
-        writer.WriteLine("Type:{0}<br/>", _provider.GetType().Name);
-        writer.WriteLine("Queries:{0}<br/>", _queries);
-        writer.WriteLine("Hits:{0}<br/>", _hits);
-        writer.WriteLine("Misses:{0}<br/>", _misses);
+	public void DumpHtml(TextWriter writer)
+	{
+		writer.WriteLine("Type:{0}<br/>", _provider.GetType().Name);
+		writer.WriteLine("Queries:{0}<br/>", _queries);
+		writer.WriteLine("Hits:{0}<br/>", _hits);
+		writer.WriteLine("Misses:{0}<br/>", _misses);
 
-        if (_zones == null) return;
-    }
+		if (_zones == null) return;
+	}
 
-    public object GetObject() => _zones;
+	public object GetObject() => _zones;
 
-    public bool TryGetZone(string hostName, out Zone zone)
-    {
-        zone = null;
-        ArgumentNullException.ThrowIfNull(hostName);
-        if (hostName.Length > 126) throw new ArgumentOutOfRangeException(nameof(hostName));
-
-        Interlocked.Increment(ref _queries);
-
-        if (!AreZonesLoaded()) return false;
-
-        zone = _zones.FirstOrDefault(zone => hostName.EndsWith(zone.Suffix));
-
-        if (zone != null)
-        {
-            Interlocked.Increment(ref _hits);
-
-            return true;
-        }
-
-        Interlocked.Increment(ref _misses);
-        return false;
-    }
-
-    public bool TryGetZoneRecords(string hostName, ResourceClass resClass, ResourceType resType, out KeyValuePair<Zone, List<ZoneRecord>> entry)
-    {
-        entry = new();
+	public bool TryGetZone(string hostName, out Zone zone)
+	{
+		zone = null;
 		ArgumentNullException.ThrowIfNull(hostName);
 		if (hostName.Length > 126) throw new ArgumentOutOfRangeException(nameof(hostName));
 
-        Interlocked.Increment(ref _queries);
+		Interlocked.Increment(ref _queries);
 
-        if (!AreZonesLoaded()) return false;
+		if (!AreZonesLoaded()) return false;
 
-        foreach (var zone in _zones.Where(zone => hostName.EndsWith(zone.Suffix)))
-        {
-            if (resType is ResourceType.ALL or ResourceType.ANY)
-            {
-                if (zone.Records.FindAll(x => x.Host == hostName.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "") && x.Class == resClass) is
-                    {
-                        Count: > 0,
-                    } records1)
-                {
-                    Interlocked.Increment(ref _hits);
+		zone = _zones.FirstOrDefault(zone => hostName.EndsWith(zone.Suffix));
 
-                    entry = new(zone, records1);
-                    return true;
-                }
-            }
+		if (zone != null)
+		{
+			Interlocked.Increment(ref _hits);
 
-            if (zone.Records.FindAll(x => x.Host == hostName.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "") && x.Class == resClass && x.Type == resType) is
-                {
-                    Count: > 0,
-                } records)
-            {
-                Interlocked.Increment(ref _hits);
+			return true;
+		}
 
-                entry = new(zone, records);
-                return true;
-            }
-        }
+		Interlocked.Increment(ref _misses);
+		return false;
+	}
 
-        Interlocked.Increment(ref _misses);
-        return false;
-    }
+	/// <summary>Subscribe to specified zone provider</summary>
+	/// <param name="zoneProvider"></param>
+	public void SubscribeTo(IObservable<List<Zone>> zoneProvider)
+	{
+		// release previous subscription
+		if (_subscription != null)
+		{
+			_subscription.Dispose();
+			_subscription = null;
+		}
 
-    public bool AreZonesLoaded() => _zones.Count > 0;
+		if (zoneProvider is IZoneProvider provider)
+			_provider = provider;
 
-    /// <summary>Subscribe to specified zone provider</summary>
-    /// <param name="zoneProvider"></param>
-    public void SubscribeTo(IObservable<List<Zone>> zoneProvider)
-    {
-        // release previous subscription
-        if (_subscription != null)
-        {
-            _subscription.Dispose();
-            _subscription = null;
-        }
+		_subscription = zoneProvider.Subscribe(this);
+	}
 
-        if (zoneProvider is IZoneProvider provider)
-            _provider = provider;
-
-        _subscription = zoneProvider.Subscribe(this);
-    }
+	public bool AreZonesLoaded() => _zones.Count > 0;
 }

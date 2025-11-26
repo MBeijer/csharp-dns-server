@@ -8,8 +8,9 @@ Apple M1 Max, 1 CPU, 10 logical and 10 physical cores
 
 
 ```
-| Method                                  | Mean       | Error    | StdDev   | Median     | Gen0   | Gen1   | Allocated |
-|---------------------------------------- |-----------:|---------:|---------:|-----------:|-------:|-------:|----------:|
+
+| Method                                          |       Mean |    Error |   StdDev |     Median |   Gen0 |   Gen1 | Allocated |
+|-------------------------------------------------|-----------:|---------:|---------:|-----------:|-------:|-------:|----------:|
 | &#39;Parse: Simple query&#39;                   |   107.3 ns |  0.64 ns |  0.54 ns |   107.4 ns | 0.0675 |      - |     424 B |
 | &#39;Parse: AAAA query&#39;                     |   112.0 ns |  0.65 ns |  0.54 ns |   112.1 ns | 0.0688 |      - |     432 B |
 | &#39;Parse: Simple response (1 A)&#39;          |   172.5 ns |  0.50 ns |  0.45 ns |   172.5 ns | 0.1261 |      - |     792 B |

@@ -20,6 +20,6 @@ public class ZoneRecord
 	[JsonConverter(typeof(JsonStringEnumConverter))]
 	public ResourceType Type { get; set; } = ResourceType.A;
 
-	public List<string> Addresses { get; set; }
+	public List<string> Addresses { get; set; } = [];
 	public int          Count     { get; set; }
 }

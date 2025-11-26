@@ -9,8 +9,9 @@ Apple M1 Max, 1 CPU, 10 logical and 10 physical cores
 IterationCount=10  WarmupCount=3  
 
 ```
-| Method                                   | Mean       | Error     | StdDev    | Gen0   | Gen1   | Allocated |
-|----------------------------------------- |-----------:|----------:|----------:|-------:|-------:|----------:|
+
+| Method                                           |       Mean |     Error |    StdDev |   Gen0 |   Gen1 | Allocated |
+|--------------------------------------------------|-----------:|----------:|----------:|-------:|-------:|----------:|
 | &#39;Buffer copy: new byte[] + BlockCopy&#39;    |   8.187 ns | 0.0289 ns | 0.0151 ns | 0.0102 |      - |      64 B |
 | &#39;MemoryStream: new per request&#39;          | 147.317 ns | 1.2329 ns | 0.7337 ns | 0.1528 | 0.0002 |     960 B |
 | &#39;MemoryStream: pooled (Phase 2)&#39;         | 167.541 ns | 0.7151 ns | 0.4730 ns | 0.0572 |      - |     360 B |

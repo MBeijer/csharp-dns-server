@@ -24,6 +24,7 @@ public enum ResourceType : ushort
 	MINFO   = 0x000e,
 	MX      = 0x000f,
 	TEXT    = 0x0010,
+	TXT     = 0x0010,
 	RP      = 0x0011,
 	AFSDB   = 0x0012,
 	X25     = 0x0013,

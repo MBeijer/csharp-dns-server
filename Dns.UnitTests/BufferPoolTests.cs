@@ -397,7 +397,7 @@ public class BufferPoolTests
 
 			// Simulate building response (DnsServer pattern)
 			using var responseStream = BufferPool.RentMemoryStream();
-			responseStream.Write(memory.Span.Slice(0, 12).ToArray(), 0, 12);
+			responseStream.Write(memory.Span[..12].ToArray(), 0, 12);
 
 			// Simulate sending response (DnsServer pattern)
 			var args = BufferPool.RentSocketAsyncEventArgs();

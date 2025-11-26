@@ -38,13 +38,13 @@ public class ResourceList : List<ResourceRecord>
 			resourceRecord.Type =  (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
 			currentOffset       += sizeof(ushort);
 
-			resourceRecord.Class =  (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span.Slice(2));
+			resourceRecord.Class =  (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
 			currentOffset        += sizeof(ushort);
 
-			resourceRecord.TTL =  BinaryPrimitives.ReadUInt32BigEndian(span.Slice(4));
+			resourceRecord.TTL =  BinaryPrimitives.ReadUInt32BigEndian(span[4..]);
 			currentOffset      += sizeof(uint);
 
-			resourceRecord.DataLength =  BinaryPrimitives.ReadUInt16BigEndian(span.Slice(8));
+			resourceRecord.DataLength =  BinaryPrimitives.ReadUInt16BigEndian(span[8..]);
 			currentOffset             += sizeof(ushort);
 
 			if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
@@ -56,7 +56,7 @@ public class ResourceList : List<ResourceRecord>
 					ResourceType.MX    => MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 					ResourceType.SOA   => SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 					ResourceType.NS    => NSRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
-					ResourceType.TEXT  => TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.TXT  => TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 					_                  => GenericRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 				};
 

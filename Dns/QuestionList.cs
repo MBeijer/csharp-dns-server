@@ -9,7 +9,6 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using Dns.Db.Models.EntityFramework.Enums;
-using Dns.Extensions;
 using Dns.Models.Dns.Packets;
 using Dns.Serializers;
 

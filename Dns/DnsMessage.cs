@@ -240,11 +240,11 @@ public class DnsMessage
 		// Phase 5: Use BinaryPrimitives for reading (cleaner, no SwapEndian needed)
 		var headerSpan = _header.AsSpan();
 		_queryIdentifier = BinaryPrimitives.ReadUInt16BigEndian(headerSpan);
-		_flags = BinaryPrimitives.ReadUInt16LittleEndian(headerSpan.Slice(2)); // Flags stored in little-endian
-		_questionCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan.Slice(4));
-		_answerCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan.Slice(6));
-		_nameServerCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan.Slice(8));
-		_additionalCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan.Slice(10));
+		_flags           = BinaryPrimitives.ReadUInt16LittleEndian(headerSpan[2..]); // Flags stored in little-endian
+		_questionCount   = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[4..]);
+		_answerCount     = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[6..]);
+		_nameServerCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[8..]);
+		_additionalCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[10..]);
 
 		return 12;
 	}

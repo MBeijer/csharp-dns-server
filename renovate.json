@@ -10,8 +10,12 @@
   "forkProcessing": "enabled",
   "packageRules": [
     {
-      "matchManagers": ["nuget"],
-      "matchPackageNames": ["AutoMapper"],
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchPackageNames": [
+        "AutoMapper"
+      ],
       "allowedVersions": "<15.0.0"
     }
   ]

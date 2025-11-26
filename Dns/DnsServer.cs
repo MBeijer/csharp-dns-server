@@ -18,6 +18,7 @@ using Dns.Config;
 using Dns.Contracts;
 using Dns.Db.Models.EntityFramework.Enums;
 using Dns.Models;
+using Dns.Models.Dns.Packets;
 using Dns.Models.Enums;
 using Dns.RDataTypes;
 using Microsoft.Extensions.Logging;
@@ -27,17 +28,17 @@ namespace Dns;
 
 public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> serverOptions) : IDnsServer
 {
-	private IPAddress[]        _defaultDns;
-	private UdpListener        _udpListener; // listener for UDP53 traffic
-	private List<IDnsResolver> _resolvers; // resolver for name entries
-	private long               _requests;
-	private long               _responses;
-	private long               _nacks;
-
 	/// <summary>
-	/// Maps forwarded DNS requests to their originating endpoints.
+	///     Maps forwarded DNS requests to their originating endpoints.
 	/// </summary>
 	private readonly ConcurrentDictionary<DnsRequestKey, EndPoint> _requestResponseMap = new();
+
+	private IPAddress[]        _defaultDns;
+	private long               _nacks;
+	private long               _requests;
+	private List<IDnsResolver> _resolvers; // resolver for name entries
+	private long               _responses;
+	private UdpListener        _udpListener; // listener for UDP53 traffic
 
 	/// <summary>Initialize server with specified domain name resolver</summary>
 	/// <param name="resolvers"></param>
@@ -61,6 +62,17 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		return Task.CompletedTask;
 	}
 
+	public void DumpHtml(TextWriter writer)
+	{
+		writer.WriteLine("DNS Server Status<br/>");
+		writer.Write("Default Nameservers:");
+		foreach (var dns in _defaultDns) writer.WriteLine(dns);
+
+		writer.WriteLine("DNS Server Status<br/>");
+	}
+
+	public object GetObject() => _defaultDns;
+
 	/// <summary>Process UDP Request</summary>
 	/// <param name="buffer">The received data buffer.</param>
 	/// <param name="length">The number of valid bytes in the buffer.</param>
@@ -79,8 +91,8 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		if (message.IsQuery())
 		{
 			if (message.Questions.Count <= 0) return;
-			KeyValuePair<Zone, List<ZoneRecord>> zoneRecords = new();
-			Zone                                 zone        = null;
+			Zone zone = null;
+
 			foreach (var question in message.Questions)
 			{
 				logger.LogInformation(
@@ -111,125 +123,28 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 						);
 					}
 				}
-				else if (_resolvers.FirstOrDefault(x => x.TryGetZoneRecords(
+				else if (_resolvers.FirstOrDefault(x => x.TryGetZone(
 					                                   question.Name,
-					                                   question.Class,
-					                                   question.Type,
-					                                   out zoneRecords
+					                                   out zone
 				                                   )
 				         ) !=
 				         null)
 				{
+					var qName = question.Name.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "");
 					message.QR    = true;
-					message.AA    = true;
-					message.RA    = false;
+					//message.AA    = true;
+					message.RA    = true;//false;
 					message.RCode = (byte)RCode.NOERROR;
-					foreach (var zoneRecord in zoneRecords.Value)
+					var zoneRecords = question.Type switch
 					{
-						switch (zoneRecord.Type)
-						{
-							case ResourceType.A:
-								foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
-									         {
-										         Name  = question.Name,
-										         Class = zoneRecord.Class,
-										         Type  = zoneRecord.Type,
-										         TTL   = 10,
-										         RData = new ANameRData { Address = IPAddress.Parse(address) },
-									         }
-								         ))
-								{
-									message.AnswerCount++;
-									message.Answers.Add(answer);
-								}
-
-								break;
-							case ResourceType.CNAME:
-								foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
-									         {
-										         Name  = question.Name,
-										         Class = zoneRecord.Class,
-										         Type  = zoneRecord.Type,
-										         TTL   = 10,
-										         RData = new CNameRData { Name = address },
-									         }
-								         ))
-								{
-									message.AnswerCount++;
-									message.Answers.Add(answer);
-								}
-
-								break;
-							case ResourceType.SOA:
-								var soaAnswer = new ResourceRecord
-								{
-									Name  = question.Name,
-									Class = zoneRecord.Class,
-									Type  = zoneRecord.Type,
-									TTL   = 10,
-									RData = new SOARData
-									{
-										PrimaryNameServer               = Environment.MachineName,
-										ResponsibleAuthoritativeMailbox = zoneRecord.Addresses[0],
-										Serial                          = zoneRecords.Key.Serial,
-										ExpirationLimit                 = 86400,
-										RetryInterval                   = 300,
-										RefreshInterval                 = 300,
-										MinimumTTL                      = 300,
-									},
-								};
-								soaAnswer.TTL = (soaAnswer.RData as SOARData).MinimumTTL;
-
-								message.AnswerCount++;
-								message.Answers.Add(soaAnswer);
-								break;
-							case ResourceType.TEXT:
-								foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
-									         {
-										         Name  = question.Name,
-										         Class = zoneRecord.Class,
-										         Type  = zoneRecord.Type,
-										         TTL   = 10,
-										         RData = new TXTRData { Name = address },
-									         }
-								         ))
-								{
-									message.AnswerCount++;
-									message.Answers.Add(answer);
-								}
-
-								break;
-						}
-					}
-				}
-				else if (_resolvers.FirstOrDefault(x => x.TryGetZone(question.Name, out zone)) !=
-				         null) // Right zone, but the hostname/machine function doesn't exist
-				{
-					message.QR          = true;
-					message.AA          = true;
-					message.RA          = false;
-					message.RCode       = (byte)RCode.NXDOMAIN;
-					message.AnswerCount = 0;
-					message.Answers.Clear();
-
-					var soaResourceData = new SOARData
-					{
-						PrimaryNameServer               = Environment.MachineName,
-						ResponsibleAuthoritativeMailbox = "stephbu." + Environment.MachineName,
-						Serial                          = zone.Serial,
-						ExpirationLimit                 = 86400,
-						RetryInterval                   = 300,
-						RefreshInterval                 = 300,
-						MinimumTTL                      = 300,
+						ResourceType.ANY => zone.Records.Where(zr => zr.Host.Equals(qName)).ToList(),
+						ResourceType.A => zone.Records.Where(zr => zr.Type is ResourceType.A or ResourceType.CNAME && zr.Host.Equals(qName)).ToList(),
+						ResourceType.AAAA => zone.Records.Where(zr => zr.Type is ResourceType.AAAA or ResourceType.CNAME && zr.Host.Equals(qName)).ToList(),
+						_ => zone.Records.Where(zr => zr.Type == question.Type && zr.Host.Equals(qName)).ToList(),
 					};
-					var soaResourceRecord = new ResourceRecord
-					{
-						Class = ResourceClass.IN, Type = ResourceType.SOA, TTL = 300, RData = soaResourceData,
-					};
-					message.NameServerCount++;
-					message.Authorities.Add(soaResourceRecord);
+
+					HandleRecords(zoneRecords, question, message, zone, remoteEndPoint);
 				}
-				//
 				else // Referral to regular DC DNS servers
 				{
 					// store current IP address and Query ID.
@@ -244,14 +159,12 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 				{
 					// send to upstream DNS servers
 					foreach (var dnsServer in _defaultDns)
-					{
 						SendUdp(
 							responseStream.GetBuffer(),
 							0,
 							(int)responseStream.Position,
 							new IPEndPoint(dnsServer, 53)
 						);
-					}
 				}
 				else
 				{
@@ -266,7 +179,6 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			var key = new DnsRequestKey(message);
 
 			if (_requestResponseMap.TryRemove(key, out var ep))
-			{
 				using (var responseStream = BufferPool.RentMemoryStream())
 				{
 					message.WriteToStream(responseStream);
@@ -283,10 +195,163 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 					SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, ep);
 				}
-			}
 			else
-			{
 				Interlocked.Increment(ref _nacks);
+		}
+	}
+
+	private void HandleRecords(
+		List<ZoneRecord> zoneRecords,
+		Question question,
+		DnsMessage message,
+		Zone zone,
+		EndPoint remoteEndPoint
+	)
+	{
+		foreach (var zoneRecord in zoneRecords)
+		{
+			switch (zoneRecord.Type)
+			{
+				case ResourceType.NS:
+					foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+						         {
+							         Name  = question.Name,
+							         Class = zoneRecord.Class,
+							         Type  = zoneRecord.Type,
+							         TTL   = 10,
+							         RData = new NSRData { Name = address },
+						         }
+					         ))
+					{
+						message.AnswerCount++;
+						message.Answers.Add(answer);
+					}
+
+					break;
+				case ResourceType.MX:
+					foreach (var answer in zoneRecord.Addresses.Select(address =>
+						         {
+							         var addressSplit = address.Split(' ');
+							         var tmpRecord = new ResourceRecord
+							         {
+								         Name  = question.Name,
+								         Class = zoneRecord.Class,
+								         Type  = zoneRecord.Type,
+								         TTL   = 10,
+								         RData = new MXRData { Name = addressSplit[1], Preference = Convert.ToUInt16(addressSplit[0]) },
+							         };
+
+							         return tmpRecord;
+						         }
+					         ))
+					{
+						message.AnswerCount++;
+						message.Answers.Add(answer);
+					}
+
+					break;
+				case ResourceType.A:
+					foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+						         {
+							         Name  = question.Name,
+							         Class = zoneRecord.Class,
+							         Type  = zoneRecord.Type,
+							         TTL   = 10,
+							         RData = new ANameRData { Address = IPAddress.Parse(address) },
+						         }
+					         ))
+					{
+						message.AnswerCount++;
+						message.Answers.Add(answer);
+					}
+
+					break;
+				case ResourceType.CNAME:
+					foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+						         {
+							         Name  = question.Name,
+							         Class = zoneRecord.Class,
+							         Type  = zoneRecord.Type,
+							         TTL   = 10,
+							         RData = new CNameRData { Name = address },
+						         }
+					         ))
+					{
+						message.AnswerCount++;
+						message.Answers.Add(answer);
+						if (answer.RData is CNameRData cnameRData && cnameRData.Name.Contains(zone.Suffix))
+						{
+							var address = cnameRData.Name
+							                        .Replace($".{zone.Suffix}.", "")
+							                        .Replace($".{zone.Suffix}", "")
+							                        .Replace($"{zone.Suffix}", "");
+
+							var cnameRecords = zone.Records
+							                       .Where(zr => zr.Type is ResourceType.A
+								                                    or ResourceType.AAAA
+								                                    or ResourceType.CNAME &&
+							                                    zr.Host.Equals(address)
+							                       )
+							                       .ToList();
+
+							var dnsMessage = new DnsMessage
+							{
+								Opcode = (byte)OpCode.QUERY,
+								Questions = [
+									new(cnameRData.Name, ResourceType.A, ResourceClass.IN),
+								],
+							};
+							using PooledMemoryStream pms        = BufferPool.RentMemoryStream();
+							dnsMessage.WriteToStream(pms);
+
+							pms.Position = 0;
+
+							ProcessUdpRequest(pms.ToArray(), (int)pms.Length, remoteEndPoint);
+
+							//HandleRecords(cnameRecords, new Question(cnameRData.Name, ResourceType.A, ResourceClass.IN), message, zone);
+						}
+					}
+
+					break;
+				case ResourceType.SOA:
+					var soaAnswer = new ResourceRecord
+					{
+						Name  = question.Name,
+						Class = zoneRecord.Class,
+						Type  = zoneRecord.Type,
+						TTL   = 10,
+						RData = new SOARData
+						{
+							PrimaryNameServer               = zoneRecord.Addresses.Count> 1? zoneRecord.Addresses[0]:Environment.MachineName,
+							ResponsibleAuthoritativeMailbox = zoneRecord.Addresses.Count> 1? zoneRecord.Addresses[1]:zoneRecord.Addresses[0],
+							Serial                          = zone.Serial,
+							ExpirationLimit                 = 86400,
+							RetryInterval                   = 300,
+							RefreshInterval                 = 300,
+							MinimumTTL                      = 300,
+						},
+					};
+					soaAnswer.TTL = (soaAnswer.RData as SOARData).MinimumTTL;
+
+					message.AnswerCount++;
+					message.Answers.Add(soaAnswer);
+					break;
+				case ResourceType.TXT:
+					foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+						         {
+							         Name  = question.Name,
+							         Class = zoneRecord.Class,
+							         Type  = zoneRecord.Type,
+							         TTL   = 10,
+							         RData = new TXTRData { Name = address },
+						         }
+					         ))
+					{
+						message.AnswerCount++;
+						message.Answers.Add(answer);
+					}
+
+					break;
 			}
 		}
 	}
@@ -339,18 +404,4 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			}
 		}
 	}
-
-	public void DumpHtml(TextWriter writer)
-	{
-		writer.WriteLine("DNS Server Status<br/>");
-		writer.Write("Default Nameservers:");
-		foreach (var dns in _defaultDns)
-		{
-			writer.WriteLine(dns);
-		}
-
-		writer.WriteLine("DNS Server Status<br/>");
-	}
-
-	public object GetObject() => _defaultDns;
 }
