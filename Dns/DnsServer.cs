@@ -5,6 +5,7 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,8 +34,11 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
     private long               _responses;
     private long               _nacks;
 
-    private readonly Dictionary<string, EndPoint> _requestResponseMap     = new();
-    private readonly ReaderWriterLockSlim         _requestResponseMapLock = new();
+        /// <summary>
+        /// Maps forwarded DNS requests to their originating endpoints.
+        /// Phase 4: Uses struct key (DnsRequestKey) + ConcurrentDictionary for lock-free, allocation-free lookups.
+        /// </summary>
+        private readonly ConcurrentDictionary<DnsRequestKey, EndPoint> _requestResponseMap = new ConcurrentDictionary<DnsRequestKey, EndPoint>();
 
     /// <summary>Initialize server with specified domain name resolver</summary>
     /// <param name="resolvers"></param>
@@ -58,12 +62,13 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
         return Task.CompletedTask;
     }
 
-    /// <summary>Process UDP Request</summary>
-    /// <param name="buffer"></param>
-    /// <param name="remoteEndPoint"></param>
-    private void ProcessUdpRequest(byte[] buffer, EndPoint remoteEndPoint)
+        /// <summary>Process UDP Request</summary>
+        /// <param name="buffer">The received data buffer.</param>
+        /// <param name="length">The number of valid bytes in the buffer.</param>
+        /// <param name="remoteEndPoint">The remote endpoint that sent the request.</param>
+    private void ProcessUdpRequest(byte[] buffer, int length, EndPoint remoteEndPoint)
     {
-        if (!DnsProtocol.TryParse(buffer, out var message))
+        if (!DnsProtocol.TryParse(buffer, length, out var message))
         {
             // TODO log bad message
             logger.LogError("unable to parse message");
@@ -231,19 +236,11 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
                 else // Referral to regular DC DNS servers
                 {
                     // store current IP address and Query ID.
-                    try
-                    {
-                        var key = GetKeyName(message);
-                        _requestResponseMapLock.EnterWriteLock();
-                        _requestResponseMap.Add(key, remoteEndPoint);
-                    }
-                    finally
-                    {
-                        _requestResponseMapLock.ExitWriteLock();
-                    }
+                            var key = new DnsRequestKey(message);
+                            _requestResponseMap.TryAdd(key, remoteEndPoint);
                 }
 
-                using MemoryStream responseStream = new(512);
+                using PooledMemoryStream responseStream = BufferPool.RentMemoryStream();
 
                 message.WriteToStream(responseStream);
                 if (message.IsQuery())
@@ -259,83 +256,78 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
                         );
                     }
                 }
-                else
-                {
-                    Interlocked.Increment(ref _responses);
-                    SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, remoteEndPoint);
+                            else
+                            {
+                                Interlocked.Increment(ref _responses);
+                                SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, remoteEndPoint);
+                            }
+                        }
+                    }
                 }
             }
-        }
-        else
-        {
-            // message is response to a delegated query
-            var key = GetKeyName(message);
-            try
+            else
             {
-                _requestResponseMapLock.EnterUpgradeableReadLock();
+                // message is response to a delegated query
+                var key = new DnsRequestKey(message);
 
-                if (_requestResponseMap.TryGetValue(key, out var ep))
+                if (_requestResponseMap.TryRemove(key, out var ep))
                 {
-                    // first test establishes presence
-                    try
-                    {
-                        _requestResponseMapLock.EnterWriteLock();
-                        // second test within lock means exclusive access
-                        if (!_requestResponseMap.TryGetValue(key, out ep)) return;
-
-                        using (MemoryStream responseStream = new(512))
+                        using (PooledMemoryStream responseStream = BufferPool.RentMemoryStream())
                         {
                             message.WriteToStream(responseStream);
                             Interlocked.Increment(ref _responses);
 
                             logger.LogInformation("{@RemoteEndPoint} answered {Name} {Class} {Type} to {@EndPoint}", remoteEndPoint, message.Questions[0].Name, message.Questions[0].Class, message.Questions[0].Type, ep);
 
-                            SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, ep);
-                        }
-                        _requestResponseMap.Remove(key);
+                                    SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, ep);
+                                }
 
                     }
-                    finally
+                    else
                     {
-                        _requestResponseMapLock.ExitWriteLock();
+                        Interlocked.Increment(ref _nacks);
                     }
                 }
-                else
-                {
-                    Interlocked.Increment(ref _nacks);
-                }
-            }
-            finally
-            {
-                _requestResponseMapLock.ExitUpgradeableReadLock();
-            }
         }
-    }
 
-    private static string GetKeyName(DnsMessage message) => message.QuestionCount > 0 ? $"{message.QueryIdentifier}|{message.Questions[0].Class}|{message.Questions[0].Type}|{message.Questions[0].Name}" : message.QueryIdentifier.ToString();
 
-    /// <summary>Send UDP response via UDP listener socket</summary>
-    /// <param name="bytes"></param>
-    /// <param name="offset"></param>
-    /// <param name="count"></param>
-    /// <param name="remoteEndpoint"></param>
-    private void SendUdp(byte[] bytes, int offset, int count, EndPoint remoteEndpoint)
-    {
-        SocketAsyncEventArgs args = new();
-        args.RemoteEndPoint = remoteEndpoint;
-        args.SetBuffer(bytes, offset, count);
+        /// <summary>Send UDP response via UDP listener socket</summary>
+        /// <param name="bytes">The buffer containing the data to send.</param>
+        /// <param name="offset">The offset in the buffer where data starts.</param>
+        /// <param name="count">The number of bytes to send.</param>
+        /// <param name="remoteEndpoint">The destination endpoint.</param>
+        private void SendUdp(byte[] bytes, int offset, int count, EndPoint remoteEndpoint)
+        {
+            // Get a pooled SocketAsyncEventArgs
+            SocketAsyncEventArgs args = BufferPool.RentSocketAsyncEventArgs();
+            args.RemoteEndPoint = remoteEndpoint;
+
+            // Copy data to a new buffer since the source may be reused
+            // TODO: Future optimization - pool these send buffers too
+            byte[] sendBuffer = new byte[count];
+            Buffer.BlockCopy(bytes, offset, sendBuffer, 0, count);
+            args.SetBuffer(sendBuffer, 0, count);
+
+            // Set up completion callback to return args to pool
+            args.Completed += OnSendCompleted;
 
         _udpListener.SendToAsync(args);
     }
 
-    /// <summary>Returns list of manual or DHCP specified DNS addresses</summary>
-    /// <returns>List of configured DNS names</returns>
-    // ReSharper disable once InconsistentNaming
-    private IEnumerable<IPAddress> GetDefaultDNS()
-    {
-        var adapters  = NetworkInterface.GetAllNetworkInterfaces();
-        foreach (var adapter in adapters)
+        /// <summary>Callback when send completes - returns SocketAsyncEventArgs to pool.</summary>
+        private void OnSendCompleted(object sender, SocketAsyncEventArgs args)
         {
+            args.Completed -= OnSendCompleted;
+            BufferPool.ReturnSocketAsyncEventArgs(args);
+        }
+
+        /// <summary>Returns list of manual or DHCP specified DNS addresses</summary>
+        /// <returns>List of configured DNS names</returns>
+        private IEnumerable<IPAddress> GetDefaultDNS()
+        {
+            NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces();
+            foreach (NetworkInterface adapter in adapters)
+            {
 
             var adapterProperties = adapter.GetIPProperties();
             var dnsServers = adapterProperties.DnsAddresses;

@@ -5,6 +5,7 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using Dns.Db.Models.EntityFramework.Enums;
@@ -24,11 +25,17 @@ public class QuestionList : List<Question>
         {
             // TODO: move this code into the Question object
 
-            var name = DnsProtocol.ReadString(bytes, ref currentOffset);
-            var type = (ResourceType)(BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
-            currentOffset += 2;
-            var lClass =  (ResourceClass) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
-            currentOffset  += 2;
+                Question question = new Question();
+
+                question.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
+
+                // Phase 5: Use BinaryPrimitives for zero-allocation reads
+                var span = bytes.AsSpan(currentOffset);
+                question.Type = (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
+                currentOffset += 2;
+
+                question.Class = (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span.Slice(2));
+                currentOffset += 2;
 
             Add(new(name, type, lClass));
         }

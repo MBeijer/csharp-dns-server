@@ -14,7 +14,13 @@ using Dns.Extensions;
 
 namespace Dns;
 
-public delegate void OnRequestHandler(byte[] buffer, EndPoint remoteEndPoint);
+    /// <summary>
+    /// Handler for incoming DNS requests.
+    /// </summary>
+    /// <param name="buffer">The received data buffer.</param>
+    /// <param name="length">The number of valid bytes in the buffer.</param>
+    /// <param name="remoteEndPoint">The remote endpoint that sent the request.</param>
+public delegate void OnRequestHandler(byte[] buffer, int length, EndPoint remoteEndPoint);
 
 public class UdpListener
 {
@@ -114,9 +120,9 @@ public class UdpListener
 			return;
 		}
 
-		var args = new SocketAsyncEventArgs();
-		args.SetBuffer(new byte[0x1000], 0, 0x1000);
-		var awaitable = new SocketAwaitable(args);
+            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
+            args.SetBuffer(new byte[0x1000], 0, 0x1000);
+            SocketAwaitable awaitable = new SocketAwaitable(args);
 
 		try
 		{
@@ -140,11 +146,11 @@ public class UdpListener
 
 					if (OnRequest != null)
 					{
-						_ = Task.Run(() => OnRequest(payload, remoteClone));
+						_ = Task.Run(() => OnRequest(payload, bytesRead, remoteClone));
 					}
 					else
 					{
-						_ = Task.Run(() => ProcessReceiveFrom(remoteClone, payload.Length));
+						_ = Task.Run(() => ProcessReceiveFrom(remoteClone, bytesRead));
 					}
 				}
 				catch (ObjectDisposedException)
