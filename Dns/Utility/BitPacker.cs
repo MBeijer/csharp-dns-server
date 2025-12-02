@@ -10,9 +10,15 @@ namespace Dns.Utility;
 
 public class BitPacker
 {
+	public enum Endian
+	{
+		HiLo,
+		LoHi,
+	}
+
 	private readonly byte[] _buffer;
-	private          int    _bitOffset;
 	private readonly int[]  _mask = [1, 2, 4, 8, 16, 32, 64, 128];
+	private          int    _bitOffset;
 
 	public BitPacker(byte[] buffer) => _buffer = buffer;
 
@@ -24,23 +30,17 @@ public class BitPacker
 
 		var bit = _bitOffset;
 
-		if (((bit + count) / 8) > _buffer.Length) throw new ArgumentOutOfRangeException("count");
+		if ((bit + count) / 8 > _buffer.Length) throw new ArgumentOutOfRangeException("count");
 
 		GenerateInitialOffset(out var byteNumber, out var bitOffset);
 
 		var span = BitConverter.ToUInt16(_buffer, byteNumber);
 
-		var mask = GetMask(count, bitOffset);
+		var mask  = GetMask(count, bitOffset);
 		var value = (span & mask) >> bitOffset;
 
 		_bitOffset += count;
-		return (byte) value;
-	}
-
-	public enum Endian
-	{
-		HiLo,
-		LoHi
+		return (byte)value;
 	}
 
 	public ushort GetUshort(int count = 16, Endian endian = Endian.LoHi)
@@ -49,7 +49,7 @@ public class BitPacker
 
 		var bit = _bitOffset;
 
-		if (((bit + count) / 8) > _buffer.Length) throw new ArgumentOutOfRangeException("count");
+		if ((bit + count) / 8 > _buffer.Length) throw new ArgumentOutOfRangeException("count");
 
 		GenerateInitialOffset(out var byteNumber, out var bitOffset);
 
@@ -66,8 +66,8 @@ public class BitPacker
 			span = BitConverter.ToUInt32(copy, byteNumber);
 		}
 
-		var mask = GetMask(count, bitOffset);
-		var value = (ushort) ((span & mask) >> bitOffset);
+		var mask  = GetMask(count, bitOffset);
+		var value = (ushort)((span & mask) >> bitOffset);
 
 		if (endian == Endian.HiLo) SwapEndian(ref value);
 
@@ -77,7 +77,7 @@ public class BitPacker
 
 	private static int GetMask(int count, ushort bitOffset)
 	{
-		var mask = 0;
+		var mask                                                             = 0;
 		for (int index = bitOffset; index < bitOffset + count; index++) mask += (int)Math.Pow(2, index);
 		return mask;
 	}
@@ -101,11 +101,12 @@ public class BitPacker
 
 	private void GenerateInitialOffset(out int index, out ushort offset)
 	{
-		index = _bitOffset == 0 ? 0 : (_bitOffset / 8);
-		offset = (ushort)(_bitOffset - (index * 8));
+		index  = _bitOffset == 0 ? 0 : _bitOffset / 8;
+		offset = (ushort)(_bitOffset - index * 8);
 	}
 
 	public static void SwapEndian(ref ushort val) => val = (ushort)((val << 8) | (val >> 8));
 
-	public static void SwapEndian(ref uint val) => val = (val<<24) | ((val<<8) & 0x00ff0000) | ((val>>8) & 0x0000ff00) | (val>>24);
+	public static void SwapEndian(ref uint val) =>
+		val = (val << 24) | ((val << 8) & 0x00ff0000) | ((val >> 8) & 0x0000ff00) | (val >> 24);
 }

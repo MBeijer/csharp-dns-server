@@ -4,7 +4,7 @@ using Dns.ZoneProvider.Traefik;
 
 namespace Dns.ZoneProvider;
 
-[JsonDerivedType(typeof(TraefikZoneProviderSettings), typeDiscriminator: "traefik")]
-[JsonDerivedType(typeof(IPProbeProviderSettings), typeDiscriminator: "ipprobe")]
-[JsonDerivedType(typeof(FileWatcherZoneProviderSettings), typeDiscriminator: "filewatcher")]
+[JsonDerivedType(typeof(TraefikZoneProviderSettings), "traefik")]
+[JsonDerivedType(typeof(IPProbeProviderSettings), "ipprobe")]
+[JsonDerivedType(typeof(FileWatcherZoneProviderSettings), "filewatcher")]
 public abstract class ProviderSettings;

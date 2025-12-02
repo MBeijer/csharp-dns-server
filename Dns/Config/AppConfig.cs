@@ -4,6 +4,5 @@ namespace Dns.Config;
 
 public class AppConfig
 {
-   [JsonPropertyName("server")]
-   public ServerOptions Server { get; set; }
+	[JsonPropertyName("server")] public ServerOptions Server { get; set; }
 }

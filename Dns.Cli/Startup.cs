@@ -38,13 +38,11 @@ using Microsoft.OpenApi;
 namespace Dns.Cli;
 
 /// <summary>
-///
 /// </summary>
 /// <param name="configuration"></param>
 public class Startup(IConfiguration configuration)
 {
 	/// <summary>
-	///
 	/// </summary>
 	/// <param name="services"></param>
 	/// <exception cref="InvalidOperationException"></exception>
@@ -159,12 +157,12 @@ public class Startup(IConfiguration configuration)
 				);
 
 				c.AddSecurityRequirement(_ => new()
-				{
 					{
-						new(JwtBearerDefaults.AuthenticationScheme),
-						[] // must be List<string>
-					},
-				});
+						{
+							new(JwtBearerDefaults.AuthenticationScheme), [] // must be List<string>
+						},
+					}
+				);
 			}
 		);
 
@@ -197,7 +195,6 @@ public class Startup(IConfiguration configuration)
 	}
 
 	/// <summary>
-	///
 	/// </summary>
 	/// <param name="app"></param>
 	/// <param name="env"></param>

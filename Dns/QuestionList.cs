@@ -5,10 +5,10 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using Dns.Db.Models.EntityFramework.Enums;
-using Dns.Extensions;
 using Dns.Models.Dns.Packets;
 using Dns.Serializers;
 
@@ -16,32 +16,33 @@ namespace Dns;
 
 public class QuestionList : List<Question>
 {
-    public int LoadFrom(byte[] bytes, int offset, ushort count)
-    {
-        var currentOffset = offset;
+	public int LoadFrom(byte[] bytes, int offset, ushort count)
+	{
+		var currentOffset = offset;
 
-        for (var index = 0; index < count; index++)
-        {
-            // TODO: move this code into the Question object
+		for (var index = 0; index < count; index++)
+		{
+			var name = DnsProtocol.ReadString(bytes, ref currentOffset);
 
-            var name = DnsProtocol.ReadString(bytes, ref currentOffset);
-            var type = (ResourceType)(BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
-            currentOffset += 2;
-            var lClass =  (ResourceClass) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
-            currentOffset  += 2;
+			var span = bytes.AsSpan(currentOffset);
+			var type = (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
+			currentOffset += 2;
 
-            Add(new(name, type, lClass));
-        }
+			var lClass = (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
+			currentOffset += 2;
 
-        var bytesRead = currentOffset - offset;
-        return bytesRead;
-    }
+			Add(new(name, type, lClass));
+		}
 
-    public long WriteToStream(Stream stream)
-    {
-        var start = stream.Length;
-        foreach (var question in this) stream.Write(question.Serialize().Buffer);
-        var end = stream.Length;
-        return end - start;
-    }
+		var bytesRead = currentOffset - offset;
+		return bytesRead;
+	}
+
+	public long WriteToStream(Stream stream)
+	{
+		var start = stream.Length;
+		foreach (var question in this) stream.Write(question.Serialize().Buffer);
+		var end = stream.Length;
+		return end - start;
+	}
 }

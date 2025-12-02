@@ -6,7 +6,6 @@ using Microsoft.Extensions.Configuration;
 namespace Dns.Cli.Extensions;
 
 /// <summary>
-///
 /// </summary>
 public static class ConfigurationExtensions
 {
@@ -37,10 +36,9 @@ public static class ConfigurationExtensions
 	}
 
 	/// <summary>
-	///
 	/// </summary>
 	/// <param name="section"></param>
 	/// <returns></returns>
-	public static JsonElement ReadJsonElement(this IConfiguration section)
-		=> JsonSerializer.SerializeToElement(ToJsonNode(section));
+	public static JsonElement ReadJsonElement(this IConfiguration section) =>
+		JsonSerializer.SerializeToElement(ToJsonNode(section));
 }

@@ -8,15 +8,12 @@ namespace Dns.Db.Contexts;
 public sealed class DnsServerDbContext : DbContext
 {
 	/// <inheritdoc />
-	public DnsServerDbContext(DbContextOptions<DnsServerDbContext> options) : base(options)
-	{
+	public DnsServerDbContext(DbContextOptions<DnsServerDbContext> options) : base(options) =>
 		ChangeTracker.LazyLoadingEnabled = false;
-	}
 
 	public DbSet<User>?       Users       { get; set; }
 	public DbSet<Zone>?       Zones       { get; set; }
 	public DbSet<ZoneRecord>? ZoneRecords { get; set; }
-
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{
@@ -46,7 +43,7 @@ public sealed class DnsServerDbContext : DbContext
 		            .HasForeignKey(b => b.Zone)
 		            .OnDelete(DeleteBehavior.Restrict);
 	}
-	
+
 	private static void CreateUserModel(EntityTypeBuilder<User> modelBuilder)
 	{
 		modelBuilder.HasIndex(u => u.Account).IsUnique();

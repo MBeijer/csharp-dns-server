@@ -4,7 +4,7 @@ namespace Dns.ZoneProvider.IPProbe;
 
 internal class Host
 {
-    internal          string           Name             { get; set; }
-    internal          AvailabilityMode AvailabilityMode { get; set; }
-    internal readonly List<Target>     AddressProbes = [];
+	internal readonly List<Target>     AddressProbes = [];
+	internal          string           Name             { get; set; }
+	internal          AvailabilityMode AvailabilityMode { get; set; }
 }

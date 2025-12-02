@@ -6,11 +6,12 @@ namespace Dns.Db.Models.EntityFramework;
 [Table("zones")]
 public class Zone
 {
-	[Key, DatabaseGenerated(DatabaseGeneratedOption.Identity), Column("id")]
+	[Key]
+	[DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+	[Column("id")]
 	public int? Id { get; set; }
 
-	[Column("suffix"), MaxLength(120)]
-	public string? Suffix { get; set; }
+	[Column("suffix")] [MaxLength(120)] public string? Suffix { get; set; }
 
 	[Column("serial")]  public uint                     Serial  { get; set; }
 	[Column("enabled")] public bool                     Enabled { get; set; }

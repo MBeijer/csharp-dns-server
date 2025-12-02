@@ -14,16 +14,13 @@ public static class StringExtensions
 		foreach (var segment in segments)
 		{
 			stream.WriteByte((byte)segment.Length);
-			foreach (var currentChar in segment)
-			{
-				stream.WriteByte((byte)currentChar);
-			}
+			foreach (var currentChar in segment) stream.WriteByte((byte)currentChar);
 		}
 
 		stream.WriteByte(0x0);
 		return stream.GetBuffer();
 	}
 
-	public static byte[] GetBytes(this string str, Encoding encoding = null)
-		=> (encoding??Encoding.ASCII).GetBytes(str);
+	public static byte[] GetBytes(this string str, Encoding encoding = null) =>
+		(encoding ?? Encoding.ASCII).GetBytes(str);
 }

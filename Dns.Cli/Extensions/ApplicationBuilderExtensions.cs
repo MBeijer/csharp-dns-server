@@ -7,12 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Dns.Cli.Extensions;
 
 /// <summary>
-///
 /// </summary>
 public static class ApplicationBuilderExtensions
 {
 	/// <summary>
-	///
 	/// </summary>
 	/// <param name="app"></param>
 	public static void UpdateDatabase(this IApplicationBuilder app)

@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace Dns.Cli.Controllers;
 
 /// <summary>
-///
 /// </summary>
 /// <param name="dnsService"></param>
 /// <param name="dnsServer"></param>

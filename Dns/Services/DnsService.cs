@@ -17,38 +17,43 @@ using Microsoft.Extensions.Options;
 
 namespace Dns.Services;
 
-public class DnsService(IServiceProvider services, IOptions<ServerOptions> serverOptions, IDnsServer dnsServer) : IDnsService
+public class DnsService(IServiceProvider services, IOptions<ServerOptions> serverOptions, IDnsServer dnsServer)
+	: IDnsService
 {
-    private static readonly List<IDnsResolver>      ZoneResolvers = [];
-    public                  bool                    Running { get; set; } = true;
-    private                 CancellationTokenSource Cts    { get; set; }
+	private static readonly List<IDnsResolver>      ZoneResolvers = [];
+	public                  bool                    Running { get; set; } = true;
+	private                 CancellationTokenSource Cts     { get; set; }
 
-    public  List<IDnsResolver> Resolvers => ZoneResolvers;
-    public async Task StartAsync(CancellationToken ct)
-    {
-        Cts           = CancellationTokenSource.CreateLinkedTokenSource(ct);
+	public List<IDnsResolver> Resolvers => ZoneResolvers;
 
-        foreach (var zone in serverOptions.Value.Zones)
-        {
-            var zoneProvider = (IZoneProvider)services.GetRequiredService(ByName(zone.Provider));
-            zoneProvider.Initialize(zone);
-            zoneProvider.Start(Cts.Token);
-            ZoneResolvers.Add(zoneProvider.Resolver);
-        }
+	public async Task StartAsync(CancellationToken ct)
+	{
+		Cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        dnsServer.Initialize(ZoneResolvers);
-        await dnsServer.Start(Cts.Token).ConfigureAwait(false);
-    }
+		foreach (var zone in serverOptions.Value.Zones)
+		{
+			var zoneProvider = (IZoneProvider)services.GetRequiredService(ByName(zone.Provider));
+			zoneProvider.Initialize(zone);
+			zoneProvider.Start(Cts.Token);
+			ZoneResolvers.Add(zoneProvider.Resolver);
+		}
 
+		dnsServer.Initialize(ZoneResolvers);
+		await dnsServer.Start(Cts.Token).ConfigureAwait(false);
+	}
 
-    public async Task StopAsync(CancellationToken cancellationToken)
-    {
-        if (Cts != null)
-            await Cts.CancelAsync().ConfigureAwait(false);
+	public async Task StopAsync(CancellationToken cancellationToken)
+	{
+		if (Cts != null)
+			await Cts.CancelAsync().ConfigureAwait(false);
 
-        // Wait until the task completes or the stop timeout occurs
-        await Task.WhenAny(Task.Delay(Timeout.Infinite, cancellationToken)).ConfigureAwait(false);
-    }
+		// Wait until the task completes or the stop timeout occurs
+		await Task.WhenAny(Task.Delay(Timeout.Infinite, cancellationToken)).ConfigureAwait(false);
+	}
 
-    private static Type ByName(string name) => AppDomain.CurrentDomain.GetAssemblies().Reverse().Select(assembly => assembly.GetType(name)).FirstOrDefault(tt => tt != null);
+	private static Type ByName(string name) =>
+		AppDomain.CurrentDomain.GetAssemblies()
+		         .Reverse()
+		         .Select(assembly => assembly.GetType(name))
+		         .FirstOrDefault(tt => tt != null);
 }

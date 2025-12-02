@@ -76,6 +76,7 @@ public static class PacketSerializer
 				var num = Convert.ChangeType(raw, ut, CultureInfo.InvariantCulture)!;
 				return Enum.ToObject(t, num);
 			}
+
 /*
 			if (IsGenericEnumerable(t, out var elemType))
 			{

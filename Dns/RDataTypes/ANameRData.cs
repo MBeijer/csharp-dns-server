@@ -8,14 +8,17 @@ namespace Dns.RDataTypes;
 
 public class ANameRData : RData
 {
-	private ResourceType _type = ResourceType.A;
-	private IPAddress    _address;
+	private readonly IPAddress    _address;
+	private readonly ResourceType _type = ResourceType.A;
 
-	public ANameRData() {}
+	public ANameRData()
+	{
+	}
+
 	private ANameRData(IReadOnlyList<byte> bytes, int offset, int size)
 	{
 		_type = size == 4 ? ResourceType.A : ResourceType.AAAA;
-		var addressBytes = new byte[size];// = BitConverter.(bytes, offset);
+		var addressBytes = new byte[size]; // = BitConverter.(bytes, offset);
 
 		var j = 0;
 		for (var i = offset; i < offset + size; i++)
@@ -27,24 +30,24 @@ public class ANameRData : RData
 		Address = new(addressBytes);
 	}
 
-	public static ANameRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
-
-	public override void WriteToStream(Stream stream)
-	{
-		var bytes = Address.GetAddressBytes();
-		stream.Write(bytes, 0, bytes.Length);
-	}
-
-	public override ushort Length => (ushort)(_type == ResourceType.A?4:16);
+	public override ushort Length => (ushort)(_type == ResourceType.A ? 4 : 16);
 
 	public IPAddress Address
 	{
 		get => _address;
 		init
 		{
-			_type = value.GetAddressBytes().Length == 4 ? ResourceType.A : ResourceType.AAAA;
+			_type    = value.GetAddressBytes().Length == 4 ? ResourceType.A : ResourceType.AAAA;
 			_address = value;
 		}
+	}
+
+	public static ANameRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
+
+	public override void WriteToStream(Stream stream)
+	{
+		var bytes = Address.GetAddressBytes();
+		stream.Write(bytes, 0, bytes.Length);
 	}
 
 	public override void Dump()

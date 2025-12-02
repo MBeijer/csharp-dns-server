@@ -7,21 +7,17 @@ using Microsoft.Extensions.Hosting;
 namespace Dns.Cli;
 
 /// <summary>
-///
 /// </summary>
 public static class Program
 {
 	/// <summary>
-	///
 	/// </summary>
 	/// <param name="args"></param>
-	public static Task Main(string[] args)
-		=> CreateWebHostBuilder(args).Build().RunAsync();
+	public static Task Main(string[] args) => CreateWebHostBuilder(args).Build().RunAsync();
 
 	private static IHostBuilder CreateWebHostBuilder(string[] args) =>
 		Host.CreateDefaultBuilder(args)
-		    .ConfigureAppConfiguration(
-			    (context, config) =>
+		    .ConfigureAppConfiguration((context, config) =>
 			    {
 				    config.AddEnvironmentVariables();
 				    config.AddCommandLine(args);
@@ -29,12 +25,8 @@ public static class Program
 				    var customPath = tempConfig["appsettings"];
 
 				    if (!string.IsNullOrWhiteSpace(customPath))
-				    {
 					    if (File.Exists(customPath))
-					    {
-						    config.AddJsonFile(customPath, optional: false, reloadOnChange: true);
-					    }
-				    }
+						    config.AddJsonFile(customPath, false, true);
 			    }
 		    )
 		    .ConfigureWebHostDefaults(webHost => webHost.UseStartup<Startup>());

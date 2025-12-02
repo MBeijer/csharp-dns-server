@@ -6,18 +6,21 @@ namespace Dns.RDataTypes;
 
 public class TXTRData : RData
 {
+	// ReSharper disable once IdentifierTypo
+	public TXTRData()
+	{
+	}
+
+	private TXTRData(byte[] bytes, int offset, int size) =>
+		Name = DnsProtocol.ReadString(bytes, ref offset)[..(size - 1)].Trim();
+
 	public string Name { get; init; }
 
 	public override ushort Length =>
 		// dots replaced by bytes
 		// + 1 segment prefix
 		// + 1 null terminator
-		(ushort) (Name.Length + 1);
-
-	// ReSharper disable once IdentifierTypo
-	public TXTRData() {}
-	private TXTRData(byte[] bytes, int offset, int size) => Name = DnsProtocol.ReadString(bytes, ref offset)[..(size-1)].Trim();
-
+		(ushort)(Name.Length + 1);
 
 	public static TXTRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
 

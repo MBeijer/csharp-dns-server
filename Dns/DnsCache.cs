@@ -12,13 +12,14 @@ namespace Dns;
 
 public class DnsCache : IDnsCache
 {
-    private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+	private readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
-    byte[] IDnsCache.Get(string key) => _cache.TryGetValue(key, out byte[] entry) ? entry : null;
+	byte[] IDnsCache.Get(string key) => _cache.TryGetValue(key, out byte[] entry) ? entry : null;
 
-    void IDnsCache.Set(string key, byte[] bytes, int ttlSeconds)
-    {
-        var cacheEntryOptions = new MemoryCacheEntryOptions().SetAbsoluteExpiration(DateTimeOffset.Now + TimeSpan.FromSeconds(ttlSeconds));
-        _cache.Set(key, bytes, cacheEntryOptions);
-    }
+	void IDnsCache.Set(string key, byte[] bytes, int ttlSeconds)
+	{
+		var cacheEntryOptions =
+			new MemoryCacheEntryOptions().SetAbsoluteExpiration(DateTimeOffset.Now + TimeSpan.FromSeconds(ttlSeconds));
+		_cache.Set(key, bytes, cacheEntryOptions);
+	}
 }

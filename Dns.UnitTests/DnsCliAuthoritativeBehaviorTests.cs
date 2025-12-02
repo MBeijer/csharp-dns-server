@@ -4,7 +4,6 @@
 // // // </copyright>
 // // //-------------------------------------------------------------------------------------------------
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -20,93 +19,96 @@ namespace Dns.UnitTests;
 [Collection(DnsCliIntegrationCollection.Name)]
 public sealed class DnsCliAuthoritativeBehaviorTests(DnsCliHostFixture fixture)
 {
-    private static readonly IPAddress PrimaryHostAddress = IPAddress.Parse("192.0.2.10");
-    private static readonly List<IPAddress> RoundRobinAddresses =
-    [
-        IPAddress.Parse("192.0.2.11"),
-        IPAddress.Parse("192.0.2.12"),
-        IPAddress.Parse("192.0.2.13"),
-    ];
+	private static readonly IPAddress PrimaryHostAddress = IPAddress.Parse("192.0.2.10");
 
-    [Fact]
-    public async Task InZoneQueriesReturnAuthoritativeAnswers()
-    {
-        var hostName = fixture.BuildHostName("alpha");
-        var response = await fixture.Client.QueryAsync(hostName);
+	private static readonly List<IPAddress> RoundRobinAddresses =
+	[
+		IPAddress.Parse("192.0.2.11"),
+		IPAddress.Parse("192.0.2.12"),
+		IPAddress.Parse("192.0.2.13"),
+	];
 
-        Assert.True(response.QR);
-        Assert.True(response.AA);
-        Assert.False(response.RA);
-        Assert.Equal(RCode.NOERROR, (RCode)response.RCode);
-        Assert.Equal((ushort)1, response.AnswerCount);
+	[Fact]
+	public async Task InZoneQueriesReturnAuthoritativeAnswers()
+	{
+		var hostName = fixture.BuildHostName("alpha");
+		var response = await fixture.Client.QueryAsync(hostName);
 
-        var answer = Assert.Single(response.Answers);
-        Assert.Equal(hostName, answer.Name);
-        Assert.Equal(ResourceType.A, answer.Type);
-        Assert.Equal(ResourceClass.IN, answer.Class);
-        Assert.Equal((uint)10, answer.TTL);
-        var address = Assert.IsType<ANameRData>(answer.RData);
-        Assert.Equal(PrimaryHostAddress, address.Address);
-    }
+		Assert.True(response.QR);
+		Assert.True(response.AA);
+		Assert.False(response.RA);
+		Assert.Equal(RCode.NOERROR, (RCode)response.RCode);
+		Assert.Equal((ushort)1, response.AnswerCount);
 
-    [Fact]
-    public async Task RecursionDesiredFlagDoesNotGrantRecursionAvailability()
-    {
-        var hostName = fixture.BuildHostName("alpha");
-        var response = await fixture.Client.QueryAsync(hostName, recursionDesired: true);
+		var answer = Assert.Single(response.Answers);
+		Assert.Equal(hostName, answer.Name);
+		Assert.Equal(ResourceType.A, answer.Type);
+		Assert.Equal(ResourceClass.IN, answer.Class);
+		Assert.Equal((uint)10, answer.TTL);
+		var address = Assert.IsType<ANameRData>(answer.RData);
+		Assert.Equal(PrimaryHostAddress, address.Address);
+	}
 
-        Assert.True(response.RD);
-        Assert.False(response.RA);
-        Assert.True(response.AA);
-    }
+	[Fact]
+	public async Task RecursionDesiredFlagDoesNotGrantRecursionAvailability()
+	{
+		var hostName = fixture.BuildHostName("alpha");
+		var response = await fixture.Client.QueryAsync(hostName, recursionDesired: true);
 
-    [Fact]
-    public async Task RoundRobinHostsRotateAddressesAcrossQueries()
-    {
-        var hostName     = fixture.BuildHostName("round");
-        var response     = await fixture.Client.QueryAsync(hostName);
-        var firstAnswers = response.Answers.Select(responseAnswer => Assert.IsType<ANameRData>(responseAnswer.RData).Address).ToList();
+		Assert.True(response.RD);
+		Assert.False(response.RA);
+		Assert.True(response.AA);
+	}
 
-        Assert.Equal(RoundRobinAddresses, firstAnswers);
-    }
+	[Fact]
+	public async Task RoundRobinHostsRotateAddressesAcrossQueries()
+	{
+		var hostName = fixture.BuildHostName("round");
+		var response = await fixture.Client.QueryAsync(hostName);
+		var firstAnswers = response.Answers
+		                           .Select(responseAnswer => Assert.IsType<ANameRData>(responseAnswer.RData).Address)
+		                           .ToList();
 
-    [Fact]
-    public async Task PositiveResponsesKeepConfiguredTtl()
-    {
-        var hostName = fixture.BuildHostName("alpha");
+		Assert.Equal(RoundRobinAddresses, firstAnswers);
+	}
 
-        var firstResponse  = await fixture.Client.QueryAsync(hostName);
-        var secondResponse = await fixture.Client.QueryAsync(hostName);
+	[Fact]
+	public async Task PositiveResponsesKeepConfiguredTtl()
+	{
+		var hostName = fixture.BuildHostName("alpha");
 
-        Assert.Equal((uint)10, Assert.Single(firstResponse.Answers).TTL);
-        Assert.Equal((uint)10, Assert.Single(secondResponse.Answers).TTL);
-        Assert.True(firstResponse.AA);
-        Assert.True(secondResponse.AA);
-    }
+		var firstResponse  = await fixture.Client.QueryAsync(hostName);
+		var secondResponse = await fixture.Client.QueryAsync(hostName);
 
-    [Fact]
-    public async Task NonexistentHostsReturnSoaAuthorityWithMinimumTtl()
-    {
-        var missingHost = fixture.BuildHostName("missing");
+		Assert.Equal((uint)10, Assert.Single(firstResponse.Answers).TTL);
+		Assert.Equal((uint)10, Assert.Single(secondResponse.Answers).TTL);
+		Assert.True(firstResponse.AA);
+		Assert.True(secondResponse.AA);
+	}
 
-        var firstResponse  = await fixture.Client.QueryAsync(missingHost);
-        var secondResponse = await fixture.Client.QueryAsync(missingHost);
+	[Fact]
+	public async Task NonexistentHostsReturnSoaAuthorityWithMinimumTtl()
+	{
+		var missingHost = fixture.BuildHostName("missing");
 
-        Assert.Equal(RCode.NXDOMAIN, (RCode)firstResponse.RCode);
-        Assert.Equal((ushort)0, firstResponse.AnswerCount);
-        Assert.Equal((ushort)1, firstResponse.NameServerCount);
-        Assert.True(firstResponse.AA);
-        Assert.False(firstResponse.RA);
+		var firstResponse  = await fixture.Client.QueryAsync(missingHost);
+		var secondResponse = await fixture.Client.QueryAsync(missingHost);
 
-        var soaRecord = Assert.Single(firstResponse.Authorities);
-        Assert.Equal(ResourceType.SOA, soaRecord.Type);
-        Assert.Equal((uint)300, soaRecord.TTL);
-        var soaData = Assert.IsType<SOARData>(soaRecord.RData);
-        Assert.Equal((uint)300, soaData.MinimumTTL);
+		Assert.Equal(RCode.NXDOMAIN, (RCode)firstResponse.RCode);
+		Assert.Equal((ushort)0, firstResponse.AnswerCount);
+		Assert.Equal((ushort)1, firstResponse.NameServerCount);
+		Assert.True(firstResponse.AA);
+		Assert.False(firstResponse.RA);
 
-        var secondSoaRecord = Assert.Single(secondResponse.Authorities);
-        Assert.Equal((uint)300, secondSoaRecord.TTL);
-        var secondSoaData = Assert.IsType<SOARData>(secondSoaRecord.RData);
-        Assert.Equal((uint)300, secondSoaData.MinimumTTL);
-    }
+		var soaRecord = Assert.Single(firstResponse.Authorities);
+		Assert.Equal(ResourceType.SOA, soaRecord.Type);
+		Assert.Equal((uint)300, soaRecord.TTL);
+		var soaData = Assert.IsType<SOARData>(soaRecord.RData);
+		Assert.Equal((uint)300, soaData.MinimumTTL);
+
+		var secondSoaRecord = Assert.Single(secondResponse.Authorities);
+		Assert.Equal((uint)300, secondSoaRecord.TTL);
+		var secondSoaData = Assert.IsType<SOARData>(secondSoaRecord.RData);
+		Assert.Equal((uint)300, secondSoaData.MinimumTTL);
+	}
 }

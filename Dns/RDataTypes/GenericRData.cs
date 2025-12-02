@@ -17,11 +17,11 @@ public class GenericRData : RData
 			_bytes[i] = bytes[offset + i];
 	}
 
+	public override ushort Length => (ushort)_bytes.Length;
+
 	public static GenericRData Parse(byte[] bytes, int offset, int size) => new(bytes, offset, size);
 
 	public override void WriteToStream(Stream stream) => stream.Write(_bytes, 0, _bytes.Length);
-
-	public override ushort Length => (ushort)_bytes.Length;
 
 	public override void Dump() => Console.WriteLine("Address:   {0}", JsonConvert.SerializeObject(this));
 }

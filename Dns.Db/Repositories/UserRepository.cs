@@ -12,7 +12,7 @@ public class UserRepository(ILogger<UserRepository> logger, DnsServerDbContext d
 	public Task<List<User>> GetUsers() => dbContext.Users!.AsNoTracking().ToListAsync();
 
 	public Task<User> GetUser(string account, CancellationToken token = default) =>
-		dbContext.Users!.FirstAsync(u => EF.Functions.Like(u.Account!, account), cancellationToken: token);
+		dbContext.Users!.FirstAsync(u => EF.Functions.Like(u.Account!, account), token);
 
 	public async Task UpdateUser(User user)
 	{

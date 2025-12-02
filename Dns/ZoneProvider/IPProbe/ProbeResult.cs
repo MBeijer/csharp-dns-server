@@ -4,7 +4,7 @@ namespace Dns.ZoneProvider.IPProbe;
 
 internal class ProbeResult
 {
-    internal DateTime StartTime;
-    internal TimeSpan Duration;
-    internal bool     Available;
+	internal bool     Available;
+	internal TimeSpan Duration;
+	internal DateTime StartTime;
 }
