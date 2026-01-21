@@ -7,4 +7,5 @@ public interface IZoneRepository
 	Task<List<Zone>> GetZones();
 	Task<Zone?>      GetZone(string suffix);
 	Task             AddZone(Zone zone);
+	Task             UpdateZone(Zone zone);
 }

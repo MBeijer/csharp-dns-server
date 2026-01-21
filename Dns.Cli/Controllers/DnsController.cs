@@ -53,6 +53,20 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 		await zoneRepository.AddZone(zone).ConfigureAwait(false);
 		return Created();
 	}
+
+	/// <summary>
+	///     Get database zones
+	/// </summary>
+	/// <returns>html</returns>
+	[ProducesResponseType(StatusCodes.Status200OK)]
+	[ProducesResponseType(StatusCodes.Status404NotFound)]
+	[ProducesResponseType(StatusCodes.Status400BadRequest)]
+	[HttpPatch("zones")]
+	public async Task<IActionResult?> UpdateZone([FromBody] Zone zone)
+	{
+		await zoneRepository.UpdateZone(zone).ConfigureAwait(false);
+		return Ok();
+	}
 }
 
 #pragma warning restore CS9113

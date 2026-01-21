@@ -19,6 +19,11 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 		await dbContext.Zones!.AddAsync(zone).ConfigureAwait(false);
 		await dbContext.SaveChangesAsync().ConfigureAwait(false);
 	}
+	public async Task UpdateZone(Zone zone)
+	{
+		dbContext.Zones!.Update(zone);
+		await dbContext.SaveChangesAsync().ConfigureAwait(false);
+	}
 }
 
 #pragma warning restore CS9113
