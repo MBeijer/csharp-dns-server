@@ -10,12 +10,12 @@ namespace Dns;
 
 public class ByteBuffer
 {
-	private readonly List<byte> _mBuffer       = [];
-	private          int        _mReadPosition;
+	private static readonly char[]     TrimChars = ['.'];
+	private readonly        List<byte> _mBuffer  = [];
+	private                 int        _mReadPosition;
 
 	public ByteBuffer(string buffer = "") => Write(Encoding.Default.GetBytes(buffer));
 	private ByteBuffer(IEnumerable<byte> str) => _mBuffer = str.ToList();
-
 
 	public byte this[int index]
 	{
@@ -289,7 +289,14 @@ public class ByteBuffer
 	{
 		var data = new byte[8];
 		Read(data);
-		return ((long)data[0] << 56) + ((long)data[1] << 48) + ((long)data[2] << 40) + ((long)data[3] << 32) + ((long)data[4] << 24) + ((long)data[5] << 16) + ((long)data[6] << 8) + data[7];
+		return ((long)data[0] << 56) +
+		       ((long)data[1] << 48) +
+		       ((long)data[2] << 40) +
+		       ((long)data[3] << 32) +
+		       ((long)data[4] << 24) +
+		       ((long)data[5] << 16) +
+		       ((long)data[6] << 8) +
+		       data[7];
 	}
 
 	private string ReadCharsAsString(int pCount)
@@ -312,7 +319,6 @@ public class ByteBuffer
 		return data2;
 	}
 
-	private static readonly char[] TrimChars = ['.'];
 	public ByteBuffer ReadDynamicString()
 	{
 		var resourceName      = new StringBuilder();
@@ -327,10 +333,8 @@ public class ByteBuffer
 			{
 				ReadPosition++;
 				if (compressionOffset == -1)
-				{
 					// only record origin, and follow all pointers thereafter
 					compressionOffset = ReadPosition;
-				}
 
 				// move pointer to compression segment
 				ReadPosition  = _mBuffer[ReadPosition];
@@ -339,10 +343,7 @@ public class ByteBuffer
 
 			if (segmentLength == 0x00)
 			{
-				if (compressionOffset != -1)
-				{
-					ReadPosition = compressionOffset;
-				}
+				if (compressionOffset != -1) ReadPosition = compressionOffset;
 				// move past end of name \0
 				ReadPosition++;
 				break;
@@ -353,6 +354,7 @@ public class ByteBuffer
 			resourceName.Append($"{Encoding.Default.GetString(_mBuffer.ToArray(), ReadPosition, segmentLength)}.");
 			ReadPosition += segmentLength;
 		}
+
 		return resourceName.ToString().TrimEnd(TrimChars);
 	}
 
@@ -360,14 +362,11 @@ public class ByteBuffer
 	{
 		str ??= "";
 
-		var       segments = str.Split(delimiter);
+		var segments = str.Split(delimiter);
 		foreach (var segment in segments)
 		{
 			WriteByte((byte)segment.Length);
-			foreach (var currentChar in segment)
-			{
-				WriteByte((byte)currentChar);
-			}
+			foreach (var currentChar in segment) WriteByte((byte)currentChar);
 		}
 
 		WriteByte(0x0);
@@ -452,10 +451,12 @@ public class ByteBuffer
 	public override string ToString() => Text;
 	public          string ToLower()  => Text.ToLower();
 	public          bool   ToBool()   => int.Parse(Text) == 1;
+
 	public int ToInt()
 	{
 		_ = int.TryParse(Text, out var numbers);
 		return numbers;
 	}
+
 	public bool IsEmpty() => Length == 0;
 }

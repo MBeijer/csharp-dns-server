@@ -11,14 +11,14 @@ namespace Dns.Cli.Controllers;
 #pragma warning disable CS9113
 
 /// <summary>
-///
 /// </summary>
 /// <param name="dnsService"></param>
 /// <param name="dnsServer"></param>
 /// <param name="zoneRepository"></param>
 [ApiController]
 [Route("dns/")]
-public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRepository zoneRepository) : ControllerBase
+public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRepository zoneRepository)
+	: ControllerBase
 {
 	/// <summary>
 	///     Dump Resolver data
@@ -28,8 +28,7 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	[ProducesResponseType(StatusCodes.Status404NotFound)]
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[HttpGet("resolvers")]
-	public IActionResult? GetDnsResolverData()
-		=> Ok(dnsService.Resolvers.Select(s => s.GetObject()));
+	public IActionResult? GetDnsResolverData() => Ok(dnsService.Resolvers.Select(s => s.GetObject()));
 
 	/// <summary>
 	///     Get database zones
@@ -39,8 +38,7 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	[ProducesResponseType(StatusCodes.Status404NotFound)]
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[HttpGet("zones")]
-	public async Task<IActionResult?> GetZones()
-		=> Ok(await zoneRepository.GetZones().ConfigureAwait(false));
+	public async Task<IActionResult?> GetZones() => Ok(await zoneRepository.GetZones().ConfigureAwait(false));
 
 	/// <summary>
 	///     Get database zones
@@ -54,6 +52,20 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	{
 		await zoneRepository.AddZone(zone).ConfigureAwait(false);
 		return Created();
+	}
+
+	/// <summary>
+	///     Get database zones
+	/// </summary>
+	/// <returns>html</returns>
+	[ProducesResponseType(StatusCodes.Status200OK)]
+	[ProducesResponseType(StatusCodes.Status404NotFound)]
+	[ProducesResponseType(StatusCodes.Status400BadRequest)]
+	[HttpPatch("zones")]
+	public async Task<IActionResult?> UpdateZone([FromBody] Zone zone)
+	{
+		await zoneRepository.UpdateZone(zone).ConfigureAwait(false);
+		return Ok();
 	}
 }
 

@@ -10,6 +10,6 @@ namespace Dns.Contracts;
 
 public interface IHtmlDump
 {
-    void   DumpHtml(TextWriter writer);
-    object GetObject();
+	void   DumpHtml(TextWriter writer);
+	object GetObject();
 }

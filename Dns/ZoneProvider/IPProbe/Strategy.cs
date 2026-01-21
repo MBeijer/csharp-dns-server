@@ -7,25 +7,25 @@ namespace Dns.ZoneProvider.IPProbe;
 
 public class Strategy
 {
-    public delegate bool Probe(ILogger logger, IPAddress addr, ushort timeout);
+	public delegate bool Probe(ILogger logger, IPAddress addr, ushort timeout);
 
-    private static readonly Dictionary<string, Probe> ProbeFunctions = new();
+	private static readonly Dictionary<string, Probe> ProbeFunctions = new();
 
-    static Strategy()
-    {
-        ProbeFunctions["ping"] = Ping;
-        ProbeFunctions["noop"] = NoOp;
-    }
+	static Strategy()
+	{
+		ProbeFunctions["ping"] = Ping;
+		ProbeFunctions["noop"] = NoOp;
+	}
 
-    public static Probe Get(string name) => ProbeFunctions.GetValueOrDefault(name, NoOp);
+	public static Probe Get(string name) => ProbeFunctions.GetValueOrDefault(name, NoOp);
 
-    private static bool Ping(ILogger logger, IPAddress address, ushort timeout)
-    {
-        logger.LogInformation("Ping: pinging {Address}", address);
-        Ping sender    = new();
-        var  pingReply = sender.Send(address, timeout);
-        return pingReply?.Status == IPStatus.Success;
-    }
+	private static bool Ping(ILogger logger, IPAddress address, ushort timeout)
+	{
+		logger.LogInformation("Ping: pinging {Address}", address);
+		Ping sender    = new();
+		var  pingReply = sender.Send(address, timeout);
+		return pingReply?.Status == IPStatus.Success;
+	}
 
-    private static bool NoOp(ILogger logger, IPAddress address, ushort _) => true;
+	private static bool NoOp(ILogger logger, IPAddress address, ushort _) => true;
 }

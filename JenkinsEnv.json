@@ -1,11 +1,11 @@
 {
-    "builds": [
-        {
-            "DockerRoot": "mbeijer",
-            "DockerImage": "dns-traefik",
-            "DockerTag": "latest",
-            "Dockerfile": "Dockerfile",
-            "BuildIfSuccessful": ""
-        },
-    ]
+  "builds": [
+    {
+      "DockerRoot": "mbeijer",
+      "DockerImage": "dns-traefik",
+      "DockerTag": "latest",
+      "Dockerfile": "Dockerfile",
+      "BuildIfSuccessful": ""
+    }
+  ]
 }

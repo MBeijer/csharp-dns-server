@@ -7,9 +7,12 @@ namespace Dns.Db.Models.EntityFramework;
 [Table("users")]
 public class User
 {
-	[Key, DatabaseGenerated(DatabaseGeneratedOption.Identity), Column("id")] public int Id { get; set; }
+	[Key]
+	[DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+	[Column("id")]
+	public int Id { get; set; }
 
-	[Column("account"), MaxLength(100)] public string? Account { get; set; }
+	[Column("account")] [MaxLength(100)] public string? Account { get; set; }
 
 	[JsonIgnore]
 	[Column("password")]
@@ -24,5 +27,4 @@ public class User
 	[Column("activated")] public bool Activated { get; set; }
 
 	[Column("adminlevel")] public byte AdminLevel { get; set; }
-
 }

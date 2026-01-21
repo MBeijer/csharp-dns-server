@@ -13,7 +13,11 @@ public static class ServiceCollectionExtensions
 		DatabaseSettings databaseSettings
 	)
 	{
-		services.AddDbContext<DnsServerDbContext>(options => options.UseSqlite(databaseSettings.SQLiteDefault, b => b.MigrationsAssembly("Dns.Cli")));
+		services.AddDbContext<DnsServerDbContext>(options => options.UseSqlite(
+			                                          databaseSettings.SQLiteDefault,
+			                                          b => b.MigrationsAssembly("Dns.Cli")
+		                                          )
+		);
 
 		services.AddScoped<IUserRepository, UserRepository>();
 		services.AddScoped<IZoneRepository, ZoneRepository>();

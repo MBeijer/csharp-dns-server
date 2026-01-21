@@ -8,13 +8,11 @@ public class CNameRData : RData
 {
 	public string Name { get; set; }
 
-	public override ushort Length
-	{
+	public override ushort Length =>
 		// dots replaced by bytes
 		// + 1 segment prefix
 		// + 1 null terminator
-		get { return (ushort) (Name.Length + 2); }
-	}
+		(ushort)(Name.Length + 2);
 
 	public static CNameRData Parse(byte[] bytes, int offset, int size)
 	{

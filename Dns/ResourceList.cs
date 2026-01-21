@@ -5,6 +5,7 @@
 // // //-------------------------------------------------------------------------------------------------
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using Dns.Db.Models.EntityFramework.Enums;
@@ -26,24 +27,28 @@ public class ResourceList : List<ResourceRecord>
 			var resourceRecord = new ResourceRecord
 			{
 				//// extract the domain, question type, question class and Ttl
-				Name = DnsProtocol.ReadString(bytes, ref currentOffset), Type = (ResourceType) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian()),
+				Name = DnsProtocol.ReadString(bytes, ref currentOffset),
+				Type = (ResourceType)BitConverter.ToUInt16(bytes, currentOffset).SwapEndian(),
 			};
 
-			currentOffset += sizeof (ushort);
+			resourceRecord.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
 
-			resourceRecord.Class = (ResourceClass) (BitConverter.ToUInt16(bytes, currentOffset).SwapEndian());
-			currentOffset += sizeof (ushort);
+			// Phase 5: Use BinaryPrimitives for zero-allocation reads
+			var span = bytes.AsSpan(currentOffset);
+			resourceRecord.Type =  (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
+			currentOffset       += sizeof(ushort);
 
-			resourceRecord.TTL = BitConverter.ToUInt32(bytes, currentOffset).SwapEndian();
-			currentOffset += sizeof (uint);
+			resourceRecord.Class =  (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
+			currentOffset        += sizeof(ushort);
 
-			resourceRecord.DataLength = BitConverter.ToUInt16(bytes, currentOffset).SwapEndian();
-			currentOffset += sizeof (ushort);
+			resourceRecord.TTL =  BinaryPrimitives.ReadUInt32BigEndian(span[4..]);
+			currentOffset      += sizeof(uint);
+
+			resourceRecord.DataLength =  BinaryPrimitives.ReadUInt16BigEndian(span[8..]);
+			currentOffset             += sizeof(ushort);
 
 			if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
-			{
 				resourceRecord.RData = ANameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
-			}
 			else
 				resourceRecord.RData = resourceRecord.Type switch
 				{
@@ -51,7 +56,7 @@ public class ResourceList : List<ResourceRecord>
 					ResourceType.MX    => MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 					ResourceType.SOA   => SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 					ResourceType.NS    => NSRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
-					ResourceType.TEXT  => TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.TXT  => TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 					_                  => GenericRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 				};
 
@@ -67,9 +72,6 @@ public class ResourceList : List<ResourceRecord>
 
 	public void WriteToStream(Stream stream)
 	{
-		foreach (var resource in this)
-		{
-			resource.WriteToStream(stream);
-		}
+		foreach (var resource in this) resource.WriteToStream(stream);
 	}
 }

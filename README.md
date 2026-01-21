@@ -2,9 +2,9 @@
 
 [![GitHub Actions Status](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml)
 
-Fully functional DNS server written in C# targeting .NET 8. Ensure the .NET 8 SDK is installed before building or testing.
+Fully functional software-extensible DNS server written in C# targeting .NET 8. Ensure the .NET 8 SDK is installed before building or testing.
 
-The project was conceived while working to reduce the cost of datacentre "stamps" while providing robust services within a datacentre, specifically to remove the need for an expensive load-balancer device by providing round-robin DNS services, and retrying connectivity instead.
+The project was conceived while working to reduce the cost of cloud datacentre "stamps", providing robust discovery services within a datacentre, while specifically removing the need for expensive load-balancer devices.  The DNS Service would support software-defined/pluggable discovery of healthy hosts and services, and round-robin DNS services.  Such that clients may re-resolve, and retry connectivity instead.
 
 ## Licence
 This software is licenced under MIT terms that permits reuse within proprietary software provided all copies of the licensed software include a copy of the MIT License terms and the copyright notice.  See [licence.txt](./licence.txt)
@@ -100,6 +100,13 @@ Two phases of testing was completed.
 2) Protocol verification - that well known messages were correctly decoded and re-encoded using the bit-packing system.
 
 Much time was spent using Netmon to capture real DNS challenges and verify that the C# DNS server responded appropriately.
+
+### Endianness Support
+The DNS protocol uses **network byte order (big-endian)** for all multi-byte values. The codebase is designed to work correctly on both little-endian (x86, x64, ARM) and big-endian systems:
+
+- The `SwapEndian()` extension methods in `Dns/Extensions.cs` conditionally swap bytes based on `BitConverter.IsLittleEndian`.
+- Semantic aliases `NetworkToHost()` and `HostToNetwork()` provide clarity when converting DNS wire format.
+- Unit tests in `dnstest/EndianTests.cs` validate correct byte order handling.
 
 ### DNS-Sec
 No effort made to handle or respond to DNS-Sec challenges.

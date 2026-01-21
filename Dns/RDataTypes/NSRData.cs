@@ -12,9 +12,10 @@ public class NSRData : RData
 		// dots replaced by bytes
 		// + 1 segment prefix
 		// + 1 null terminator
-		(ushort) (Name.Length + 2);
+		(ushort)(Name.Length + 2);
 
-	public static NSRData Parse(byte[] bytes, int offset, int size) => new() { Name = DnsProtocol.ReadString(bytes, ref offset) };
+	public static NSRData Parse(byte[] bytes, int offset, int size) =>
+		new() { Name = DnsProtocol.ReadString(bytes, ref offset) };
 
 	public override void WriteToStream(Stream stream) => Name.WriteToStream(stream);
 

@@ -8,16 +8,23 @@ namespace Dns.Db.Models.EntityFramework;
 [Table("zone_records")]
 public class ZoneRecord
 {
-	[Key, DatabaseGenerated(DatabaseGeneratedOption.Identity), Column("id")]
+	[Key]
+	[DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+	[Column("id")]
 	public int? Id { get; set; }
 
-	[Column("host"), MaxLength(120)] public string?        Host    { get; set; }
+	[Column("host")] [MaxLength(120)] public string? Host { get; set; }
+
 	[JsonConverter(typeof(JsonStringEnumConverter))]
-	[Column("class")]                public ResourceClass? Class   { get; set; }
+	[Column("class")]
+	public ResourceClass? Class { get; set; }
+
 	[JsonConverter(typeof(JsonStringEnumConverter))]
-	[Column("type")]                 public ResourceType?  Type    { get; set; }
-	[Column("data")]                 public string?        Data    { get; set; }
-	[Column("zone")]                 public int?           Zone    { get; set; }
-	[JsonIgnore]
-	public                                  Zone?          ZoneObj { get; set; }
+	[Column("type")]
+	public ResourceType? Type { get; set; }
+
+	[Column("data")] public string? Data { get; set; }
+	[Column("zone")] public int?    Zone { get; set; }
+
+	[JsonIgnore] public Zone? ZoneObj { get; set; }
 }

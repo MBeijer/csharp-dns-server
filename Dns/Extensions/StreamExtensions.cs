@@ -17,10 +17,7 @@ public static class StreamExtensions
 			foreach (var segment in segments)
 			{
 				stream.WriteByte((byte)segment.Length);
-				foreach (var currentChar in segment)
-				{
-					stream.WriteByte((byte)currentChar);
-				}
+				foreach (var currentChar in segment) stream.WriteByte((byte)currentChar);
 			}
 		}
 
@@ -32,18 +29,12 @@ public static class StreamExtensions
 		if (string.IsNullOrWhiteSpace(str)) return;
 
 		stream.WriteByte((byte)str.Length);
-		foreach (var currentChar in str)
-		{
-			stream.WriteByte((byte)currentChar);
-		}
+		foreach (var currentChar in str) stream.WriteByte((byte)currentChar);
 	}
 
 	public static void WriteToStream(this IEnumerable<byte> chars, Stream stream)
 	{
-		foreach (var currentChar in chars)
-		{
-			stream.WriteByte(currentChar);
-		}
+		foreach (var currentChar in chars) stream.WriteByte(currentChar);
 	}
 
 	public static void WriteToStream(this ushort value, Stream stream)

@@ -8,7 +8,7 @@ namespace Dns.Contracts;
 
 public interface IDnsCache
 {
-    byte[] Get(string key);
+	byte[] Get(string key);
 
-    void Set(string key, byte[] bytes, int ttlSeconds);
+	void Set(string key, byte[] bytes, int ttlSeconds);
 }
