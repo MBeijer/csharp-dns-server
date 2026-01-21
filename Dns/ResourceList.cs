@@ -18,6 +18,7 @@ public class ResourceList : List<ResourceRecord>
 {
 	public int LoadFrom(byte[] bytes, int offset, ushort count)
 	{
+		if (offset >= bytes.Length) return 0;
 		var currentOffset = offset;
 
 		for (var index = 0; index < count; index++)
@@ -30,8 +31,6 @@ public class ResourceList : List<ResourceRecord>
 				Name = DnsProtocol.ReadString(bytes, ref currentOffset),
 				Type = (ResourceType)BitConverter.ToUInt16(bytes, currentOffset).SwapEndian(),
 			};
-
-			resourceRecord.Name = DnsProtocol.ReadString(bytes, ref currentOffset);
 
 			// Phase 5: Use BinaryPrimitives for zero-allocation reads
 			var span = bytes.AsSpan(currentOffset);

@@ -225,8 +225,7 @@ public class DnsMessage
 		byteOffset += result.Answers.LoadFrom(bytes, byteOffset, result.AnswerCount);
 		byteOffset += result.Authorities.LoadFrom(bytes, byteOffset, result.NameServerCount);
 		byteOffset += result.Additionals.LoadFrom(bytes, byteOffset, result.AdditionalCount);
-
-		// Console.WriteLine("Bytes read: {0}", byteOffset);
+		//Console.WriteLine("Bytes read: {0}", byteOffset);
 
 		return result;
 	}

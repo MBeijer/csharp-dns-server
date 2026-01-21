@@ -12,6 +12,7 @@ public class GenericRData : RData
 	private GenericRData(IReadOnlyList<byte> bytes, int offset, int size)
 	{
 		_bytes = new byte[size];
+		if (offset > bytes.Count) return;
 
 		for (var i = 0; i < size; i++)
 			_bytes[i] = bytes[offset + i];
