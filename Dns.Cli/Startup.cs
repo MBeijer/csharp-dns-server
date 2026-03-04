@@ -70,6 +70,7 @@ public class Startup(IConfiguration configuration)
 
 				        opt.Zones       = parsed.Zones;
 				        opt.DnsListener = parsed.DnsListener;
+				        opt.ZoneTransfer = parsed.ZoneTransfer;
 				        opt.WebServer   = parsed.WebServer;
 			        }
 		        );

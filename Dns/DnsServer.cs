@@ -32,12 +32,16 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 	///     Maps forwarded DNS requests to their originating endpoints.
 	/// </summary>
 	private readonly ConcurrentDictionary<DnsRequestKey, EndPoint> _requestResponseMap = new();
+	private readonly Dictionary<string, uint>                      _zoneSerials          = new(StringComparer.OrdinalIgnoreCase);
 
 	private IPAddress[]        _defaultDns;
 	private long               _nacks;
+	private CancellationToken  _notifyLoopCancellationToken;
+	private List<IPEndPoint>   _notifyTargets = [];
 	private long               _requests;
 	private List<IDnsResolver> _resolvers; // resolver for name entries
 	private long               _responses;
+	private TcpDnsListener     _tcpListener;
 	private UdpListener        _udpListener; // listener for UDP53 traffic
 
 	/// <summary>Initialize server with specified domain name resolver</summary>
@@ -47,17 +51,30 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		_resolvers = resolvers;
 
 		_udpListener = new();
+		_tcpListener = new();
 
 		_udpListener.Initialize(serverOptions.Value.DnsListener.Port);
 		_udpListener.OnRequest += ProcessUdpRequest;
+		var tcpPort = serverOptions.Value.DnsListener.TcpPort ?? serverOptions.Value.DnsListener.Port;
+		_tcpListener.Initialize(tcpPort);
+		_tcpListener.OnRequest += ProcessTcpRequest;
 
 		_defaultDns = GetDefaultDNS().ToArray();
+		_notifyTargets = ParseNotifyTargets(serverOptions.Value.ZoneTransfer.NotifySecondaries);
 	}
 
 	public Task Start(CancellationToken ct)
 	{
 		_udpListener.Start();
+		_tcpListener.Start();
 		ct.Register(_udpListener.Stop);
+		ct.Register(_tcpListener.Stop);
+
+		if (serverOptions.Value.ZoneTransfer.Enabled && _notifyTargets.Count > 0)
+		{
+			_notifyLoopCancellationToken = ct;
+			_ = Task.Run(RunNotifyLoop, ct);
+		}
 
 		return Task.CompletedTask;
 	}
@@ -73,6 +90,26 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 	public object GetObject() => _defaultDns;
 
+	private Task<byte[]> ProcessTcpRequest(byte[] buffer, int length, EndPoint remoteEndPoint)
+	{
+		if (!DnsProtocol.TryParse(buffer, length, out var message))
+		{
+			logger.LogError("unable to parse tcp message");
+			return Task.FromResult<byte[]>(null);
+		}
+
+		Interlocked.Increment(ref _requests);
+
+		if (message.IsQuery())
+		{
+			var response = BuildResponseForQuery(message, remoteEndPoint, true);
+			return response == null ? Task.FromResult<byte[]>(null) : Task.FromResult(SerializeMessage(response));
+		}
+
+		Interlocked.Increment(ref _nacks);
+		return Task.FromResult<byte[]>(null);
+	}
+
 	/// <summary>Process UDP Request</summary>
 	/// <param name="buffer">The received data buffer.</param>
 	/// <param name="length">The number of valid bytes in the buffer.</param>
@@ -87,6 +124,27 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		}
 
 		Interlocked.Increment(ref _requests);
+
+		if (message.IsQuery() && message.Opcode == (byte)OpCode.NOTIFY)
+		{
+			var notifyResponse = BuildNotifyResponse(message, remoteEndPoint);
+			SendUdpResponse(notifyResponse, remoteEndPoint);
+			return;
+		}
+
+		if (message.IsQuery() &&
+		    message.Questions.Count > 0 &&
+		    message.Questions[0].Type is ResourceType.AXFR or ResourceType.IXFR)
+		{
+			var refused = BuildBasicResponse(
+				message,
+				(byte)RCode.REFUSED,
+				authoritative: true,
+				recursionAvailable: false
+			);
+			SendUdpResponse(refused, remoteEndPoint);
+			return;
+		}
 
 		if (message.IsQuery())
 		{
@@ -198,6 +256,398 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			else
 				Interlocked.Increment(ref _nacks);
 		}
+	}
+
+	private DnsMessage BuildResponseForQuery(DnsMessage message, EndPoint remoteEndPoint, bool viaTcp)
+	{
+		if (message.Questions.Count == 0)
+			return BuildBasicResponse(message, (byte)RCode.FORMERR, authoritative: false, recursionAvailable: false);
+
+		if (message.Opcode == (byte)OpCode.NOTIFY) return BuildNotifyResponse(message, remoteEndPoint);
+
+		if (message.Opcode != (byte)OpCode.QUERY)
+			return BuildBasicResponse(message, (byte)RCode.NOTIMP, authoritative: false, recursionAvailable: false);
+
+		var question = message.Questions[0];
+		if (question.Type is ResourceType.AXFR or ResourceType.IXFR)
+			return BuildTransferResponse(message, question, remoteEndPoint, viaTcp);
+
+		return BuildBasicResponse(message, (byte)RCode.REFUSED, authoritative: false, recursionAvailable: false);
+	}
+
+	private DnsMessage BuildNotifyResponse(DnsMessage message, EndPoint remoteEndPoint)
+	{
+		if (message.Questions.Count == 0)
+			return BuildBasicResponse(message, (byte)RCode.FORMERR, authoritative: false, recursionAvailable: false);
+
+		var zoneExists = _resolvers.Any(resolver => resolver.TryGetZone(message.Questions[0].Name, out _));
+		return BuildBasicResponse(
+			message,
+			zoneExists ? (byte)RCode.NOERROR : (byte)RCode.NOTAUTH,
+			authoritative: zoneExists,
+			recursionAvailable: false
+		);
+	}
+
+	private DnsMessage BuildTransferResponse(
+		DnsMessage message,
+		Question question,
+		EndPoint remoteEndPoint,
+		bool viaTcp
+	)
+	{
+		if (!serverOptions.Value.ZoneTransfer.Enabled || !viaTcp || !IsTransferAllowed(remoteEndPoint))
+			return BuildBasicResponse(message, (byte)RCode.REFUSED, authoritative: true, recursionAvailable: false);
+
+		if (!TryResolveZone(question.Name, out var transferZone))
+			return BuildBasicResponse(message, (byte)RCode.NOTAUTH, authoritative: false, recursionAvailable: false);
+
+		var response = BuildBasicResponse(message, (byte)RCode.NOERROR, authoritative: true, recursionAvailable: false);
+		var zoneName = CanonicalZoneName(transferZone.Suffix);
+		var records = question.Type == ResourceType.IXFR
+			? BuildIxfrRecords(message, transferZone, zoneName)
+			: BuildAxfrRecords(transferZone, zoneName);
+
+		foreach (var record in records)
+		{
+			response.Answers.Add(record);
+			response.AnswerCount++;
+		}
+
+		return response;
+	}
+
+	private List<ResourceRecord> BuildIxfrRecords(DnsMessage message, Zone zone, string zoneName)
+	{
+		var clientSerial = message.Authorities
+		                          .Where(authority => authority.Type == ResourceType.SOA)
+		                          .Select(authority => authority.RData)
+		                          .OfType<SOARData>()
+		                          .Select(soa => (uint?)soa.Serial)
+		                          .FirstOrDefault();
+
+		if (clientSerial.HasValue && clientSerial.Value >= zone.Serial) return [CreateSoaRecord(zoneName, zone)];
+
+		return BuildAxfrRecords(zone, zoneName);
+	}
+
+	private List<ResourceRecord> BuildAxfrRecords(Zone zone, string zoneName)
+	{
+		var answers = new List<ResourceRecord> { CreateSoaRecord(zoneName, zone) };
+
+		foreach (var zoneRecord in zone.Records)
+		{
+			foreach (var rr in BuildResourceRecords(zoneRecord, zone, zoneName))
+			{
+				if (rr.Type == ResourceType.SOA) continue;
+				answers.Add(rr);
+			}
+		}
+
+		answers.Add(CreateSoaRecord(zoneName, zone));
+		return answers;
+	}
+
+	private List<ResourceRecord> BuildResourceRecords(ZoneRecord zoneRecord, Zone zone, string zoneName)
+	{
+		var name = BuildRecordOwnerName(zoneName, zoneRecord.Host);
+		var records = new List<ResourceRecord>();
+
+		switch (zoneRecord.Type)
+		{
+			case ResourceType.NS:
+				records.AddRange(zoneRecord.Addresses.Select(address => new ResourceRecord
+					{
+						Name  = name,
+						Class = zoneRecord.Class,
+						Type  = zoneRecord.Type,
+						TTL   = 10,
+						RData = new NSRData { Name = address },
+					}
+				));
+				break;
+			case ResourceType.MX:
+				records.AddRange(zoneRecord.Addresses.Select(address =>
+					{
+						var addressSplit = address.Split(' ');
+						return new ResourceRecord
+						{
+							Name  = name,
+							Class = zoneRecord.Class,
+							Type  = zoneRecord.Type,
+							TTL   = 10,
+							RData = new MXRData { Name = addressSplit[1], Preference = Convert.ToUInt16(addressSplit[0]) },
+						};
+					}
+				));
+				break;
+			case ResourceType.A:
+				records.AddRange(zoneRecord.Addresses.Select(address => new ResourceRecord
+					{
+						Name  = name,
+						Class = zoneRecord.Class,
+						Type  = zoneRecord.Type,
+						TTL   = 10,
+						RData = new ANameRData { Address = IPAddress.Parse(address) },
+					}
+				));
+				break;
+			case ResourceType.CNAME:
+				records.AddRange(zoneRecord.Addresses.Select(address => new ResourceRecord
+					{
+						Name  = name,
+						Class = zoneRecord.Class,
+						Type  = zoneRecord.Type,
+						TTL   = 10,
+						RData = new CNameRData { Name = address },
+					}
+				));
+				break;
+			case ResourceType.TXT:
+				records.AddRange(zoneRecord.Addresses.Select(address => new ResourceRecord
+					{
+						Name  = name,
+						Class = zoneRecord.Class,
+						Type  = zoneRecord.Type,
+						TTL   = 10,
+						RData = new TXTRData { Name = address },
+					}
+				));
+				break;
+			case ResourceType.SOA:
+				records.Add(CreateSoaRecord(name, zone, zoneRecord));
+				break;
+		}
+
+		return records;
+	}
+
+	private static string BuildRecordOwnerName(string zoneName, string host)
+	{
+		if (string.IsNullOrWhiteSpace(host)) return zoneName;
+
+		var normalizedHost = host.Trim().TrimEnd('.');
+		if (normalizedHost.EndsWith(zoneName, StringComparison.OrdinalIgnoreCase)) return normalizedHost;
+
+		return $"{normalizedHost}.{zoneName}";
+	}
+
+	private static string CanonicalZoneName(string suffix) => suffix?.Trim().Trim('.') ?? string.Empty;
+
+	private static byte[] SerializeMessage(DnsMessage message)
+	{
+		using var stream = BufferPool.RentMemoryStream();
+		message.WriteToStream(stream);
+		var output = new byte[stream.Position];
+		Buffer.BlockCopy(stream.GetBuffer(), 0, output, 0, output.Length);
+		return output;
+	}
+
+	private void SendUdpResponse(DnsMessage message, EndPoint remoteEndPoint)
+	{
+		var payload = SerializeMessage(message);
+		Interlocked.Increment(ref _responses);
+		SendUdp(payload, 0, payload.Length, remoteEndPoint);
+	}
+
+	private bool TryResolveZone(string hostName, out Zone zone)
+	{
+		zone = null;
+		if (_resolvers == null) return false;
+
+		foreach (var resolver in _resolvers)
+			if (resolver.TryGetZone(hostName, out zone) && zone != null)
+				return true;
+
+		return false;
+	}
+
+	private static DnsMessage BuildBasicResponse(
+		DnsMessage request,
+		byte rCode,
+		bool authoritative,
+		bool recursionAvailable
+	)
+	{
+		var response = new DnsMessage
+		{
+			QueryIdentifier = request.QueryIdentifier,
+			Opcode          = request.Opcode,
+			RD              = request.RD,
+			RCode           = rCode,
+			QR              = true,
+			AA              = authoritative,
+			RA              = recursionAvailable,
+		};
+
+		foreach (var question in request.Questions)
+			response.Questions.Add(new(question.Name, question.Type, question.Class));
+		response.QuestionCount = (ushort)response.Questions.Count;
+
+		return response;
+	}
+
+	private ResourceRecord CreateSoaRecord(string name, Zone zone, ZoneRecord zoneRecord = null)
+	{
+		return new()
+		{
+			Name  = name,
+			Class = ResourceClass.IN,
+			Type  = ResourceType.SOA,
+			TTL   = 300,
+			RData = new SOARData
+			{
+				PrimaryNameServer = zoneRecord?.Addresses.Count > 1
+					? zoneRecord.Addresses[0]
+					: Environment.MachineName,
+				ResponsibleAuthoritativeMailbox = zoneRecord?.Addresses.Count > 1
+					? zoneRecord.Addresses[1]
+					: zoneRecord?.Addresses.FirstOrDefault() ?? $"hostmaster.{name}",
+				Serial          = zone.Serial,
+				ExpirationLimit = 86400,
+				RetryInterval   = 300,
+				RefreshInterval = 300,
+				MinimumTTL      = 300,
+			},
+		};
+	}
+
+	private bool IsTransferAllowed(EndPoint remoteEndPoint)
+	{
+		if (remoteEndPoint is not IPEndPoint ipEndpoint) return false;
+
+		var allowList = serverOptions.Value.ZoneTransfer.AllowTransfersFrom;
+		if (allowList == null || allowList.Count == 0) return false;
+
+		return allowList.Any(entry => IsAllowedByEntry(ipEndpoint.Address, entry));
+	}
+
+	private static bool IsAllowedByEntry(IPAddress remoteAddress, string allowEntry)
+	{
+		if (string.IsNullOrWhiteSpace(allowEntry)) return false;
+		if (allowEntry == "*") return true;
+
+		if (allowEntry.Contains('/'))
+		{
+			var split = allowEntry.Split('/');
+			if (split.Length != 2) return false;
+			if (!IPAddress.TryParse(split[0], out var networkAddress)) return false;
+			if (!int.TryParse(split[1], out var prefixLength)) return false;
+			return IsAddressInCidr(remoteAddress, networkAddress, prefixLength);
+		}
+
+		return IPAddress.TryParse(allowEntry, out var exactAddress) && exactAddress.Equals(remoteAddress);
+	}
+
+	private static bool IsAddressInCidr(IPAddress remoteAddress, IPAddress networkAddress, int prefixLength)
+	{
+		var remoteBytes  = remoteAddress.GetAddressBytes();
+		var networkBytes = networkAddress.GetAddressBytes();
+		if (remoteBytes.Length != networkBytes.Length) return false;
+
+		var fullBytes = prefixLength / 8;
+		var extraBits = prefixLength % 8;
+
+		for (var i = 0; i < fullBytes; i++)
+			if (remoteBytes[i] != networkBytes[i])
+				return false;
+
+		if (extraBits == 0) return true;
+
+		var mask = (byte)~(0xFF >> extraBits);
+		return (remoteBytes[fullBytes] & mask) == (networkBytes[fullBytes] & mask);
+	}
+
+	private static List<IPEndPoint> ParseNotifyTargets(IEnumerable<string> entries)
+	{
+		var endpoints = new List<IPEndPoint>();
+		if (entries == null) return endpoints;
+
+		foreach (var entry in entries)
+		{
+			if (string.IsNullOrWhiteSpace(entry)) continue;
+
+			if (TryParseIpEndpoint(entry, out var endpoint))
+				endpoints.Add(endpoint);
+		}
+
+		return endpoints;
+	}
+
+	private static bool TryParseIpEndpoint(string value, out IPEndPoint endpoint)
+	{
+		endpoint = null;
+		var trimmed = value.Trim();
+		if (IPAddress.TryParse(trimmed, out var ipAddress))
+		{
+			endpoint = new(ipAddress, 53);
+			return true;
+		}
+
+		var separator = trimmed.LastIndexOf(':');
+		if (separator <= 0 || separator == trimmed.Length - 1) return false;
+
+		var hostPart = trimmed[..separator];
+		var portPart = trimmed[(separator + 1)..];
+		if (!IPAddress.TryParse(hostPart, out ipAddress)) return false;
+		if (!ushort.TryParse(portPart, out var port)) return false;
+
+		endpoint = new(ipAddress, port);
+		return true;
+	}
+
+	private async Task RunNotifyLoop()
+	{
+		var pollInterval = Math.Max(1, serverOptions.Value.ZoneTransfer.NotifyPollIntervalSeconds);
+
+		while (!_notifyLoopCancellationToken.IsCancellationRequested)
+		{
+			try
+			{
+				var zones = _resolvers.SelectMany(resolver => resolver.GetZones()).ToList();
+				foreach (var zone in zones.Where(zone => zone != null))
+				{
+					var zoneKey = CanonicalZoneName(zone.Suffix);
+					var existed = _zoneSerials.TryGetValue(zoneKey, out var previousSerial);
+					_zoneSerials[zoneKey] = zone.Serial;
+
+					if (!existed || previousSerial == zone.Serial) continue;
+
+					foreach (var notifyTarget in _notifyTargets)
+						SendNotify(zone, zoneKey, notifyTarget);
+				}
+			}
+			catch (Exception ex)
+			{
+				logger.LogError(ex, "notify loop error");
+			}
+
+			try
+			{
+				await Task.Delay(TimeSpan.FromSeconds(pollInterval), _notifyLoopCancellationToken).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+				break;
+			}
+		}
+	}
+
+	private void SendNotify(Zone zone, string zoneName, IPEndPoint notifyTarget)
+	{
+		var notifyMessage = new DnsMessage
+		{
+			QueryIdentifier = (ushort)Random.Shared.Next(ushort.MinValue, ushort.MaxValue + 1),
+			Opcode          = (byte)OpCode.NOTIFY,
+			AA              = true,
+			QuestionCount   = 1,
+		};
+		notifyMessage.Questions.Add(new(zoneName, ResourceType.SOA, ResourceClass.IN));
+		notifyMessage.Authorities.Add(CreateSoaRecord(zoneName, zone));
+		notifyMessage.NameServerCount = 1;
+
+		var payload = SerializeMessage(notifyMessage);
+		SendUdp(payload, 0, payload.Length, notifyTarget);
 	}
 
 	private void HandleRecords(

@@ -9,5 +9,7 @@ public class ServerOptions
 
 	[JsonPropertyName("dnsListener")] public DnsListenerOptions DnsListener { get; set; }
 
+	[JsonPropertyName("zoneTransfer")] public ZoneTransferOptions ZoneTransfer { get; set; } = new();
+
 	[JsonPropertyName("webServer")] public WebServerOptions WebServer { get; set; }
 }

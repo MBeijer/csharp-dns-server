@@ -45,6 +45,7 @@ As written, the server has the following features:
  - health-checks.  While maintaining a list of machines in round-robin for a name, the code performs periodic healthchecks against the machines, if necessary removing machines that fail the health checks from rotation.
  - Delegates all other DNS lookup to host machines default DNS server(s)
  - Automatic set up of zones for docker instances running on a specific docker server, can be used to get `.local` or `.internal` zones, so you can route traffic by hostname via something like Traefik
+ - Authoritative secondary support primitives: `AXFR`/`IXFR` over TCP and `NOTIFY` request/ack handling
 
 The DNS server has a built-in Web Server providing operational insight into the current server behaviour.
 - healthcheck for server status
@@ -77,6 +78,35 @@ Add the provider via `appsettings.json` (both `Dns` and `dns-cli` hosts read the
 ```
 
 The provider reads the file whenever it changes (a 10-second settlement window avoids partial writes), validates the directives/records, and only publishes `A`/`AAAA` data to SmartZoneResolver when the parse succeeds.  All other record types are parsed/validated so that zone files failing to meet RFC expectations never poison the active zone.
+
+### Zone Transfer / Notify Configuration
+`AXFR` and `IXFR` are only served over TCP when zone transfer is enabled and the caller IP is allowlisted.
+
+```json
+{
+  "server": {
+    "dnsListener": {
+      "port": 53,
+      "tcpPort": 53
+    },
+    "zoneTransfer": {
+      "enabled": true,
+      "allowTransfersFrom": [
+        "192.0.2.10",
+        "198.51.100.0/24"
+      ],
+      "notifySecondaries": [
+        "192.0.2.20:53"
+      ],
+      "notifyPollIntervalSeconds": 5
+    }
+  }
+}
+```
+
+- `allowTransfersFrom`: required ACL for incoming AXFR/IXFR requests.
+- `notifySecondaries`: optional list of `ip[:port]` targets that receive outbound DNS NOTIFY whenever a zone serial changes.
+- UDP AXFR/IXFR requests are refused by design; use TCP transport.
 
 ## Documentation
 - [Product requirements](docs/product_requirements.md) describe the current roadmap, observability goals, and .NET maintenance plans.

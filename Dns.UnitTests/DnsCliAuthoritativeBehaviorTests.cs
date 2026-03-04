@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Dns.Db.Models.EntityFramework.Enums;
+using Dns.Models.Dns.Packets;
 using Dns.Models.Enums;
 using Dns.RDataTypes;
 using Dns.UnitTests.Integration;
@@ -110,5 +111,87 @@ public sealed class DnsCliAuthoritativeBehaviorTests(DnsCliHostFixture fixture)
 		Assert.Equal((uint)300, secondSoaRecord.TTL);
 		var secondSoaData = Assert.IsType<SOARData>(secondSoaRecord.RData);
 		Assert.Equal((uint)300, secondSoaData.MinimumTTL);
+	}
+
+	[Fact]
+	public async Task AxfrOverTcpReturnsSoaEnvelopeAndZoneRecords()
+	{
+		var zoneName         = fixture.BuildHostName("alpha");
+		var canonicalZoneName = zoneName.Split('.', 2)[1];
+		var response = await fixture.Client.QueryTcpAsync(zoneName, ResourceType.AXFR);
+
+		Assert.True(response.QR);
+		Assert.True(response.AA);
+		Assert.Equal(RCode.NOERROR, (RCode)response.RCode);
+		Assert.True(response.AnswerCount >= 2);
+
+		var first = response.Answers.First();
+		var last  = response.Answers.Last();
+		Assert.Equal(ResourceType.SOA, first.Type);
+		Assert.Equal(ResourceType.SOA, last.Type);
+		Assert.Equal(canonicalZoneName, first.Name);
+		Assert.Equal(canonicalZoneName, last.Name);
+	}
+
+	[Fact]
+	public async Task IxfrOverTcpReturnsCurrentSoaWhenSerialIsCurrent()
+	{
+		var zoneName      = fixture.BuildHostName("alpha");
+		var axfrResponse  = await fixture.Client.QueryTcpAsync(zoneName, ResourceType.AXFR);
+		var currentSerial = Assert.IsType<SOARData>(axfrResponse.Answers.First().RData).Serial;
+
+		var ixfrRequest = new DnsMessage
+		{
+			QueryIdentifier = 0x4242,
+			QuestionCount   = 1,
+		};
+		ixfrRequest.Questions.Add(new Question(zoneName, ResourceType.IXFR, ResourceClass.IN));
+		ixfrRequest.Authorities.Add(
+			new ResourceRecord
+			{
+				Name  = zoneName,
+				Type  = ResourceType.SOA,
+				Class = ResourceClass.IN,
+				TTL   = 0,
+				RData = new SOARData
+				{
+					PrimaryNameServer               = "ns1.integration.test",
+					ResponsibleAuthoritativeMailbox = "hostmaster.integration.test",
+					Serial                          = currentSerial,
+					RefreshInterval                 = 300,
+					RetryInterval                   = 300,
+					ExpirationLimit                 = 86400,
+					MinimumTTL                      = 300,
+				},
+			}
+		);
+		ixfrRequest.NameServerCount = 1;
+
+		var response = await fixture.Client.SendTcpMessageAsync(ixfrRequest);
+
+		Assert.Equal(RCode.NOERROR, (RCode)response.RCode);
+		Assert.Equal((ushort)1, response.AnswerCount);
+		Assert.Equal(ResourceType.SOA, Assert.Single(response.Answers).Type);
+	}
+
+	[Fact]
+	public async Task NotifyRequestReturnsAuthoritativeAck()
+	{
+		var zoneName = fixture.BuildHostName("alpha");
+		var request = new DnsMessage
+		{
+			QueryIdentifier = 0x5252,
+			Opcode          = (byte)OpCode.NOTIFY,
+			QuestionCount   = 1,
+			AA              = true,
+		};
+		request.Questions.Add(new Question(zoneName, ResourceType.SOA, ResourceClass.IN));
+
+		var response = await fixture.Client.SendUdpMessageAsync(request);
+
+		Assert.True(response.QR);
+		Assert.Equal((byte)OpCode.NOTIFY, response.Opcode);
+		Assert.True(response.AA);
+		Assert.Equal(RCode.NOERROR, (RCode)response.RCode);
 	}
 }

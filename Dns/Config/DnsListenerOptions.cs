@@ -5,4 +5,6 @@ namespace Dns.Config;
 public class DnsListenerOptions
 {
 	[JsonPropertyName("port")] public ushort Port { get; set; }
+
+	[JsonPropertyName("tcpPort")] public ushort? TcpPort { get; set; }
 }
