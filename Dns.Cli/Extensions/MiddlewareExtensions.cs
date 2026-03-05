@@ -11,6 +11,6 @@ public static class MiddlewareExtensions
 	/// </summary>
 	/// <param name="app"></param>
 	/// <returns></returns>
-	public static IApplicationBuilder UseLoadCurrentUser(this IApplicationBuilder app) =>
-		app.UseMiddleware<LoadCurrentUserMiddleware>();
+	public static IApplicationBuilder UseLoadCurrentUser(this IApplicationBuilder app)
+		=> app.UseMiddleware<LoadCurrentUserMiddleware>();
 }

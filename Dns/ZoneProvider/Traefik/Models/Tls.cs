@@ -1,8 +1,8 @@
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Dns.ZoneProvider.Traefik.Models;
 
 public class Tls
 {
-	[JsonProperty("certResolver")] public string CertResolver { get; set; }
+	[JsonPropertyName("certResolver")] public string CertResolver { get; set; }
 }

@@ -19,14 +19,12 @@ public sealed class LoadCurrentUserMiddleware(RequestDelegate next)
 	{
 		var ct = context.RequestAborted;
 
-		// Get the user id from the auth ticket (JWT, cookie, etc.)
 		var username = context.User?.Identity?.Name;
 
 		if (!string.IsNullOrEmpty(username))
 		{
 			var user = new object() /*await userRepository.GetUser(username, ct).ConfigureAwait(false)*/;
 
-			// Store either the entity or a lightweight DTO
 			context.Items[HttpContextItemKey] = user;
 		}
 

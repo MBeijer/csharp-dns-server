@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace Dns.RDataTypes;
 
@@ -24,5 +24,5 @@ public class GenericRData : RData
 
 	public override void WriteToStream(Stream stream) => stream.Write(_bytes, 0, _bytes.Length);
 
-	public override void Dump() => Console.WriteLine("Address:   {0}", JsonConvert.SerializeObject(this));
+	public override void Dump() => Console.WriteLine("Address:   {0}", JsonSerializer.Serialize(this));
 }

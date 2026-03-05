@@ -7,11 +7,15 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Xml;
 using Dns.Cli.Extensions;
+using Dns.Cli.Filters;
+using Dns.Cli.Handlers;
 using Dns.Cli.Middleware;
 using Dns.Config;
 using Dns.Contracts;
 using Dns.Db.Configuration;
 using Dns.Db.Extensions;
+using Dns.Db.Models.EntityFramework;
+using Dns.Db.Repositories;
 using Dns.Handlers;
 using Dns.Services;
 using Dns.ZoneProvider;
@@ -22,6 +26,7 @@ using Dns.ZoneProvider.Traefik;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
@@ -104,23 +109,24 @@ public class Startup(IConfiguration configuration)
 
 		services.AddCors();
 
-		services.AddResponseCompression(options =>
+		services.AddResponseCompression(
+			options =>
 			{
 				options.EnableForHttps = true;
 				options.Providers.Add<GzipCompressionProvider>();
 			}
 		);
 
-		services.AddLogging(configure =>
+		services.AddLogging(
+			configure =>
 			{
 				configure.AddSimpleConsole(options =>
-					{
-						options.IncludeScopes   = true;
-						options.SingleLine      = true;
-						options.TimestampFormat = "[hh:mm:ss] ";
-						options.ColorBehavior   = LoggerColorBehavior.Enabled;
-					}
-				);
+				{
+					options.IncludeScopes   = true;
+					options.SingleLine      = true;
+					options.TimestampFormat = "[hh:mm:ss] ";
+					options.ColorBehavior   = LoggerColorBehavior.Enabled;
+				});
 			}
 		);
 
@@ -130,15 +136,18 @@ public class Startup(IConfiguration configuration)
 				        options.EnableEndpointRouting      = false;
 			        }
 		        )
-		        .AddMvcOptions(o => o.OutputFormatters.Add(
-			                       new XmlSerializerOutputFormatter(new XmlWriterSettings { Indent = true })
-		                       )
+		        .AddMvcOptions(
+			        o => o.OutputFormatters.Add(
+				        new XmlSerializerOutputFormatter(new XmlWriterSettings { Indent = true })
+			        )
 		        )
-		        .AddJsonOptions(options => options.JsonSerializerOptions.DefaultIgnoreCondition =
-			                        JsonIgnoreCondition.WhenWritingNull
+		        .AddJsonOptions(
+			        options => options.JsonSerializerOptions.DefaultIgnoreCondition =
+				        JsonIgnoreCondition.WhenWritingNull
 		        );
 
-		services.AddSwaggerGen(c =>
+		services.AddSwaggerGen(
+			c =>
 			{
 				c.IncludeXmlComments(
 					Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml")
@@ -151,26 +160,21 @@ public class Startup(IConfiguration configuration)
 						BearerFormat = "JWT",
 						Name         = "Authorization",
 						In           = ParameterLocation.Header,
-						Type         = SecuritySchemeType.ApiKey,
+						Type         = SecuritySchemeType.Http,
 						Scheme       = JwtBearerDefaults.AuthenticationScheme,
 						Description  = "Put **_ONLY_** your JWT Bearer token on textbox below!",
 					}
 				);
 
-				c.AddSecurityRequirement(_ => new()
-					{
-						{
-							new(JwtBearerDefaults.AuthenticationScheme), [] // must be List<string>
-						},
-					}
-				);
+				c.OperationFilter<AuthorizeOnlyOperationFilter>();
 			}
 		);
 
 		services.AddHttpContextAccessor();
 
 		services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-		        .AddJwtBearer(options =>
+		        .AddJwtBearer(
+			        options =>
 			        {
 				        options.TokenValidationParameters = new()
 				        {
@@ -184,7 +188,9 @@ public class Startup(IConfiguration configuration)
 				        };
 			        }
 		        );
+		services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
+		services.AddSingleton<IJwtTokenHandler, JwtTokenHandler>();
 		services.AddSingleton<IServiceProvider, ServiceProvider>();
 
 		services.AddDatabaseDependencies(databaseSettings);
@@ -192,10 +198,13 @@ public class Startup(IConfiguration configuration)
 		services.AddSingleton<IDnsService, DnsService>();
 		services.AddHostedService(p => p.GetRequiredService<IDnsService>());
 
+
+		services.AddScoped<IUserRepository, UserRepository>();
 		services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
 	}
 
 	/// <summary>
+	///
 	/// </summary>
 	/// <param name="app"></param>
 	/// <param name="env"></param>

@@ -160,26 +160,23 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 					question.Class,
 					question.Type
 				);
-				if (question.Type == ResourceType.PTR)
+				if (question.Type == ResourceType.PTR && question.Name == "1.0.0.127.in-addr.arpa")
 				{
-					if (question.Name == "1.0.0.127.in-addr.arpa") // query for PTR record
-					{
-						message.QR = true;
-						message.AA = true;
-						message.RA = false;
-						message.AnswerCount++;
-						message.Answers.Add(
-							new()
-							{
-								Name       = question.Name,
-								Class      = ResourceClass.IN,
-								Type       = ResourceType.PTR,
-								TTL        = 3600,
-								DataLength = 0xB,
-								RData      = new DomainNamePointRData { Name = "localhost" },
-							}
-						);
-					}
+					message.QR = true;
+					message.AA = true;
+					message.RA = false;
+					message.AnswerCount++;
+					message.Answers.Add(
+						new()
+						{
+							Name       = question.Name,
+							Class      = ResourceClass.IN,
+							Type       = ResourceType.PTR,
+							TTL        = 3600,
+							DataLength = 0xB,
+							RData      = new DomainNamePointRData { Name = "localhost" },
+						}
+					);
 				}
 				else if (_resolvers.FirstOrDefault(x => x.TryGetZone(
 					                                   question.Name,
@@ -190,8 +187,8 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 				{
 					var qName = question.Name.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "");
 					message.QR    = true;
-					//message.AA    = true;
-					message.RA    = true;//false;
+					message.AA    = true;
+					message.RA    = false;
 					message.RCode = (byte)RCode.NOERROR;
 					var zoneRecords = question.Type switch
 					{
@@ -201,7 +198,18 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 						_ => zone.Records.Where(zr => zr.Type == question.Type && zr.Host.Equals(qName)).ToList(),
 					};
 
-					HandleRecords(zoneRecords, question, message, zone, remoteEndPoint);
+					if (zoneRecords.Count == 0)
+					{
+						message.RCode = (byte)RCode.NXDOMAIN;
+						var zoneName = CanonicalZoneName(zone.Suffix);
+						var zoneSoa  = zone.Records.FirstOrDefault(record => record.Type == ResourceType.SOA);
+						message.NameServerCount++;
+						message.Authorities.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
+					}
+					else
+					{
+						HandleRecords(zoneRecords, question, message, zone, remoteEndPoint);
+					}
 				}
 				else // Referral to regular DC DNS servers
 				{
@@ -411,6 +419,17 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 						Type  = zoneRecord.Type,
 						TTL   = 10,
 						RData = new TXTRData { Name = address },
+					}
+				));
+				break;
+			case ResourceType.PTR:
+				records.AddRange(zoneRecord.Addresses.Select(address => new ResourceRecord
+					{
+						Name  = name,
+						Class = zoneRecord.Class,
+						Type  = zoneRecord.Type,
+						TTL   = 10,
+						RData = new DomainNamePointRData { Name = address },
 					}
 				));
 				break;
@@ -794,6 +813,22 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							         Type  = zoneRecord.Type,
 							         TTL   = 10,
 							         RData = new TXTRData { Name = address },
+						         }
+					         ))
+					{
+						message.AnswerCount++;
+						message.Answers.Add(answer);
+					}
+
+					break;
+				case ResourceType.PTR:
+					foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
+						         {
+							         Name  = question.Name,
+							         Class = zoneRecord.Class,
+							         Type  = zoneRecord.Type,
+							         TTL   = 10,
+							         RData = new DomainNamePointRData { Name = address },
 						         }
 					         ))
 					{

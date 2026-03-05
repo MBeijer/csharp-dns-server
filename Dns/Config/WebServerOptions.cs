@@ -4,5 +4,5 @@ namespace Dns.Config;
 
 public class WebServerOptions
 {
-	[JsonPropertyName("jwtSecretKey")] public string JwtSecretKey { get; set; }
+	[JsonPropertyName("JwtSecretKey")] public string JwtSecretKey { get; set; }
 }

@@ -108,6 +108,40 @@ The provider reads the file whenever it changes (a 10-second settlement window a
 - `notifySecondaries`: optional list of `ip[:port]` targets that receive outbound DNS NOTIFY whenever a zone serial changes.
 - UDP AXFR/IXFR requests are refused by design; use TCP transport.
 
+### Import BIND Zone Into Database Zone
+You can convert a BIND zone file into a database-backed zone via the DNS API:
+
+`POST /dns/zones/import-bind`
+
+```json
+{
+  "fileName": "/path/to/example.com.zone",
+  "zoneSuffix": "example.com",
+  "enabled": true,
+  "replaceExistingRecords": true
+}
+```
+
+Behavior:
+- Parses the file using the same BIND parser used by `BindZoneProvider`.
+- Upserts the database zone by `suffix` (creates if missing, updates if present).
+- Flattens each BIND RR datum into `zone_records` rows.
+
+To import and switch all currently active BIND providers at runtime:
+
+`POST /dns/zones/import-active-bind`
+
+```json
+{
+  "replaceExistingRecords": true,
+  "enableImportedZones": true
+}
+```
+
+This operation:
+- Imports every currently active `BindZoneProvider` zone file into the DB.
+- Disables those BIND providers in the running process after successful import.
+
 ## Documentation
 - [Product requirements](docs/product_requirements.md) describe the current roadmap, observability goals, and .NET maintenance plans.
 - [Project priorities & plan](docs/priorities.md) outline the P0/P1/P2 focus areas plus execution notes (DI migration, OpenTelemetry instrumentation).

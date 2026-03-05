@@ -1,7 +1,7 @@
 using System;
 using System.IO;
+using System.Text.Json;
 using Dns.Extensions;
-using Newtonsoft.Json;
 
 namespace Dns.RDataTypes;
 
@@ -33,6 +33,6 @@ public class MXRData : RData
 
 	public override void Dump()
 	{
-		Console.WriteLine("Address:   {0}", JsonConvert.SerializeObject(this));
+		Console.WriteLine("Address:   {0}", JsonSerializer.Serialize(this));
 	}
 }

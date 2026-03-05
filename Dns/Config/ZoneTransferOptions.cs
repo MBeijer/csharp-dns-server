@@ -9,9 +9,11 @@ public class ZoneTransferOptions
 	[JsonPropertyName("enabled")] public bool Enabled { get; set; }
 
 	[JsonPropertyName("allowTransfersFrom")]
+	[JsonConverter(typeof(FlexibleStringListJsonConverter))]
 	public List<string> AllowTransfersFrom { get; set; } = [];
 
 	[JsonPropertyName("notifySecondaries")]
+	[JsonConverter(typeof(FlexibleStringListJsonConverter))]
 	public List<string> NotifySecondaries { get; set; } = [];
 
 	[JsonPropertyName("notifyPollIntervalSeconds")]

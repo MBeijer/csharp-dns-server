@@ -26,6 +26,19 @@ namespace Dns.ZoneProvider.Bind;
 public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dnsResolver)
 	: FileWatcherZoneProvider(dnsResolver)
 {
+	public static Zone ParseZoneFile(string filename, string zoneSuffix)
+	{
+		var parser  = new ZoneFileParser(filename, zoneSuffix);
+		var records = parser.Parse();
+		var zone = new Zone
+		{
+			Suffix = zoneSuffix,
+			Serial = parser.Serial ?? 0,
+		};
+		zone.Initialize(records);
+		return zone;
+	}
+
 	/// <summary>Initialize ZoneProvider</summary>
 	/// <param name="zoneOptions">ZoneProvider Configuration Section</param>
 	public override void Initialize(ZoneOptions zoneOptions)
@@ -39,12 +52,9 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 	{
 		try
 		{
-			var parser  = new ZoneFileParser(Filename, Zone.Suffix);
-			var records = parser.Parse();
-
-			var soaRecord = records.FirstOrDefault(r => r.Type == ResourceType.SOA);
-
-			Zone.Initialize(records);
+			var parsedZone = ParseZoneFile(Filename, Zone.Suffix);
+			Zone.Serial = parsedZone.Serial;
+			Zone.Initialize(parsedZone.Records);
 
 			return Zone;
 		}
@@ -88,6 +98,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 		private int    _lastLineNumber;
 		private string _lastOwner;
 		private bool   _sawSoa;
+		public uint? Serial { get; private set; }
 
 		public ZoneFileParser(string filename, string zoneSuffix)
 		{
@@ -169,12 +180,8 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 
 			if (line.OwnerImplicit)
 			{
-				if (string.IsNullOrEmpty(_lastOwner))
-					throw new BindZoneFileException(
-						line.LineNumber,
-						"Record omitted owner but no previous owner exists."
-					);
-				owner = _lastOwner;
+				owner = string.IsNullOrEmpty(_lastOwner) ? TrimTrailingDot(_currentOrigin) : _lastOwner;
+				_lastOwner = owner;
 			}
 			else
 			{
@@ -238,6 +245,9 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 				case ResourceType.CNAME:
 					ParseCName(record, rdata, line.LineNumber);
 					break;
+				case ResourceType.PTR:
+					ParsePtr(record, rdata, line.LineNumber);
+					break;
 				case ResourceType.MX:
 					ParseMx(record, rdata, line.LineNumber);
 					break;
@@ -298,6 +308,10 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 				}).ToString();
 			}
 
+			if (!uint.TryParse(rdata[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var serial))
+				throw new BindZoneFileException(lineNumber, $"Invalid SOA serial field '{rdata[2]}'.");
+
+			Serial = serial;
 			_sawSoa = true;
 		}
 
@@ -336,6 +350,13 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 
 			var target = CanonicalizeName(rdata[0], lineNumber);
 			record.Addresses.Add(target);
+		}
+
+		private void ParsePtr(ZoneRecord record, List<string> rdata, int lineNumber)
+		{
+			if (rdata.Count != 1) throw new BindZoneFileException(lineNumber, "PTR record expects a single target.");
+
+			record.Addresses.Add(CanonicalizeName(rdata[0], lineNumber));
 		}
 
 		private static void ParseAddressRecord(

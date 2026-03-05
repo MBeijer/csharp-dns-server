@@ -1,4 +1,5 @@
-﻿using Dns.Db.Contexts;
+﻿using System;
+using Dns.Db.Contexts;
 using Dns.Db.Models.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,44 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 	{
 		dbContext.Zones!.Update(zone);
 		await dbContext.SaveChangesAsync().ConfigureAwait(false);
+	}
+
+	public async Task<Zone> UpsertZone(Zone zone, bool replaceRecords = true)
+	{
+		ArgumentNullException.ThrowIfNull(zone);
+		if (string.IsNullOrWhiteSpace(zone.Suffix))
+			throw new ArgumentException("Zone suffix is required.", nameof(zone));
+
+		var existing = await dbContext.Zones!
+		                              .Include(z => z.Records)
+		                              .SingleOrDefaultAsync(z => z.Suffix == zone.Suffix)
+		                              .ConfigureAwait(false);
+
+		if (existing == null)
+		{
+			await dbContext.Zones!.AddAsync(zone).ConfigureAwait(false);
+			await dbContext.SaveChangesAsync().ConfigureAwait(false);
+			return zone;
+		}
+
+		existing.Serial  = zone.Serial;
+		existing.Enabled = zone.Enabled;
+
+		if (replaceRecords)
+		{
+			if (existing.Records?.Count > 0) dbContext.ZoneRecords!.RemoveRange(existing.Records);
+
+			existing.Records = zone.Records ?? [];
+			foreach (var record in existing.Records)
+			{
+				record.Id      = null;
+				record.ZoneObj = existing;
+				record.Zone    = existing.Id;
+			}
+		}
+
+		await dbContext.SaveChangesAsync().ConfigureAwait(false);
+		return existing;
 	}
 }
 

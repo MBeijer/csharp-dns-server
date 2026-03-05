@@ -8,6 +8,7 @@ Dns.Cli/dns.db*
 *.user
 *.sln.docstates
 *.orig
+bind/
 
 # Build results
 

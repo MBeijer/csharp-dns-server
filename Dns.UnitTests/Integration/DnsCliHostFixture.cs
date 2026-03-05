@@ -26,6 +26,7 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 	private readonly ConcurrentQueue<string>    _logLines = new();
 	private readonly TaskCompletionSource<bool> _readyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 	private          string                     _configPath;
+	private          int                        _httpPort;
 
 	private Process       _process;
 	private Task          _stderrTask;
@@ -44,6 +45,7 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 
 		var dnsPort  = GetAvailableUdpPort();
 		var httpPort = GetAvailableTcpPort();
+		_httpPort = httpPort;
 
 		DnsEndpoint = new(IPAddress.Loopback, dnsPort);
 
@@ -146,6 +148,7 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 			UseShellExecute        = false,
 			CreateNoWindow         = true,
 		};
+		startInfo.Environment["ASPNETCORE_URLS"] = $"http://127.0.0.1:{_httpPort}";
 
 		_process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start dns-cli.");
 		Console.WriteLine($"Start info: {startInfo.FileName} {startInfo.Arguments}");

@@ -11,9 +11,9 @@ public sealed class DnsServerDbContext : DbContext
 	public DnsServerDbContext(DbContextOptions<DnsServerDbContext> options) : base(options) =>
 		ChangeTracker.LazyLoadingEnabled = false;
 
-	public DbSet<User>?       Users       { get; set; }
-	public DbSet<Zone>?       Zones       { get; set; }
-	public DbSet<ZoneRecord>? ZoneRecords { get; set; }
+	public DbSet<User>        Users       { get; set; }
+	public DbSet<Zone>        Zones       { get; set; }
+	public DbSet<ZoneRecord>  ZoneRecords { get; set; }
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{

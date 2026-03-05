@@ -1,27 +1,27 @@
 using System.Collections.Generic;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Dns.ZoneProvider.Traefik.Models;
 
 public class Route
 {
-	[JsonProperty("entryPoints")] public List<string> EntryPoints { get; set; }
+	[JsonPropertyName("entryPoints")] public List<string> EntryPoints { get; set; }
 
-	[JsonProperty("service")] public string Service { get; set; }
+	[JsonPropertyName("service")] public string Service { get; set; }
 
-	[JsonProperty("rule")] public string Rule { get; set; }
+	[JsonPropertyName("rule")] public string Rule { get; set; }
 
-	[JsonProperty("priority")] public object Priority { get; set; }
+	[JsonPropertyName("priority")] public object Priority { get; set; }
 
-	[JsonProperty("status")] public string Status { get; set; }
+	[JsonPropertyName("status")] public string Status { get; set; }
 
-	[JsonProperty("using")] public List<string> Using { get; set; }
+	[JsonPropertyName("using")] public List<string> Using { get; set; }
 
-	[JsonProperty("name")] public string Name { get; set; }
+	[JsonPropertyName("name")] public string Name { get; set; }
 
-	[JsonProperty("provider")] public string Provider { get; set; }
+	[JsonPropertyName("provider")] public string Provider { get; set; }
 
-	[JsonProperty("middlewares")] public List<string> Middlewares { get; set; }
+	[JsonPropertyName("middlewares")] public List<string> Middlewares { get; set; }
 
-	[JsonProperty("tls")] public Tls Tls { get; set; }
+	[JsonPropertyName("tls")] public Tls Tls { get; set; }
 }
