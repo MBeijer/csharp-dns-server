@@ -82,9 +82,31 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 						fingerprint: true
 					)
 
-					withCredentials([string(credentialsId: 'MBEIJER_CSHARP_DNS_SERVER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
-					    sh("curl -s https://codecov.io/bash > codecov && chmod +x codecov && ./codecov -f \"Testing/unit_tests.xml\" -t ${env.CODECOV_TOKEN} && ./codecov -f \"Dns.UnitTests/coverage.opencover.xml\" -t ${env.CODECOV_TOKEN}")
-					}
+						withCredentials([string(credentialsId: 'MBEIJER_CSHARP_DNS_SERVER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
+							sh('''#!/usr/bin/env bash
+set -euo pipefail
+
+curl -Os https://uploader.codecov.io/latest/linux/codecov
+chmod +x codecov
+
+GIT_SHA="$(git rev-parse HEAD)"
+GIT_BRANCH="${BRANCH_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
+GIT_SLUG="mbeijer/csharp-dns-server"
+BUILD_URL_VALUE="${BUILD_URL:-}"
+
+./codecov \
+	--token "$CODECOV_TOKEN" \
+	--file "Testing/unit_tests.xml" \
+	--file "Dns.UnitTests/coverage.opencover.xml" \
+	--sha "$GIT_SHA" \
+	--branch "$GIT_BRANCH" \
+	--slug "$GIT_SLUG" \
+	--build "$BUILD_NUMBER" \
+	--build-url "$BUILD_URL_VALUE" \
+	--name "jenkins-${JOB_NAME}-${BUILD_NUMBER}" \
+	--disable-search
+''')
+						}
 
 					stage("Xunit") {
 						xunit (
