@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -26,8 +26,8 @@ public partial class TraefikZoneProvider(
 	IDnsResolver dnsResolver
 ) : BaseZoneProvider(dnsResolver)
 {
-	private CancellationToken Ct          { get; set; }
-	private Task              RunningTask { get; set; }
+	private CancellationToken Ct { get; set; }
+	private Task RunningTask { get; set; }
 
 	/// <summary>Initialize ZoneProvider</summary>
 	/// <param name="zoneOptions">ZoneProvider Configuration Section</param>
@@ -74,16 +74,16 @@ public partial class TraefikZoneProvider(
 	private async Task<IEnumerable<ZoneRecord>> GetZoneRecords() =>
 		(from host in await traefikClientService.GetRoutes().ConfigureAwait(false)
 		 where (host.Provider.Equals("docker", StringComparison.InvariantCultureIgnoreCase) ||
-		        host.EntryPoints.Contains("web")) &&
-		       host.Tls == null &&
-		       host.Rule.Contains(Zone.Suffix)
+				host.EntryPoints.Contains("web")) &&
+			   host.Tls == null &&
+			   host.Rule.Contains(Zone.Suffix)
 		 select new ZoneRecord
 		 {
-			 Host      = CreateHostName(host),
+			 Host = CreateHostName(host),
 			 Addresses = [traefikClientService.GetDockerHostInternalIp().ToString()],
-			 Count     = 1,
-			 Type      = ResourceType.A,
-			 Class     = ResourceClass.IN,
+			 Count = 1,
+			 Type = ResourceType.A,
+			 Class = ResourceClass.IN,
 		 }).ToList();
 
 	private string CreateHostName(Route host)

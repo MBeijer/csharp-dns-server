@@ -22,8 +22,8 @@ public class Strategy
 	private static bool Ping(ILogger logger, IPAddress address, ushort timeout)
 	{
 		logger.LogInformation("Ping: pinging {Address}", address);
-		Ping sender    = new();
-		var  pingReply = sender.Send(address, timeout);
+		Ping sender = new();
+		var pingReply = sender.Send(address, timeout);
 		return pingReply?.Status == IPStatus.Success;
 	}
 

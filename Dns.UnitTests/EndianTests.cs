@@ -1,4 +1,4 @@
-// //-------------------------------------------------------------------------------------------------
+﻿// //-------------------------------------------------------------------------------------------------
 // // <copyright file="EndianTests.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -26,8 +26,8 @@ public class EndianTests
 	{
 		// DNS uses big-endian (network byte order)
 		// Value 0x1234 should be serialized as bytes [0x12, 0x34]
-		const ushort hostValue    = 0x1234;
-		var          networkValue = hostValue.SwapEndian();
+		const ushort hostValue = 0x1234;
+		var networkValue = hostValue.SwapEndian();
 
 		// After SwapEndian, writing to stream should produce big-endian bytes
 		using var stream = new MemoryStream();
@@ -44,8 +44,8 @@ public class EndianTests
 	{
 		// DNS uses big-endian (network byte order)
 		// Value 0x12345678 should be serialized as bytes [0x12, 0x34, 0x56, 0x78]
-		const uint hostValue    = 0x12345678;
-		var        networkValue = hostValue.SwapEndian();
+		const uint hostValue = 0x12345678;
+		var networkValue = hostValue.SwapEndian();
 
 		// After SwapEndian, writing to stream should produce big-endian bytes
 		using var stream = new MemoryStream();
@@ -138,10 +138,10 @@ public class EndianTests
 		// TTL of 300 seconds (0x0000012C) should serialize as big-endian
 		var record = new ResourceRecord
 		{
-			Name  = "test",
-			Type  = ResourceType.A,
+			Name = "test",
+			Type = ResourceType.A,
 			Class = ResourceClass.IN,
-			TTL   = 300,
+			TTL = 300,
 			RData = new ANameRData { Address = new(new byte[] { 127, 0, 0, 1 }) },
 		};
 
@@ -153,7 +153,7 @@ public class EndianTests
 		// Name "test" = [4, t, e, s, t, 0] = 6 bytes
 		// Type = 2 bytes, Class = 2 bytes
 		// TTL starts at offset 10
-		var ttlOffset     = 6 + 2 + 2; // name + type + class
+		var ttlOffset = 6 + 2 + 2; // name + type + class
 		var serializedTtl = BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(ttlOffset));
 		Assert.Equal(300u, serializedTtl);
 	}
@@ -164,7 +164,7 @@ public class EndianTests
 		// Verify that BinaryPrimitives reads the same as our parsing
 		var networkData = new byte[] { 0x12, 0x34, 0x56, 0x78 };
 
-		var offset  = 0;
+		var offset = 0;
 		var value16 = DnsProtocol.ReadUshort(networkData, ref offset).SwapEndian();
 		Assert.Equal((ushort)0x1234, value16);
 
@@ -185,8 +185,8 @@ public class EndianTests
 		var isLittleEndian = BitConverter.IsLittleEndian;
 
 		// Test that our SwapEndian behaves correctly for this system
-		const ushort testValue   = 0x0102;
-		var          directBytes = BitConverter.GetBytes(testValue);
+		const ushort testValue = 0x0102;
+		var directBytes = BitConverter.GetBytes(testValue);
 
 		if (isLittleEndian)
 		{

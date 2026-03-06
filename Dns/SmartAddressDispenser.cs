@@ -17,8 +17,8 @@ public class SmartAddressDispenser(ZoneRecord record, ushort maxAddressesReturne
 {
 	private ulong _sequence;
 
-	string IAddressDispenser.HostName   => ZoneRecord.Host;
-	public ZoneRecord        ZoneRecord { get; } = record;
+	string IAddressDispenser.HostName => ZoneRecord.Host;
+	public ZoneRecord ZoneRecord { get; } = record;
 
 	/// <summary>Returns round-robin rotated set of IP addresses</summary>
 	/// <returns>Set of IP Addresses</returns>
@@ -30,7 +30,7 @@ public class SmartAddressDispenser(ZoneRecord record, ushort maxAddressesReturne
 			yield break;
 
 		// starting position in rollover list
-		var start  = (int)(_sequence % (ulong)addresses.Length);
+		var start = (int)(_sequence % (ulong)addresses.Length);
 		var offset = start;
 
 		uint count = 0;

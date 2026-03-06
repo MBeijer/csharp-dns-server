@@ -24,7 +24,7 @@ public class BindZoneProviderTests
 		var zoneFile = Path.Combine(TestProjectPaths.TestDataDirectory, "Bind", "simple.zone");
 
 		using var provider = CreateProvider(zoneFile);
-		var       zone     = provider.GenerateZone();
+		var zone = provider.GenerateZone();
 
 		Assert.NotNull(zone);
 		Assert.Equal("example.com", zone.Suffix);
@@ -55,7 +55,7 @@ public class BindZoneProviderTests
 		var zoneFile = Path.Combine(TestProjectPaths.TestDataDirectory, "Bind", "invalid_missing_ttl.zone");
 
 		using var provider = CreateProvider(zoneFile);
-		var       zone     = provider.GenerateZone();
+		var zone = provider.GenerateZone();
 
 		Assert.NotNull(zone);
 		Assert.Equal("example.com", zone.Suffix);
@@ -91,7 +91,7 @@ public class BindZoneProviderTests
 		try
 		{
 			using var provider = CreateProvider(tempZone);
-			var       zone     = provider.GenerateZone();
+			var zone = provider.GenerateZone();
 
 			Assert.NotNull(zone);
 
@@ -128,7 +128,7 @@ public class BindZoneProviderTests
 		try
 		{
 			using var provider = CreateProvider(tempZone, "2.0.192.in-addr.arpa");
-			var       zone     = provider.GenerateZone();
+			var zone = provider.GenerateZone();
 
 			Assert.NotNull(zone);
 			var ptr = Assert.Single(zone.Records, record => record.Host == "10" && record.Type == ResourceType.PTR);
@@ -160,7 +160,7 @@ public class BindZoneProviderTests
 		try
 		{
 			using var provider = CreateProvider(tempZone);
-			var       zone     = provider.GenerateZone();
+			var zone = provider.GenerateZone();
 
 			Assert.NotNull(zone);
 			Assert.Equal(2024010101u, zone.Serial);
@@ -182,7 +182,7 @@ public class BindZoneProviderTests
 		provider.Initialize(
 			new()
 			{
-				Name             = zoneName,
+				Name = zoneName,
 				ProviderSettings = new FileWatcherZoneProviderSettings { FileName = zoneFile },
 			}
 		);

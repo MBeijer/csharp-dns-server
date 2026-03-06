@@ -1,4 +1,4 @@
-using Dns.Cli.Middleware;
+﻿using Dns.Cli.Middleware;
 using Microsoft.AspNetCore.Builder;
 
 namespace Dns.Cli.Extensions;

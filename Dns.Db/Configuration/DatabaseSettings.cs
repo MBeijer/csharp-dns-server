@@ -1,4 +1,4 @@
-namespace Dns.Db.Configuration;
+﻿namespace Dns.Db.Configuration;
 
 /// <summary>
 /// </summary>

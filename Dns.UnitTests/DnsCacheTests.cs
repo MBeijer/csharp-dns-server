@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Text;
 using Dns.Contracts;
 using Xunit;
@@ -10,8 +10,8 @@ public class DnsCacheTests
 	[Fact]
 	public void Test1()
 	{
-		IDnsCache cache            = new DnsCache();
-		var       invalidKeyResult = cache.Get("invalidTestKey");
+		IDnsCache cache = new DnsCache();
+		var invalidKeyResult = cache.Get("invalidTestKey");
 		Assert.Null(invalidKeyResult);
 	}
 
@@ -20,9 +20,9 @@ public class DnsCacheTests
 	{
 		IDnsCache cache = new DnsCache();
 
-		const string key  = "sampleCacheKey";
-		var          data = Encoding.ASCII.GetBytes("test");
-		const int    ttl  = 10;
+		const string key = "sampleCacheKey";
+		var data = Encoding.ASCII.GetBytes("test");
+		const int ttl = 10;
 
 		cache.Set(key, data, ttl);
 		var result = cache.Get(key);

@@ -20,12 +20,12 @@ namespace Dns;
 
 public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 {
-	private long          _hits;
-	private long          _misses;
+	private long _hits;
+	private long _misses;
 	private IZoneProvider _provider;
-	private long          _queries;
-	private IDisposable   _subscription;
-	private List<Zone>    _zones = [];
+	private long _queries;
+	private IDisposable _subscription;
+	private List<Zone> _zones = [];
 
 	private static JsonSerializerOptions SerializerOptions { get; } = new() { WriteIndented = true };
 
@@ -34,7 +34,7 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 		get => _zones;
 		set
 		{
-			_zones         = value ?? throw new ArgumentNullException(nameof(value));
+			_zones = value ?? throw new ArgumentNullException(nameof(value));
 			LastZoneReload = DateTime.Now;
 			logger.LogInformation("Zone reloaded: {Zones}", string.Join(',', _zones.Select(z => z.Suffix)));
 		}

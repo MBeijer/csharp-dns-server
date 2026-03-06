@@ -1,4 +1,4 @@
-// //-------------------------------------------------------------------------------------------------
+﻿// //-------------------------------------------------------------------------------------------------
 // // <copyright file="RequestProcessingBenchmarks.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -33,7 +33,7 @@ public class RequestProcessingBenchmarks
 
 	// Simulated request-response map (like in DnsServer)
 	private Dictionary<string, EndPoint> _requestResponseMap;
-	private ReaderWriterLockSlim         _requestResponseMapLock;
+	private ReaderWriterLockSlim _requestResponseMapLock;
 
 	// Sample endpoint
 	private EndPoint _sampleEndpoint;
@@ -53,9 +53,9 @@ public class RequestProcessingBenchmarks
 
 		DnsMessage.TryParse(_queryBytes, out _parsedQuery);
 
-		_requestResponseMap     = new();
+		_requestResponseMap = new();
 		_requestResponseMapLock = new();
-		_sampleEndpoint         = new IPEndPoint(IPAddress.Parse("192.168.1.100"), 12345);
+		_sampleEndpoint = new IPEndPoint(IPAddress.Parse("192.168.1.100"), 12345);
 	}
 
 	[GlobalCleanup]
@@ -64,11 +64,11 @@ public class RequestProcessingBenchmarks
 		_requestResponseMapLock?.Dispose();
 	}
 
-    /// <summary>
-    ///     Simulates key generation for request-response tracking.
-    ///     This is the current implementation in DnsServer.GetKeyName().
-    /// </summary>
-    [Benchmark(Description = "GetKeyName: string.Format (current)")]
+	/// <summary>
+	///     Simulates key generation for request-response tracking.
+	///     This is the current implementation in DnsServer.GetKeyName().
+	/// </summary>
+	[Benchmark(Description = "GetKeyName: string.Format (current)")]
 	public string GetKeyName_StringFormat() =>
 		string.Format(
 			"{0}|{1}|{2}|{3}",
@@ -78,39 +78,39 @@ public class RequestProcessingBenchmarks
 			_parsedQuery.Questions[0].Name
 		);
 
-    /// <summary>
-    ///     Alternative using string interpolation.
-    /// </summary>
-    [Benchmark(Description = "GetKeyName: interpolation")]
+	/// <summary>
+	///     Alternative using string interpolation.
+	/// </summary>
+	[Benchmark(Description = "GetKeyName: interpolation")]
 	public string GetKeyName_Interpolation() =>
 		$"{_parsedQuery.QueryIdentifier}|{_parsedQuery.Questions[0].Class}|{_parsedQuery.Questions[0].Type}|{_parsedQuery.Questions[0].Name}";
 
-    /// <summary>
-    ///     Simulates the full parse → build response → serialize cycle.
-    ///     This is the hot path for authoritative responses.
-    /// </summary>
-    [Benchmark(Description = "Full cycle: Parse → Build response → Serialize")]
+	/// <summary>
+	///     Simulates the full parse → build response → serialize cycle.
+	///     This is the hot path for authoritative responses.
+	/// </summary>
+	[Benchmark(Description = "Full cycle: Parse → Build response → Serialize")]
 	public byte[] FullCycle_AuthoritativeResponse()
 	{
 		// Parse incoming
 		DnsMessage.TryParse(_queryBytes, out var message);
 
 		// Build response (simulating authoritative answer)
-		message.QR          = true;
-		message.AA          = true;
-		message.RA          = false;
-		message.RCode       = (byte)RCode.NOERROR;
+		message.QR = true;
+		message.AA = true;
+		message.RA = false;
+		message.RCode = (byte)RCode.NOERROR;
 		message.AnswerCount = 1;
 
 		var rdata = new ANameRData { Address = IPAddress.Parse("192.0.2.1") };
 		message.Answers.Add(
 			new()
 			{
-				Name       = message.Questions[0].Name,
-				Class      = ResourceClass.IN,
-				Type       = ResourceType.A,
-				TTL        = 300,
-				RData      = rdata,
+				Name = message.Questions[0].Name,
+				Class = ResourceClass.IN,
+				Type = ResourceType.A,
+				TTL = 300,
+				RData = rdata,
 				DataLength = rdata.Length,
 			}
 		);
@@ -121,24 +121,24 @@ public class RequestProcessingBenchmarks
 		return responseStream.GetBuffer();
 	}
 
-    /// <summary>
-    ///     Simulates buffer copy pattern from UdpListener.
-    ///     Current code: new byte[bytesRead] + Buffer.BlockCopy
-    /// </summary>
-    [Benchmark(Description = "Buffer copy: new byte[] + BlockCopy")]
+	/// <summary>
+	///     Simulates buffer copy pattern from UdpListener.
+	///     Current code: new byte[bytesRead] + Buffer.BlockCopy
+	/// </summary>
+	[Benchmark(Description = "Buffer copy: new byte[] + BlockCopy")]
 	public byte[] BufferCopy_NewArray()
 	{
 		var bytesRead = _queryBytes.Length;
-		var payload   = new byte[bytesRead];
+		var payload = new byte[bytesRead];
 		Buffer.BlockCopy(_queryBytes, 0, payload, 0, bytesRead);
 		return payload;
 	}
 
-    /// <summary>
-    ///     Simulates the MemoryStream allocation pattern in DnsServer.
-    ///     Current code: new MemoryStream(512) per response
-    /// </summary>
-    [Benchmark(Description = "MemoryStream: new per request")]
+	/// <summary>
+	///     Simulates the MemoryStream allocation pattern in DnsServer.
+	///     Current code: new MemoryStream(512) per response
+	/// </summary>
+	[Benchmark(Description = "MemoryStream: new per request")]
 	public MemoryStream MemoryStream_NewPerRequest()
 	{
 		var stream = new MemoryStream(512);
@@ -146,11 +146,11 @@ public class RequestProcessingBenchmarks
 		return stream;
 	}
 
-    /// <summary>
-    ///     Simulates pooled MemoryStream usage (Phase 2 optimization).
-    ///     Uses BufferPool.RentMemoryStream() pattern.
-    /// </summary>
-    [Benchmark(Description = "MemoryStream: pooled (Phase 2)")]
+	/// <summary>
+	///     Simulates pooled MemoryStream usage (Phase 2 optimization).
+	///     Uses BufferPool.RentMemoryStream() pattern.
+	/// </summary>
+	[Benchmark(Description = "MemoryStream: pooled (Phase 2)")]
 	public PooledMemoryStream MemoryStream_Pooled()
 	{
 		var stream = BufferPool.RentMemoryStream();
@@ -159,11 +159,11 @@ public class RequestProcessingBenchmarks
 		return stream;
 	}
 
-    /// <summary>
-    ///     Simulates SocketAsyncEventArgs allocation pattern.
-    ///     Current code: new SocketAsyncEventArgs() per send
-    /// </summary>
-    [Benchmark(Description = "SocketAsyncEventArgs: new per send")]
+	/// <summary>
+	///     Simulates SocketAsyncEventArgs allocation pattern.
+	///     Current code: new SocketAsyncEventArgs() per send
+	/// </summary>
+	[Benchmark(Description = "SocketAsyncEventArgs: new per send")]
 	public SocketAsyncEventArgs SocketAsyncEventArgs_New()
 	{
 		var args = new SocketAsyncEventArgs();
@@ -172,11 +172,11 @@ public class RequestProcessingBenchmarks
 		return args;
 	}
 
-    /// <summary>
-    ///     Simulates pooled SocketAsyncEventArgs usage (Phase 2 optimization).
-    ///     Uses BufferPool.RentSocketAsyncEventArgs() pattern.
-    /// </summary>
-    [Benchmark(Description = "SocketAsyncEventArgs: pooled (Phase 2)")]
+	/// <summary>
+	///     Simulates pooled SocketAsyncEventArgs usage (Phase 2 optimization).
+	///     Uses BufferPool.RentSocketAsyncEventArgs() pattern.
+	/// </summary>
+	[Benchmark(Description = "SocketAsyncEventArgs: pooled (Phase 2)")]
 	public SocketAsyncEventArgs SocketAsyncEventArgs_Pooled()
 	{
 		var args = BufferPool.RentSocketAsyncEventArgs();
@@ -186,11 +186,11 @@ public class RequestProcessingBenchmarks
 		return args;
 	}
 
-    /// <summary>
-    ///     Simulates buffer rental from MemoryPool (Phase 2 optimization).
-    ///     Uses BufferPool.RentBuffer() pattern.
-    /// </summary>
-    [Benchmark(Description = "Buffer: MemoryPool rental (Phase 2)")]
+	/// <summary>
+	///     Simulates buffer rental from MemoryPool (Phase 2 optimization).
+	///     Uses BufferPool.RentBuffer() pattern.
+	/// </summary>
+	[Benchmark(Description = "Buffer: MemoryPool rental (Phase 2)")]
 	public IMemoryOwner<byte> Buffer_MemoryPoolRental()
 	{
 		var owner = BufferPool.RentBuffer();
@@ -199,10 +199,10 @@ public class RequestProcessingBenchmarks
 		return owner;
 	}
 
-    /// <summary>
-    ///     Simulates dictionary add with ReaderWriterLockSlim (write path).
-    /// </summary>
-    [Benchmark(Description = "RequestMap: Add with RWLock")]
+	/// <summary>
+	///     Simulates dictionary add with ReaderWriterLockSlim (write path).
+	/// </summary>
+	[Benchmark(Description = "RequestMap: Add with RWLock")]
 	public void RequestMap_AddWithLock()
 	{
 		var key = $"{_parsedQuery.QueryIdentifier}|test";
@@ -228,10 +228,10 @@ public class RequestProcessingBenchmarks
 		}
 	}
 
-    /// <summary>
-    ///     Simulates dictionary lookup with ReaderWriterLockSlim (read path).
-    /// </summary>
-    [Benchmark(Description = "RequestMap: TryGet with RWLock")]
+	/// <summary>
+	///     Simulates dictionary lookup with ReaderWriterLockSlim (read path).
+	/// </summary>
+	[Benchmark(Description = "RequestMap: TryGet with RWLock")]
 	public EndPoint RequestMap_TryGetWithLock()
 	{
 		var key = $"{_parsedQuery.QueryIdentifier}|test";

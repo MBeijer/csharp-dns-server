@@ -16,7 +16,7 @@ public static class ApplicationBuilderExtensions
 	public static void UpdateDatabase(this IApplicationBuilder app)
 	{
 		using var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>().CreateScope();
-		using var context      = serviceScope.ServiceProvider.GetService<DnsServerDbContext>();
+		using var context = serviceScope.ServiceProvider.GetService<DnsServerDbContext>();
 
 		var migrator = context?.Database.GetService<IMigrator>();
 		migrator?.Migrate();

@@ -11,6 +11,6 @@ namespace Dns.RDataTypes;
 public abstract class RData
 {
 	public abstract ushort Length { get; }
-	public abstract void   Dump();
-	public abstract void   WriteToStream(Stream stream);
+	public abstract void Dump();
+	public abstract void WriteToStream(Stream stream);
 }

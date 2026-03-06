@@ -22,24 +22,24 @@ public class APZoneProvider(IDnsResolver resolver) : FileWatcherZoneProvider(res
 
 		var parser = CsvParser.Create(Filename);
 		var machines = parser.Rows.Select(row => new
-			                     {
-				                     MachineFunction = row["MachineFunction"],
-				                     StaticIP        = row["StaticIP"],
-				                     MachineName     = row["MachineName"],
-                                 }
-		                     )
-		                     .ToArray();
+		{
+			MachineFunction = row["MachineFunction"],
+			StaticIP = row["StaticIP"],
+			MachineName = row["MachineName"],
+		}
+							 )
+							 .ToArray();
 
 		var zoneRecords = machines
-		                  .GroupBy(machine => machine.MachineFunction, machine => IPAddress.Parse(machine.StaticIP))
-		                  .Select(group => new ZoneRecord
-			                  {
-				                  Host      = group.Key,
-				                  Count     = group.Count(),
-				                  Addresses = group.Select(address => address.ToString()).ToList(),
-                              }
-		                  )
-		                  .ToArray();
+						  .GroupBy(machine => machine.MachineFunction, machine => IPAddress.Parse(machine.StaticIP))
+						  .Select(group => new ZoneRecord
+						  {
+							  Host = group.Key,
+							  Count = group.Count(),
+							  Addresses = group.Select(address => address.ToString()).ToList(),
+						  }
+						  )
+						  .ToArray();
 
 		Zone.Initialize(zoneRecords);
 		Zone.Serial++;

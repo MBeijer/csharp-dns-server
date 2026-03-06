@@ -1,4 +1,4 @@
-// //-------------------------------------------------------------------------------------------------
+﻿// //-------------------------------------------------------------------------------------------------
 // // <copyright file="DnsProtocolBenchmarks.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -18,7 +18,7 @@ public class DnsProtocolBenchmarks
 {
 	// Domain with compression pointer
 	private byte[] _compressedDomain;
-	private int    _compressedDomainOffset;
+	private int _compressedDomainOffset;
 
 	// Full DNS query message containing domain
 	private byte[] _fullQueryMessage;
@@ -30,7 +30,7 @@ public class DnsProtocolBenchmarks
 
 	// Simple domain: www.msn.com (3 labels)
 	private byte[] _simpleDomain;
-	private int    _simpleDomainOffset;
+	private int _simpleDomainOffset;
 
 	[GlobalSetup]
 	public void Setup()

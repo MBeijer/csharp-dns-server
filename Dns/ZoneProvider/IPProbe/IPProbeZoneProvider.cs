@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -22,9 +22,9 @@ public class IPProbeZoneProvider(ILogger<IPProbeZoneProvider> logger, IDnsResolv
 {
 	private IPProbeProviderSettings _settings;
 
-	private State             state       { get; set; }
-	private CancellationToken ct          { get; set; }
-	private Task              runningTask { get; set; }
+	private State state { get; set; }
+	private CancellationToken ct { get; set; }
+	private Task runningTask { get; set; }
 
 	/// <summary>Initialize ZoneProvider</summary>
 	/// <param name="serviceCollection"></param>
@@ -37,7 +37,7 @@ public class IPProbeZoneProvider(ILogger<IPProbeZoneProvider> logger, IDnsResolv
 		if (_settings == null) throw new("Error loading IPProbeProviderOptions");
 
 		// load up initial state from options
-		state       = new(_settings);
+		state = new(_settings);
 		Zone.Suffix = zoneOptions.Name;
 
 		base.Initialize(zoneOptions);
@@ -59,8 +59,8 @@ public class IPProbeZoneProvider(ILogger<IPProbeZoneProvider> logger, IDnsResolv
 				probe =>
 				{
 					var startTime = DateTime.UtcNow;
-					var result    = probe.ProbeFunction(logger, probe.Address, probe.TimeoutMilliseconds);
-					var duration  = DateTime.UtcNow - startTime;
+					var result = probe.ProbeFunction(logger, probe.Address, probe.TimeoutMilliseconds);
+					var duration = DateTime.UtcNow - startTime;
 					probe.AddResult(new() { StartTime = startTime, Duration = duration, Available = result });
 				}
 			);
@@ -106,11 +106,11 @@ public class IPProbeZoneProvider(ILogger<IPProbeZoneProvider> logger, IDnsResolv
 
 			yield return new()
 			{
-				Host      = host.Name + Zone,
+				Host = host.Name + Zone,
 				Addresses = addresses,
-				Count     = addresses.Count,
-				Type      = ResourceType.A,
-				Class     = ResourceClass.IN,
+				Count = addresses.Count,
+				Type = ResourceType.A,
+				Class = ResourceClass.IN,
 			};
 		}
 	}

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 using Dns.Db.Models.EntityFramework.Enums;
@@ -13,7 +13,7 @@ public class ZoneRecord
 	[Column("id")]
 	public int? Id { get; set; }
 
-	[Column("host")] [MaxLength(120)] public string? Host { get; set; }
+	[Column("host")][MaxLength(120)] public string? Host { get; set; }
 
 	[JsonConverter(typeof(JsonStringEnumConverter))]
 	[Column("class")]
@@ -24,7 +24,7 @@ public class ZoneRecord
 	public ResourceType? Type { get; set; }
 
 	[Column("data")] public string? Data { get; set; }
-	[Column("zone")] public int?    Zone { get; set; }
+	[Column("zone")] public int? Zone { get; set; }
 
 	[JsonIgnore] public Zone? ZoneObj { get; set; }
 }

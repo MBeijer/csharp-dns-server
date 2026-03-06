@@ -23,14 +23,14 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 {
 	private const string ZoneSuffix = ".integration.test";
 
-	private readonly ConcurrentQueue<string>    _logLines = new();
+	private readonly ConcurrentQueue<string> _logLines = new();
 	private readonly TaskCompletionSource<bool> _readyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-	private          string                     _configPath;
-	private          int                        _httpPort;
+	private string _configPath;
+	private int _httpPort;
 
-	private Process       _process;
-	private Task          _stderrTask;
-	private Task          _stdoutTask;
+	private Process _process;
+	private Task _stderrTask;
+	private Task _stdoutTask;
 	private DirectoryInfo _workingDirectory;
 
 	public IPEndPoint DnsEndpoint { get; private set; }
@@ -43,7 +43,7 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 	{
 		ValidateArtifacts();
 
-		var dnsPort  = GetAvailableUdpPort();
+		var dnsPort = GetAvailableUdpPort();
 		var httpPort = GetAvailableTcpPort();
 		_httpPort = httpPort;
 
@@ -112,7 +112,7 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 
 	private void WriteConfigFile(int dnsPort, int httpPort)
 	{
-		var template     = File.ReadAllText(GetTemplatePath());
+		var template = File.ReadAllText(GetTemplatePath());
 		var zoneFilePath = Path.Combine(_workingDirectory.FullName, "machineinfo.csv");
 
 		template = template.Replace(
@@ -140,13 +140,13 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 	{
 		var startInfo = new ProcessStartInfo
 		{
-			FileName               = "dotnet",
-			Arguments              = $"\"{TestProjectPaths.DnsCliDllPath}\" --appsettings=\"{_configPath}\"",
-			WorkingDirectory       = Path.GetDirectoryName(_configPath)!,
+			FileName = "dotnet",
+			Arguments = $"\"{TestProjectPaths.DnsCliDllPath}\" --appsettings=\"{_configPath}\"",
+			WorkingDirectory = Path.GetDirectoryName(_configPath)!,
 			RedirectStandardOutput = true,
-			RedirectStandardError  = true,
-			UseShellExecute        = false,
-			CreateNoWindow         = true,
+			RedirectStandardError = true,
+			UseShellExecute = false,
+			CreateNoWindow = true,
 		};
 		startInfo.Environment["ASPNETCORE_URLS"] = $"http://127.0.0.1:{_httpPort}";
 
@@ -184,7 +184,7 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 	private async Task WaitForReadyAsync(CancellationToken cancellationToken)
 	{
 		var completed = await Task.WhenAny(_readyTcs.Task, Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken))
-		                          .ConfigureAwait(false);
+								  .ConfigureAwait(false);
 		if (completed != _readyTcs.Task)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
@@ -235,7 +235,7 @@ public sealed class DnsCliHostFixture : IAsyncLifetime, IDisposable
 			}
 
 		_process.Dispose();
-		_process    = null;
+		_process = null;
 		_stdoutTask = null;
 		_stderrTask = null;
 	}

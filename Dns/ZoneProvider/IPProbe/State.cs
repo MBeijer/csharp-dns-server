@@ -5,7 +5,7 @@ namespace Dns.ZoneProvider.IPProbe;
 
 internal class State
 {
-	internal readonly HashSet<Host>   Hosts   = [];
+	internal readonly HashSet<Host> Hosts = [];
 	internal readonly HashSet<Target> Targets = new(new Target.Comparer());
 
 	internal State(IPProbeProviderSettings settings)
@@ -18,8 +18,8 @@ internal class State
 			{
 				Target addressProbe = new()
 				{
-					Address             = IPAddress.Parse(address),
-					ProbeFunction       = Strategy.Get(host.Probe),
+					Address = IPAddress.Parse(address),
+					ProbeFunction = Strategy.Get(host.Probe),
 					TimeoutMilliseconds = host.Timeout,
 				};
 

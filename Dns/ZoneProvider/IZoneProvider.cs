@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Dns.Config;
@@ -10,6 +10,6 @@ namespace Dns.ZoneProvider;
 public interface IZoneProvider : IObservable<List<Zone>>
 {
 	IDnsResolver Resolver { get; }
-	public void  Initialize(ZoneOptions zoneOptions);
-	public void  Start(CancellationToken ct);
+	public void Initialize(ZoneOptions zoneOptions);
+	public void Start(CancellationToken ct);
 }

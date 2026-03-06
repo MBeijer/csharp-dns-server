@@ -33,9 +33,9 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 			throw new ArgumentException("Zone suffix is required.", nameof(zone));
 
 		var existing = await dbContext.Zones!
-		                              .Include(z => z.Records)
-		                              .SingleOrDefaultAsync(z => z.Suffix == zone.Suffix)
-		                              .ConfigureAwait(false);
+									  .Include(z => z.Records)
+									  .SingleOrDefaultAsync(z => z.Suffix == zone.Suffix)
+									  .ConfigureAwait(false);
 
 		if (existing == null)
 		{
@@ -44,7 +44,7 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 			return zone;
 		}
 
-		existing.Serial  = zone.Serial;
+		existing.Serial = zone.Serial;
 		existing.Enabled = zone.Enabled;
 
 		if (replaceRecords)
@@ -54,9 +54,9 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 			existing.Records = zone.Records ?? [];
 			foreach (var record in existing.Records)
 			{
-				record.Id      = null;
+				record.Id = null;
 				record.ZoneObj = existing;
-				record.Zone    = existing.Id;
+				record.Zone = existing.Id;
 			}
 		}
 

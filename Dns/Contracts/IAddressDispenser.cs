@@ -12,7 +12,7 @@ namespace Dns.Contracts;
 
 public interface IAddressDispenser : IHtmlDump
 {
-	string     HostName   { get; }
+	string HostName { get; }
 	ZoneRecord ZoneRecord { get; }
 
 	IEnumerable<IPAddress> GetAddresses();

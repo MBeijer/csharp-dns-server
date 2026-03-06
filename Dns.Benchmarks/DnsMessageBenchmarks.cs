@@ -1,4 +1,4 @@
-// //-------------------------------------------------------------------------------------------------
+﻿// //-------------------------------------------------------------------------------------------------
 // // <copyright file="DnsMessageBenchmarks.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -128,14 +128,14 @@ public class DnsMessageBenchmarks
 		_queryMessage = new()
 		{
 			QueryIdentifier = 0xFEED,
-			QR              = false,
-			Opcode          = (byte)OpCode.QUERY,
-			AA              = false,
-			TC              = false,
-			RD              = true,
-			RA              = false,
-			QuestionCount   = 1,
-			AnswerCount     = 0,
+			QR = false,
+			Opcode = (byte)OpCode.QUERY,
+			AA = false,
+			TC = false,
+			RD = true,
+			RA = false,
+			QuestionCount = 1,
+			AnswerCount = 0,
 			NameServerCount = 0,
 			AdditionalCount = 0,
 		};
@@ -145,14 +145,14 @@ public class DnsMessageBenchmarks
 		_responseMessage = new()
 		{
 			QueryIdentifier = 0xFEED,
-			QR              = true,
-			Opcode          = (byte)OpCode.QUERY,
-			AA              = true,
-			TC              = false,
-			RD              = true,
-			RA              = false,
-			QuestionCount   = 1,
-			AnswerCount     = 2,
+			QR = true,
+			Opcode = (byte)OpCode.QUERY,
+			AA = true,
+			TC = false,
+			RD = true,
+			RA = false,
+			QuestionCount = 1,
+			AnswerCount = 2,
 			NameServerCount = 0,
 			AdditionalCount = 0,
 		};
@@ -162,11 +162,11 @@ public class DnsMessageBenchmarks
 		_responseMessage.Answers.Add(
 			new()
 			{
-				Name       = "www.example.com",
-				Class      = ResourceClass.IN,
-				Type       = ResourceType.A,
-				TTL        = 300,
-				RData      = rdata1,
+				Name = "www.example.com",
+				Class = ResourceClass.IN,
+				Type = ResourceType.A,
+				TTL = 300,
+				RData = rdata1,
 				DataLength = rdata1.Length,
 			}
 		);
@@ -174,11 +174,11 @@ public class DnsMessageBenchmarks
 		_responseMessage.Answers.Add(
 			new()
 			{
-				Name       = "www.example.com",
-				Class      = ResourceClass.IN,
-				Type       = ResourceType.A,
-				TTL        = 300,
-				RData      = rdata2,
+				Name = "www.example.com",
+				Class = ResourceClass.IN,
+				Type = ResourceType.A,
+				TTL = 300,
+				RData = rdata2,
 				DataLength = rdata2.Length,
 			}
 		);

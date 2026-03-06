@@ -16,7 +16,7 @@ public class Question(string name, ResourceType type, ResourceClass pClass) : Ge
 {
 	[DynamicLengthString] public string Name { get; set; } = name;
 
-	public ResourceType  Type  { get; set; } = type;
+	public ResourceType Type { get; set; } = type;
 	public ResourceClass Class { get; set; } = pClass;
 
 	public void WriteToStream(Stream stream)

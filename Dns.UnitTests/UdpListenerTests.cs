@@ -67,8 +67,8 @@ public class UdpListenerTests
 
 		try
 		{
-			var captured   = new List<IPEndPoint>();
-			var gate       = new object();
+			var captured = new List<IPEndPoint>();
+			var gate = new object();
 			var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 			listener.OnRequest += (buffer, length, remote) =>

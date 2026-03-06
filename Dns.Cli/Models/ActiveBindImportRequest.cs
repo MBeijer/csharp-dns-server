@@ -1,4 +1,4 @@
-namespace Dns.Cli.Models;
+﻿namespace Dns.Cli.Models;
 
 /// <summary>
 ///     Options controlling the bulk import of active BIND zones into database-backed zones.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -21,8 +21,8 @@ public static class Program
 		get
 		{
 			var attribute = Assembly.GetExecutingAssembly()
-			                        .GetCustomAttributes<AssemblyMetadataAttribute>()
-			                        .FirstOrDefault(a => a.Key == "BuildTime");
+									.GetCustomAttributes<AssemblyMetadataAttribute>()
+									.FirstOrDefault(a => a.Key == "BuildTime");
 
 			return attribute != null && DateTime.TryParse(attribute.Value, out var date) ? date : default;
 		}
@@ -36,8 +36,8 @@ public static class Program
 		get
 		{
 			var attribute = Assembly.GetExecutingAssembly()
-			                        .GetCustomAttributes<AssemblyMetadataAttribute>()
-			                        .FirstOrDefault(a => a.Key == "BuildVersion");
+									.GetCustomAttributes<AssemblyMetadataAttribute>()
+									.FirstOrDefault(a => a.Key == "BuildVersion");
 
 			return attribute?.Value;
 		}
@@ -51,18 +51,18 @@ public static class Program
 
 	private static IHostBuilder CreateWebHostBuilder(string[] args) =>
 		Host.CreateDefaultBuilder(args)
-		    .ConfigureAppConfiguration(
-			    (_, config) =>
-			    {
-				    config.AddEnvironmentVariables();
-				    config.AddCommandLine(args);
-				    var tempConfig = config.Build();
-				    var customPath = tempConfig["appsettings"];
+			.ConfigureAppConfiguration(
+				(_, config) =>
+				{
+					config.AddEnvironmentVariables();
+					config.AddCommandLine(args);
+					var tempConfig = config.Build();
+					var customPath = tempConfig["appsettings"];
 
-				    if (!string.IsNullOrWhiteSpace(customPath))
-					    if (File.Exists(customPath))
-						    config.AddJsonFile(customPath, false, true);
-			    }
-		    )
-		    .ConfigureWebHostDefaults(webHost => webHost.UseStartup<Startup>());
+					if (!string.IsNullOrWhiteSpace(customPath))
+						if (File.Exists(customPath))
+							config.AddJsonFile(customPath, false, true);
+				}
+			)
+			.ConfigureWebHostDefaults(webHost => webHost.UseStartup<Startup>());
 }

@@ -7,9 +7,9 @@ namespace Dns.ZoneProvider.IPProbe;
 internal class Target
 {
 	internal readonly List<ProbeResult> Results = [];
-	internal          IPAddress         Address             { get; init; }
-	internal          Strategy.Probe    ProbeFunction       { get; init; }
-	internal          ushort            TimeoutMilliseconds { get; init; }
+	internal IPAddress Address { get; init; }
+	internal Strategy.Probe ProbeFunction { get; init; }
+	internal ushort TimeoutMilliseconds { get; init; }
 
 	internal bool IsAvailable
 	{

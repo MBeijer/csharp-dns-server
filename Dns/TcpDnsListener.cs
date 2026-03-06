@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Net;
@@ -12,10 +12,10 @@ public delegate Task<byte[]> OnTcpRequestHandler(byte[] buffer, int length, EndP
 
 public class TcpDnsListener
 {
-	private readonly Lock                    _syncRoot = new();
-	private          CancellationTokenSource _cts;
-	private          TcpListener             _listener;
-	private          Task                    _acceptLoopTask;
+	private readonly Lock _syncRoot = new();
+	private CancellationTokenSource _cts;
+	private TcpListener _listener;
+	private Task _acceptLoopTask;
 
 	public OnTcpRequestHandler OnRequest;
 
@@ -37,7 +37,7 @@ public class TcpDnsListener
 			if (_cts != null) throw new InvalidOperationException("TCP listener already started.");
 
 			_listener.Start();
-			_cts            = new();
+			_cts = new();
 			_acceptLoopTask = AcceptLoopAsync(_cts.Token);
 		}
 	}
@@ -45,15 +45,15 @@ public class TcpDnsListener
 	public void Stop()
 	{
 		CancellationTokenSource cts;
-		Task                    acceptLoop;
+		Task acceptLoop;
 
 		lock (_syncRoot)
 		{
 			if (_cts == null) return;
 
-			cts             = _cts;
-			acceptLoop      = _acceptLoopTask;
-			_cts            = null;
+			cts = _cts;
+			acceptLoop = _acceptLoopTask;
+			_cts = null;
 			_acceptLoopTask = null;
 		}
 

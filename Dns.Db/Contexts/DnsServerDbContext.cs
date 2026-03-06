@@ -1,4 +1,4 @@
-using Dns.Db.Models.EntityFramework;
+﻿using Dns.Db.Models.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -11,9 +11,9 @@ public sealed class DnsServerDbContext : DbContext
 	public DnsServerDbContext(DbContextOptions<DnsServerDbContext> options) : base(options) =>
 		ChangeTracker.LazyLoadingEnabled = false;
 
-	public DbSet<User>        Users       { get; set; }
-	public DbSet<Zone>        Zones       { get; set; }
-	public DbSet<ZoneRecord>  ZoneRecords { get; set; }
+	public DbSet<User> Users { get; set; }
+	public DbSet<Zone> Zones { get; set; }
+	public DbSet<ZoneRecord> ZoneRecords { get; set; }
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{
@@ -25,9 +25,9 @@ public sealed class DnsServerDbContext : DbContext
 	private static void CreateZoneModel(EntityTypeBuilder<Zone> modelBuilder)
 	{
 		modelBuilder.HasMany(b => b.Records)
-		            .WithOne(b => b.ZoneObj)
-		            .HasForeignKey(b => b.Zone)
-		            .OnDelete(DeleteBehavior.Cascade);
+					.WithOne(b => b.ZoneObj)
+					.HasForeignKey(b => b.Zone)
+					.OnDelete(DeleteBehavior.Cascade);
 		modelBuilder.HasIndex(b => b.Suffix).IsUnique();
 
 		modelBuilder.Navigation(b => b.Records).AutoInclude();
@@ -39,9 +39,9 @@ public sealed class DnsServerDbContext : DbContext
 		modelBuilder.HasIndex(b => b.Zone);
 
 		modelBuilder.HasOne(b => b.ZoneObj)
-		            .WithMany(u => u.Records)
-		            .HasForeignKey(b => b.Zone)
-		            .OnDelete(DeleteBehavior.Restrict);
+					.WithMany(u => u.Records)
+					.HasForeignKey(b => b.Zone)
+					.OnDelete(DeleteBehavior.Restrict);
 	}
 
 	private static void CreateUserModel(EntityTypeBuilder<User> modelBuilder)

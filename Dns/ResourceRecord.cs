@@ -14,12 +14,12 @@ namespace Dns;
 
 public class ResourceRecord
 {
-	public string        Name       { get; set; }
-	public uint          TTL        { get; set; }
-	public ResourceClass Class      { get; set; }
-	public ResourceType  Type       { get; set; }
-	public RData         RData      { get; set; }
-	public ushort        DataLength { get; set; }
+	public string Name { get; set; }
+	public uint TTL { get; set; }
+	public ResourceClass Class { get; set; }
+	public ResourceType Type { get; set; }
+	public RData RData { get; set; }
+	public ushort DataLength { get; set; }
 
 	/// <summary>Serialize resource to stream according to RFC1034 format</summary>
 	/// <param name="stream"></param>

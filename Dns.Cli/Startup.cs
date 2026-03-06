@@ -64,26 +64,26 @@ public class Startup(IConfiguration configuration)
 			}
 		);
 		services.AddOptions<ServerOptions>()
-		        .Configure<IConfiguration, IOptions<JsonSerializerOptions>>((opt, cfg, json) =>
-			        {
-				        var section = cfg.GetRequiredSection("server");
+				.Configure<IConfiguration, IOptions<JsonSerializerOptions>>((opt, cfg, json) =>
+					{
+						var section = cfg.GetRequiredSection("server");
 
-				        var element = section.ReadJsonElement();
+						var element = section.ReadJsonElement();
 
-				        var parsed = element.Deserialize<ServerOptions>(json.Value) ??
-				                     throw new InvalidOperationException("Failed to deserialize ServerOptions.");
+						var parsed = element.Deserialize<ServerOptions>(json.Value) ??
+									 throw new InvalidOperationException("Failed to deserialize ServerOptions.");
 
-				        opt.Zones       = parsed.Zones;
-				        opt.DnsListener = parsed.DnsListener;
-				        opt.ZoneTransfer = parsed.ZoneTransfer;
-				        opt.WebServer   = parsed.WebServer;
-			        }
-		        );
+						opt.Zones = parsed.Zones;
+						opt.DnsListener = parsed.DnsListener;
+						opt.ZoneTransfer = parsed.ZoneTransfer;
+						opt.WebServer = parsed.WebServer;
+					}
+				);
 
 		services.AddOptions<DatabaseSettings>().Bind(configuration.GetSection(nameof(DatabaseSettings)));
 
 		var databaseSettings = configuration.GetSection(nameof(DatabaseSettings)).Get<DatabaseSettings>() ??
-		                       throw new InvalidOperationException("Missing DatabaseSettings configuration.");
+							   throw new InvalidOperationException("Missing DatabaseSettings configuration.");
 
 		var appConfig = configuration.Get<AppConfig>();
 
@@ -122,29 +122,29 @@ public class Startup(IConfiguration configuration)
 			{
 				configure.AddSimpleConsole(options =>
 				{
-					options.IncludeScopes   = true;
-					options.SingleLine      = true;
+					options.IncludeScopes = true;
+					options.SingleLine = true;
 					options.TimestampFormat = "[hh:mm:ss] ";
-					options.ColorBehavior   = LoggerColorBehavior.Enabled;
+					options.ColorBehavior = LoggerColorBehavior.Enabled;
 				});
 			}
 		);
 
 		services.AddControllers(options =>
-			        {
-				        options.RespectBrowserAcceptHeader = true;
-				        options.EnableEndpointRouting      = false;
-			        }
-		        )
-		        .AddMvcOptions(
-			        o => o.OutputFormatters.Add(
-				        new XmlSerializerOutputFormatter(new XmlWriterSettings { Indent = true })
-			        )
-		        )
-		        .AddJsonOptions(
-			        options => options.JsonSerializerOptions.DefaultIgnoreCondition =
-				        JsonIgnoreCondition.WhenWritingNull
-		        );
+					{
+						options.RespectBrowserAcceptHeader = true;
+						options.EnableEndpointRouting = false;
+					}
+				)
+				.AddMvcOptions(
+					o => o.OutputFormatters.Add(
+						new XmlSerializerOutputFormatter(new XmlWriterSettings { Indent = true })
+					)
+				)
+				.AddJsonOptions(
+					options => options.JsonSerializerOptions.DefaultIgnoreCondition =
+						JsonIgnoreCondition.WhenWritingNull
+				);
 
 		services.AddSwaggerGen(
 			c =>
@@ -158,11 +158,11 @@ public class Startup(IConfiguration configuration)
 					new OpenApiSecurityScheme
 					{
 						BearerFormat = "JWT",
-						Name         = "Authorization",
-						In           = ParameterLocation.Header,
-						Type         = SecuritySchemeType.Http,
-						Scheme       = JwtBearerDefaults.AuthenticationScheme,
-						Description  = "Put **_ONLY_** your JWT Bearer token on textbox below!",
+						Name = "Authorization",
+						In = ParameterLocation.Header,
+						Type = SecuritySchemeType.Http,
+						Scheme = JwtBearerDefaults.AuthenticationScheme,
+						Description = "Put **_ONLY_** your JWT Bearer token on textbox below!",
 					}
 				);
 
@@ -173,21 +173,21 @@ public class Startup(IConfiguration configuration)
 		services.AddHttpContextAccessor();
 
 		services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-		        .AddJwtBearer(
-			        options =>
-			        {
-				        options.TokenValidationParameters = new()
-				        {
-					        ValidateIssuerSigningKey = true,
-					        IssuerSigningKey =
-						        new SymmetricSecurityKey(
-							        Encoding.ASCII.GetBytes(appConfig!.Server.WebServer.JwtSecretKey)
-						        ),
-					        ValidateIssuer   = false,
-					        ValidateAudience = false,
-				        };
-			        }
-		        );
+				.AddJwtBearer(
+					options =>
+					{
+						options.TokenValidationParameters = new()
+						{
+							ValidateIssuerSigningKey = true,
+							IssuerSigningKey =
+								new SymmetricSecurityKey(
+									Encoding.ASCII.GetBytes(appConfig!.Server.WebServer.JwtSecretKey)
+								),
+							ValidateIssuer = false,
+							ValidateAudience = false,
+						};
+					}
+				);
 		services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 		services.AddSingleton<IJwtTokenHandler, JwtTokenHandler>();

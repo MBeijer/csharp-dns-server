@@ -1,4 +1,4 @@
-// //-------------------------------------------------------------------------------------------------
+﻿// //-------------------------------------------------------------------------------------------------
 // // <copyright file="BufferPool.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -18,64 +18,64 @@ namespace Dns;
 /// </summary>
 public static class BufferPool
 {
-    /// <summary>
-    ///     Default buffer size for DNS messages. Standard DNS is 512 bytes,
-    ///     but EDNS(0) extends this to 4096 bytes. We use 4096 to be future-proof.
-    /// </summary>
-    public const int DefaultBufferSize = 4096;
+	/// <summary>
+	///     Default buffer size for DNS messages. Standard DNS is 512 bytes,
+	///     but EDNS(0) extends this to 4096 bytes. We use 4096 to be future-proof.
+	/// </summary>
+	public const int DefaultBufferSize = 4096;
 
-    /// <summary>
-    ///     Maximum number of SocketAsyncEventArgs to keep pooled.
-    /// </summary>
-    private const int MaxPooledSocketArgs = 64;
+	/// <summary>
+	///     Maximum number of SocketAsyncEventArgs to keep pooled.
+	/// </summary>
+	private const int MaxPooledSocketArgs = 64;
 
-    /// <summary>
-    ///     Shared memory pool for byte buffers.
-    ///     Uses ArrayPool under the hood with efficient bucket sizes.
-    /// </summary>
-    private static readonly MemoryPool<byte> s_memoryPool = MemoryPool<byte>.Shared;
+	/// <summary>
+	///     Shared memory pool for byte buffers.
+	///     Uses ArrayPool under the hood with efficient bucket sizes.
+	/// </summary>
+	private static readonly MemoryPool<byte> s_memoryPool = MemoryPool<byte>.Shared;
 
-    /// <summary>
-    ///     Pool of reusable SocketAsyncEventArgs for send operations.
-    /// </summary>
-    private static readonly ConcurrentBag<SocketAsyncEventArgs> s_socketArgsPool = new();
+	/// <summary>
+	///     Pool of reusable SocketAsyncEventArgs for send operations.
+	/// </summary>
+	private static readonly ConcurrentBag<SocketAsyncEventArgs> s_socketArgsPool = new();
 
-    /// <summary>
-    ///     Pool of reusable MemoryStream objects for response serialization.
-    /// </summary>
-    private static readonly ConcurrentBag<PooledMemoryStream> s_streamPool = new();
+	/// <summary>
+	///     Pool of reusable MemoryStream objects for response serialization.
+	/// </summary>
+	private static readonly ConcurrentBag<PooledMemoryStream> s_streamPool = new();
 
-    /// <summary>
-    ///     Rents a buffer from the pool. The buffer may be larger than requested.
-    ///     Caller must dispose the returned IMemoryOwner when done.
-    /// </summary>
-    /// <param name="minBufferSize">Minimum buffer size needed.</param>
-    /// <returns>A memory owner that must be disposed to return the buffer.</returns>
-    public static IMemoryOwner<byte> RentBuffer(int minBufferSize = DefaultBufferSize) =>
+	/// <summary>
+	///     Rents a buffer from the pool. The buffer may be larger than requested.
+	///     Caller must dispose the returned IMemoryOwner when done.
+	/// </summary>
+	/// <param name="minBufferSize">Minimum buffer size needed.</param>
+	/// <returns>A memory owner that must be disposed to return the buffer.</returns>
+	public static IMemoryOwner<byte> RentBuffer(int minBufferSize = DefaultBufferSize) =>
 		s_memoryPool.Rent(minBufferSize);
 
-    /// <summary>
-    ///     Gets a SocketAsyncEventArgs from the pool or creates a new one.
-    /// </summary>
-    /// <returns>A SocketAsyncEventArgs ready for use.</returns>
-    public static SocketAsyncEventArgs RentSocketAsyncEventArgs()
+	/// <summary>
+	///     Gets a SocketAsyncEventArgs from the pool or creates a new one.
+	/// </summary>
+	/// <returns>A SocketAsyncEventArgs ready for use.</returns>
+	public static SocketAsyncEventArgs RentSocketAsyncEventArgs()
 	{
 		if (s_socketArgsPool.TryTake(out var args)) return args;
 		return new();
 	}
 
-    /// <summary>
-    ///     Returns a SocketAsyncEventArgs to the pool for reuse.
-    /// </summary>
-    /// <param name="args">The args to return.</param>
-    public static void ReturnSocketAsyncEventArgs(SocketAsyncEventArgs args)
+	/// <summary>
+	///     Returns a SocketAsyncEventArgs to the pool for reuse.
+	/// </summary>
+	/// <param name="args">The args to return.</param>
+	public static void ReturnSocketAsyncEventArgs(SocketAsyncEventArgs args)
 	{
 		if (args == null) return;
 
 		// Clear state for reuse
 		args.SetBuffer(null, 0, 0);
 		args.RemoteEndPoint = null;
-		args.UserToken      = null;
+		args.UserToken = null;
 
 		// Only pool if we haven't exceeded our limit
 		if (s_socketArgsPool.Count < MaxPooledSocketArgs)
@@ -84,13 +84,13 @@ public static class BufferPool
 			args.Dispose();
 	}
 
-    /// <summary>
-    ///     Gets a MemoryStream from the pool or creates a new one.
-    ///     The stream is reset to position 0 and ready for writing.
-    /// </summary>
-    /// <param name="capacity">Initial capacity hint.</param>
-    /// <returns>A pooled memory stream that should be disposed when done.</returns>
-    public static PooledMemoryStream RentMemoryStream(int capacity = DefaultBufferSize)
+	/// <summary>
+	///     Gets a MemoryStream from the pool or creates a new one.
+	///     The stream is reset to position 0 and ready for writing.
+	/// </summary>
+	/// <param name="capacity">Initial capacity hint.</param>
+	/// <returns>A pooled memory stream that should be disposed when done.</returns>
+	public static PooledMemoryStream RentMemoryStream(int capacity = DefaultBufferSize)
 	{
 		if (s_streamPool.TryTake(out var stream))
 		{
@@ -102,11 +102,11 @@ public static class BufferPool
 		return new(capacity);
 	}
 
-    /// <summary>
-    ///     Returns a PooledMemoryStream to the pool.
-    ///     Called automatically by PooledMemoryStream.Dispose().
-    /// </summary>
-    internal static void ReturnMemoryStream(PooledMemoryStream stream)
+	/// <summary>
+	///     Returns a PooledMemoryStream to the pool.
+	///     Called automatically by PooledMemoryStream.Dispose().
+	/// </summary>
+	internal static void ReturnMemoryStream(PooledMemoryStream stream)
 	{
 		if (stream == null) return;
 
@@ -140,9 +140,9 @@ public class PooledMemoryStream : MemoryStream
 		base.Dispose(disposing);
 	}
 
-    /// <summary>
-    ///     Gets the underlying buffer without creating a copy.
-    ///     Only valid bytes are from 0 to Position.
-    /// </summary>
-    public ArraySegment<byte> GetBufferSegment() => new(GetBuffer(), 0, (int)Position);
+	/// <summary>
+	///     Gets the underlying buffer without creating a copy.
+	///     Only valid bytes are from 0 to Position.
+	/// </summary>
+	public ArraySegment<byte> GetBufferSegment() => new(GetBuffer(), 0, (int)Position);
 }

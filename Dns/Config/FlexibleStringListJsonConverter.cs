@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -15,30 +15,30 @@ public sealed class FlexibleStringListJsonConverter : JsonConverter<List<string>
 			case JsonTokenType.Null:
 				return [];
 			case JsonTokenType.String:
-			{
-				var value = reader.GetString();
-				if (string.IsNullOrWhiteSpace(value)) return [];
-
-				return value.Split(',', StringSplitOptions.RemoveEmptyEntries)
-				            .Select(item => item.Trim())
-				            .Where(item => item.Length > 0)
-				            .ToList();
-			}
-			case JsonTokenType.StartArray:
-			{
-				var items = new List<string>();
-				while (reader.Read())
 				{
-					if (reader.TokenType == JsonTokenType.EndArray) return items;
-					if (reader.TokenType != JsonTokenType.String)
-						throw new JsonException("Expected only string elements in array.");
-
 					var value = reader.GetString();
-					if (!string.IsNullOrWhiteSpace(value)) items.Add(value.Trim());
-				}
+					if (string.IsNullOrWhiteSpace(value)) return [];
 
-				throw new JsonException("Unterminated array while reading string list.");
-			}
+					return value.Split(',', StringSplitOptions.RemoveEmptyEntries)
+								.Select(item => item.Trim())
+								.Where(item => item.Length > 0)
+								.ToList();
+				}
+			case JsonTokenType.StartArray:
+				{
+					var items = new List<string>();
+					while (reader.Read())
+					{
+						if (reader.TokenType == JsonTokenType.EndArray) return items;
+						if (reader.TokenType != JsonTokenType.String)
+							throw new JsonException("Expected only string elements in array.");
+
+						var value = reader.GetString();
+						if (!string.IsNullOrWhiteSpace(value)) items.Add(value.Trim());
+					}
+
+					throw new JsonException("Unterminated array while reading string list.");
+				}
 			default:
 				throw new JsonException("Expected string, string array, or null for list value.");
 		}

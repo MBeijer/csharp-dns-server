@@ -1,4 +1,4 @@
-// // //------------------------------------------------------------------------------------------------- 
+﻿// // //------------------------------------------------------------------------------------------------- 
 // // // <copyright file="BitPacker.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
@@ -17,8 +17,8 @@ public class BitPacker
 	}
 
 	private readonly byte[] _buffer;
-	private readonly int[]  _mask = [1, 2, 4, 8, 16, 32, 64, 128];
-	private          int    _bitOffset;
+	private readonly int[] _mask = [1, 2, 4, 8, 16, 32, 64, 128];
+	private int _bitOffset;
 
 	public BitPacker(byte[] buffer) => _buffer = buffer;
 
@@ -36,7 +36,7 @@ public class BitPacker
 
 		var span = BitConverter.ToUInt16(_buffer, byteNumber);
 
-		var mask  = GetMask(count, bitOffset);
+		var mask = GetMask(count, bitOffset);
 		var value = (span & mask) >> bitOffset;
 
 		_bitOffset += count;
@@ -66,7 +66,7 @@ public class BitPacker
 			span = BitConverter.ToUInt32(copy, byteNumber);
 		}
 
-		var mask  = GetMask(count, bitOffset);
+		var mask = GetMask(count, bitOffset);
 		var value = (ushort)((span & mask) >> bitOffset);
 
 		if (endian == Endian.HiLo) SwapEndian(ref value);
@@ -77,7 +77,7 @@ public class BitPacker
 
 	private static int GetMask(int count, ushort bitOffset)
 	{
-		var mask                                                             = 0;
+		var mask = 0;
 		for (int index = bitOffset; index < bitOffset + count; index++) mask += (int)Math.Pow(2, index);
 		return mask;
 	}
@@ -101,7 +101,7 @@ public class BitPacker
 
 	private void GenerateInitialOffset(out int index, out ushort offset)
 	{
-		index  = _bitOffset == 0 ? 0 : _bitOffset / 8;
+		index = _bitOffset == 0 ? 0 : _bitOffset / 8;
 		offset = (ushort)(_bitOffset - index * 8);
 	}
 

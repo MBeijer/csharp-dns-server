@@ -1,13 +1,15 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS setup
 WORKDIR /src
 COPY ["Dns/Dns.csproj", "Dns/"]
 COPY ["Dns.Cli/Dns.Cli.csproj", "Dns.Cli/"]
 COPY ["Dns.Db/Dns.Db.csproj", "Dns.Db/"]
 RUN dotnet restore "Dns.Cli/Dns.Cli.csproj"
 COPY . .
+
+FROM setup AS build
 WORKDIR "/src/Dns.Cli"
 RUN dotnet build "Dns.Cli.csproj" -c Release -o /app/build
 

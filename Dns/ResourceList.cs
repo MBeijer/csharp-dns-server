@@ -34,17 +34,17 @@ public class ResourceList : List<ResourceRecord>
 
 			// Phase 5: Use BinaryPrimitives for zero-allocation reads
 			var span = bytes.AsSpan(currentOffset);
-			resourceRecord.Type =  (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
-			currentOffset       += sizeof(ushort);
+			resourceRecord.Type = (ResourceType)BinaryPrimitives.ReadUInt16BigEndian(span);
+			currentOffset += sizeof(ushort);
 
-			resourceRecord.Class =  (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
-			currentOffset        += sizeof(ushort);
+			resourceRecord.Class = (ResourceClass)BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
+			currentOffset += sizeof(ushort);
 
-			resourceRecord.TTL =  BinaryPrimitives.ReadUInt32BigEndian(span[4..]);
-			currentOffset      += sizeof(uint);
+			resourceRecord.TTL = BinaryPrimitives.ReadUInt32BigEndian(span[4..]);
+			currentOffset += sizeof(uint);
 
-			resourceRecord.DataLength =  BinaryPrimitives.ReadUInt16BigEndian(span[8..]);
-			currentOffset             += sizeof(ushort);
+			resourceRecord.DataLength = BinaryPrimitives.ReadUInt16BigEndian(span[8..]);
+			currentOffset += sizeof(ushort);
 
 			if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
 				resourceRecord.RData = ANameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
@@ -52,11 +52,11 @@ public class ResourceList : List<ResourceRecord>
 				resourceRecord.RData = resourceRecord.Type switch
 				{
 					ResourceType.CNAME => CNameRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
-					ResourceType.MX    => MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
-					ResourceType.SOA   => SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength),
-					ResourceType.NS    => NSRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
-					ResourceType.TXT  => TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
-					_                  => GenericRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.MX => MXRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.SOA => SOARData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.NS => NSRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					ResourceType.TXT => TXTRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
+					_ => GenericRData.Parse(bytes, currentOffset, resourceRecord.DataLength),
 				};
 
 			// move past resource data record

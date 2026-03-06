@@ -1,4 +1,4 @@
-// //-------------------------------------------------------------------------------------------------
+﻿// //-------------------------------------------------------------------------------------------------
 // // <copyright file="DnsLookupKey.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -19,18 +19,18 @@ namespace Dns;
 /// </remarks>
 public readonly struct DnsRequestKey : IEquatable<DnsRequestKey>
 {
-	public readonly  ushort        QueryId;
-	public readonly  ResourceClass Class;
-	public readonly  ResourceType  Type;
-	public readonly  string        Name;
-	private readonly int           _hashCode;
+	public readonly ushort QueryId;
+	public readonly ResourceClass Class;
+	public readonly ResourceType Type;
+	public readonly string Name;
+	private readonly int _hashCode;
 
 	public DnsRequestKey(ushort queryId, ResourceClass resClass, ResourceType resType, string name)
 	{
 		QueryId = queryId;
-		Class   = resClass;
-		Type    = resType;
-		Name    = name ?? string.Empty;
+		Class = resClass;
+		Type = resType;
+		Name = name ?? string.Empty;
 		// Precompute hash for fast dictionary lookups
 		_hashCode = HashCode.Combine(QueryId, Class, Type, StringComparer.OrdinalIgnoreCase.GetHashCode(Name));
 	}
@@ -70,16 +70,16 @@ public readonly struct DnsRequestKey : IEquatable<DnsRequestKey>
 /// </remarks>
 public readonly struct DnsZoneLookupKey : IEquatable<DnsZoneLookupKey>
 {
-	public readonly  ResourceClass Class;
-	public readonly  ResourceType  Type;
-	public readonly  string        Host;
-	private readonly int           _hashCode;
+	public readonly ResourceClass Class;
+	public readonly ResourceType Type;
+	public readonly string Host;
+	private readonly int _hashCode;
 
 	public DnsZoneLookupKey(string host, ResourceClass resClass, ResourceType resType)
 	{
-		Host  = host ?? string.Empty;
+		Host = host ?? string.Empty;
 		Class = resClass;
-		Type  = resType;
+		Type = resType;
 		// Precompute hash for fast dictionary lookups (case-insensitive for DNS)
 		_hashCode = HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(Host), Class, Type);
 	}

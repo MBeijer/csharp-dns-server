@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
@@ -20,11 +20,11 @@ public sealed class AuthorizeOnlyOperationFilter : IOperationFilter
 	{
 		// Policy names map to scopes
 		var requiredScopes = context.MethodInfo
-		                            .GetCustomAttributes(true)
-		                            .OfType<AuthorizeAttribute>()
-		                            .Select(attribute => attribute.Policy!)
-		                            .Distinct()
-		                            .ToList();
+									.GetCustomAttributes(true)
+									.OfType<AuthorizeAttribute>()
+									.Select(attribute => attribute.Policy!)
+									.Distinct()
+									.ToList();
 
 		if (requiredScopes.Count > 0)
 		{

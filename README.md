@@ -98,7 +98,8 @@ The provider reads the file whenever it changes (a 10-second settlement window a
       "notifySecondaries": [
         "192.0.2.20:53"
       ],
-      "notifyPollIntervalSeconds": 5
+      "notifyPollIntervalSeconds": 5,
+      "injectedNsAddress": "192.0.2.53"
     }
   }
 }
@@ -106,6 +107,7 @@ The provider reads the file whenever it changes (a 10-second settlement window a
 
 - `allowTransfersFrom`: required ACL for incoming AXFR/IXFR requests.
 - `notifySecondaries`: optional list of `ip[:port]` targets that receive outbound DNS NOTIFY whenever a zone serial changes.
+- `injectedNsAddress`: optional fallback address/target used only when the server auto-injects an apex NS for AXFR validity; IPv4 -> `A`, IPv6 -> `AAAA`, hostname -> `CNAME`.
 - UDP AXFR/IXFR requests are refused by design; use TCP transport.
 
 ### Import BIND Zone Into Database Zone

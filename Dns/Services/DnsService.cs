@@ -25,15 +25,15 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 {
 	private sealed class ProviderRuntime(ZoneOptions zoneOptions, IZoneProvider provider)
 	{
-		public ZoneOptions  ZoneOptions { get; } = zoneOptions;
-		public IZoneProvider Provider    { get; } = provider;
+		public ZoneOptions ZoneOptions { get; } = zoneOptions;
+		public IZoneProvider Provider { get; } = provider;
 	}
 
-	private static readonly Lock                    RuntimeSyncRoot = new();
-	private static readonly List<IDnsResolver>      ZoneResolvers = [];
-	private static readonly List<ProviderRuntime>   ActiveProviders = [];
-	public                  bool                    Running { get; set; } = true;
-	private                 CancellationTokenSource Cts     { get; set; }
+	private static readonly Lock RuntimeSyncRoot = new();
+	private static readonly List<IDnsResolver> ZoneResolvers = [];
+	private static readonly List<ProviderRuntime> ActiveProviders = [];
+	public bool Running { get; set; } = true;
+	private CancellationTokenSource Cts { get; set; }
 
 	public List<IDnsResolver> Resolvers => ZoneResolvers;
 
@@ -81,37 +81,37 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 		lock (RuntimeSyncRoot)
 		{
 			activeBindProviders = ActiveProviders
-			                      .Where(runtime => runtime.Provider is BindZoneProvider)
-			                      .ToList();
+								  .Where(runtime => runtime.Provider is BindZoneProvider)
+								  .ToList();
 		}
 
 		var result = new BindZoneImportBatchResult();
 
-		using var scope          = services.CreateScope();
-		var       zoneRepository = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
+		using var scope = services.CreateScope();
+		var zoneRepository = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
 
 		foreach (var runtime in activeBindProviders)
 		{
 			var item = new BindZoneImportBatchItem
 			{
 				ZoneSuffix = runtime.ZoneOptions.Name ?? string.Empty,
-				FileName   = (runtime.ZoneOptions.ProviderSettings as FileWatcherZoneProviderSettings)?.FileName ?? string.Empty,
+				FileName = (runtime.ZoneOptions.ProviderSettings as FileWatcherZoneProviderSettings)?.FileName ?? string.Empty,
 			};
 
 			try
 			{
 				if (runtime.ZoneOptions.ProviderSettings is not FileWatcherZoneProviderSettings fileSettings ||
-				    string.IsNullOrWhiteSpace(fileSettings.FileName))
+					string.IsNullOrWhiteSpace(fileSettings.FileName))
 					throw new InvalidOperationException("BIND provider is missing file watcher settings.");
 
 				var bindFilePath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(fileSettings.FileName));
-				var parsedZone   = BindZoneProvider.ParseZoneFile(bindFilePath, runtime.ZoneOptions.Name);
-				var dbZone     = BindZoneImportMapper.ToDbZone(parsedZone, runtime.ZoneOptions.Name, enableImportedZones);
-				var upserted   = await zoneRepository.UpsertZone(dbZone, replaceExistingRecords).ConfigureAwait(false);
+				var parsedZone = BindZoneProvider.ParseZoneFile(bindFilePath, runtime.ZoneOptions.Name);
+				var dbZone = BindZoneImportMapper.ToDbZone(parsedZone, runtime.ZoneOptions.Name, enableImportedZones);
+				var upserted = await zoneRepository.UpsertZone(dbZone, replaceExistingRecords).ConfigureAwait(false);
 
-				item.Imported   = true;
-				item.ZoneId     = upserted.Id;
-				item.Serial     = upserted.Serial;
+				item.Imported = true;
+				item.ZoneId = upserted.Id;
+				item.Serial = upserted.Serial;
 				item.RecordCount = upserted.Records?.Count ?? dbZone.Records?.Count ?? 0;
 				result.ImportedCount++;
 
@@ -140,7 +140,7 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 
 	private static Type ByName(string name) =>
 		AppDomain.CurrentDomain.GetAssemblies()
-		         .Reverse()
-		         .Select(assembly => assembly.GetType(name))
-		         .FirstOrDefault(tt => tt != null);
+				 .Reverse()
+				 .Select(assembly => assembly.GetType(name))
+				 .FirstOrDefault(tt => tt != null);
 }

@@ -33,7 +33,7 @@ def killall_jobs() {
 	}
 
 	if (killnums != "") {
-		slackSend color: "danger", channel: "#jenkins", message: "Killing task(s) ${fixed_job_name} ${killnums} in favor of #${buildnum}, ignore following failed builds for ${killnums}"
+		notify("Killing task(s) ${fixed_job_name} ${killnums} in favor of #${buildnum}, ignore following failed builds for ${killnums}");
 	}
 	echo "Done killing"
 }
@@ -64,6 +64,45 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 				customImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}", "--build-arg BUILDENV=${buildenv} --network=host --pull -f ${DOCKERFILE} .");
 			}
 
+			stage("Testing ${DOCKERIMAGE}:${tag}...") {
+            	def testImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}", "--build-arg BUILDENV=${buildenv} --network=host --pull --target setup -f ${DOCKERFILE} .");
+            	testImage.inside("-u 0") {
+					try{
+						sh("dotnet test --logger \"trx;LogFileName=../../Testing/unit_tests.xml\"");
+						sh("dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=opencover");
+						sh("chmod 777 -R .");
+					} catch(err) {
+						currentBuild.result = 'FAILURE'
+						sh("chmod 777 -R .");
+						notify('Testing failed')
+					}
+
+					archiveArtifacts (
+						artifacts: 'Testing/**.xml',
+						fingerprint: true
+					)
+
+					stage("Xunit") {
+						xunit (
+							testTimeMargin: '3000',
+							thresholdMode: 1,
+							thresholds: [
+								skipped(failureThreshold: '1000'),
+								failed(failureThreshold: '0')
+							],
+							tools: [MSTest(
+								pattern: 'Testing/**.xml',
+								deleteOutputFiles: true,
+								failIfNotNew: false,
+								skipNoTestFiles: true,
+								stopProcessingIfError: true
+							)],
+							skipPublishingChecks: false
+						);
+					}
+            	}
+            }
+
 			if (publish) {
 				stage("Pushing to docker hub registry...") {
 					customImage.push();
@@ -75,7 +114,6 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 			build "${BUILD_NEXT}/${env.BRANCH_NAME}";
 		}
 	} catch(err) {
-		slackSend color: "danger", channel: "#jenkins", message: "Build Failed: ${fixed_job_name} #${env.BUILD_NUMBER} Target: ${DOCKER_ROOT}/${DOCKERIMAGE}:${tag} (<${env.BUILD_URL}|Open>)"
 		currentBuild.result = 'FAILURE'
 		notify("Build Failed: ${fixed_job_name} #${env.BUILD_NUMBER} Target: ${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}")
 		throw err
@@ -85,7 +123,6 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 node('master') {
 	killall_jobs();
 	def fixed_job_name = env.JOB_NAME.replace('%2F','/');
-	slackSend color: "good", channel: "#jenkins", message: "Build Started: ${fixed_job_name} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)";
 
 	checkout scm;
 

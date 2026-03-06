@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Dns.Config;
@@ -18,4 +18,7 @@ public class ZoneTransferOptions
 
 	[JsonPropertyName("notifyPollIntervalSeconds")]
 	public int NotifyPollIntervalSeconds { get; set; } = 5;
+
+	[JsonPropertyName("injectedNsAddress")]
+	public string InjectedNsAddress { get; set; }
 }

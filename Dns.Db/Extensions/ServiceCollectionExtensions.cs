@@ -1,4 +1,4 @@
-using Dns.Db.Configuration;
+﻿using Dns.Db.Configuration;
 using Dns.Db.Contexts;
 using Dns.Db.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +14,9 @@ public static class ServiceCollectionExtensions
 	)
 	{
 		services.AddDbContext<DnsServerDbContext>(options => options.UseSqlite(
-			                                          databaseSettings.SQLiteDefault,
-			                                          b => b.MigrationsAssembly("Dns.Cli")
-		                                          )
+													  databaseSettings.SQLiteDefault,
+													  b => b.MigrationsAssembly("Dns.Cli")
+												  )
 		);
 
 		services.AddScoped<IUserRepository, UserRepository>();

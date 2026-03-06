@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 
 namespace Dns.Extensions;
@@ -9,8 +9,8 @@ public static class StringExtensions
 	{
 		str ??= "";
 
-		using var stream   = new MemoryStream(str.Length + 2);
-		var       segments = str.Split(delimiter);
+		using var stream = new MemoryStream(str.Length + 2);
+		var segments = str.Split(delimiter);
 		foreach (var segment in segments)
 		{
 			stream.WriteByte((byte)segment.Length);

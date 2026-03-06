@@ -79,7 +79,7 @@ public class DnsProtocolTest
 			0x01,
 			0x00,
 			0x01,
-        };
+		};
 		Assert.True(DnsMessage.TryParse(sampleQuery, out var query));
 		query.Dump();
 	}
@@ -145,7 +145,7 @@ public class DnsProtocolTest
 			0x1C,
 			0x00,
 			0x01,
-        };
+		};
 		Assert.True(DnsMessage.TryParse(sampleQuery, out var query));
 
 		// Header Checks
@@ -444,7 +444,7 @@ public class DnsProtocolTest
 			0xC2,
 			0x21,
 			0x23,
-        };
+		};
 		Assert.True(DnsMessage.TryParse(sampleQuery, out var query));
 		query.Dump();
 	}
@@ -542,7 +542,7 @@ public class DnsProtocolTest
 			0xFD,
 			0x0D,
 			0x8C,
-        };
+		};
 
 		//Act
 		var result = DnsMessage.TryParse(sampleQuery, out var query);
@@ -679,7 +679,7 @@ public class DnsProtocolTest
 			0x6D,
 			0x49,
 			0x51,
-        };
+		};
 		Assert.True(DnsMessage.TryParse(sampleQuery, out var query));
 
 		// Header Checks
@@ -772,7 +772,7 @@ public class DnsProtocolTest
 			0x1C,
 			0x00,
 			0x01,
-        };
+		};
 		Assert.True(DnsMessage.TryParse(sampleQuery, out var query));
 
 		// Header Checks
@@ -807,11 +807,11 @@ public class DnsProtocolTest
 	[Fact(Skip = "Will fix later")]
 	public void SerializerTest()
 	{
-		var       question = new Question("www.msn.com", pClass: ResourceClass.IN, type: ResourceType.A);
-		using var stream   = new MemoryStream();
+		var question = new Question("www.msn.com", pClass: ResourceClass.IN, type: ResourceType.A);
+		using var stream = new MemoryStream();
 		question.WriteToStream(stream);
 
-		var streamBuffer     = stream.GetBuffer();
+		var streamBuffer = stream.GetBuffer();
 		var serializerBuffer = question.Serialize().Buffer.ToArray();
 
 
@@ -825,22 +825,22 @@ public class DnsProtocolTest
 		//Arrange
 		var message = new DnsMessage
 		{
-			QueryIdentifier    = 0xFEED,
-			QR                 = false,
-			Opcode             = (byte)OpCode.QUERY,
-			AA                 = false,
-			TC                 = false,
-			RD                 = true,
-			RA                 = false,
-			Zero               = false,
+			QueryIdentifier = 0xFEED,
+			QR = false,
+			Opcode = (byte)OpCode.QUERY,
+			AA = false,
+			TC = false,
+			RD = true,
+			RA = false,
+			Zero = false,
 			AuthenticatingData = false,
-			CheckingDisabled   = false,
-			RCode              = 0x0000,
-			QuestionCount      = 1,
-			AnswerCount        = 0,
-			NameServerCount    = 0,
-			AdditionalCount    = 0,
-			Questions          = [new("www.msn.com", ResourceType.A, ResourceClass.IN)],
+			CheckingDisabled = false,
+			RCode = 0x0000,
+			QuestionCount = 1,
+			AnswerCount = 0,
+			NameServerCount = 0,
+			AdditionalCount = 0,
+			Questions = [new("www.msn.com", ResourceType.A, ResourceClass.IN)],
 		};
 
 		using var stream = new MemoryStream();
@@ -881,45 +881,45 @@ public class DnsProtocolTest
 	{
 		var message = new DnsMessage
 		{
-			QueryIdentifier    = 0xFEED,
-			QR                 = false,
-			Opcode             = (byte)OpCode.QUERY,
-			AA                 = false,
-			TC                 = false,
-			RD                 = true,
-			RA                 = false,
-			Zero               = false,
+			QueryIdentifier = 0xFEED,
+			QR = false,
+			Opcode = (byte)OpCode.QUERY,
+			AA = false,
+			TC = false,
+			RD = true,
+			RA = false,
+			Zero = false,
 			AuthenticatingData = false,
-			CheckingDisabled   = false,
-			RCode              = 0x0000,
-			QuestionCount      = 1,
-			AnswerCount        = 2,
-			NameServerCount    = 0,
-			AdditionalCount    = 0,
-			Questions          = [new("www.msn.com", ResourceType.A, ResourceClass.IN)],
+			CheckingDisabled = false,
+			RCode = 0x0000,
+			QuestionCount = 1,
+			AnswerCount = 2,
+			NameServerCount = 0,
+			AdditionalCount = 0,
+			Questions = [new("www.msn.com", ResourceType.A, ResourceClass.IN)],
 		};
 		message.Answers.Add(
 			new()
 			{
-				Name       = "8.8.8.8",
-				Class      = ResourceClass.IN,
-				Type       = ResourceType.NS,
-				TTL        = 468,
+				Name = "8.8.8.8",
+				Class = ResourceClass.IN,
+				Type = ResourceType.NS,
+				TTL = 468,
 				DataLength = 0,
-				RData      = null,
-            }
+				RData = null,
+			}
 		);
 		var data = new ANameRData { Address = IPAddress.Parse("8.8.8.9") };
 		message.Answers.Add(
 			new()
 			{
-				Name       = "8.8.8.9",
-				Class      = ResourceClass.IN,
-				Type       = ResourceType.NS,
-				TTL        = 468,
-				RData      = data,
+				Name = "8.8.8.9",
+				Class = ResourceClass.IN,
+				Type = ResourceType.NS,
+				TTL = 468,
+				RData = data,
 				DataLength = data.Length,
-            }
+			}
 		);
 
 		DnsMessage outMessage;

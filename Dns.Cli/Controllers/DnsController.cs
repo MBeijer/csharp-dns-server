@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Dns.Cli.Models;
@@ -110,10 +110,10 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 
 		var payload = new
 		{
-			id          = upserted.Id,
-			suffix      = upserted.Suffix,
-			serial      = upserted.Serial,
-			enabled     = upserted.Enabled,
+			id = upserted.Id,
+			suffix = upserted.Suffix,
+			serial = upserted.Serial,
+			enabled = upserted.Enabled,
 			recordCount = upserted.Records?.Count ?? dbZone.Records?.Count ?? 0,
 		};
 
@@ -135,10 +135,10 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	{
 		var options = request ?? new();
 		var result = await dnsService.ImportActiveBindZonesToDatabaseAndDisableAsync(
-			                       options.ReplaceExistingRecords,
-			                       options.EnableImportedZones
-		                       )
-		                       .ConfigureAwait(false);
+								   options.ReplaceExistingRecords,
+								   options.EnableImportedZones
+							   )
+							   .ConfigureAwait(false);
 
 		return Ok(result);
 	}

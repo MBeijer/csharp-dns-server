@@ -17,27 +17,27 @@ internal static class TestProjectPaths
 		TargetFramework = tfmDirectory.Name;
 
 		var configurationDirectory = tfmDirectory.Parent ??
-		                             throw new InvalidOperationException(
-			                             "Unable to determine configuration directory for the test assembly output."
-		                             );
+									 throw new InvalidOperationException(
+										 "Unable to determine configuration directory for the test assembly output."
+									 );
 		Configuration = configurationDirectory.Name;
 
 		var binDirectory = configurationDirectory.Parent ??
-		                   throw new InvalidOperationException(
-			                   "Unable to determine bin directory for the test assembly output."
-		                   );
+						   throw new InvalidOperationException(
+							   "Unable to determine bin directory for the test assembly output."
+						   );
 		var projectDirectory = binDirectory.Parent ??
-		                       throw new InvalidOperationException("Unable to determine test project directory.");
+							   throw new InvalidOperationException("Unable to determine test project directory.");
 		TestProjectDirectory = projectDirectory.FullName;
 
 		var solutionDirectory = projectDirectory.Parent ??
-		                        throw new InvalidOperationException("Unable to determine solution root.");
+								throw new InvalidOperationException("Unable to determine solution root.");
 		SolutionRoot = solutionDirectory.FullName;
 
 		TestDataDirectory = Path.Combine(TestProjectDirectory, "TestData");
 
 		DnsCliOutputDirectory = Path.Combine(SolutionRoot, "Dns.Cli", "bin", Configuration, TargetFramework);
-		DnsCliDllPath         = Path.Combine(DnsCliOutputDirectory, "Dns.Cli.dll");
+		DnsCliDllPath = Path.Combine(DnsCliOutputDirectory, "Dns.Cli.dll");
 	}
 
 	public static string Configuration { get; }

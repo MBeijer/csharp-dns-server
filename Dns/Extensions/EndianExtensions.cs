@@ -1,4 +1,4 @@
-namespace Dns.Extensions;
+﻿namespace Dns.Extensions;
 
 public static class EndianExtensions
 {

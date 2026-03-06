@@ -21,5 +21,5 @@ public class ZoneRecord
 	public ResourceType Type { get; set; } = ResourceType.A;
 
 	public List<string> Addresses { get; set; } = [];
-	public int          Count     { get; set; }
+	public int Count { get; set; }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,9 +10,9 @@ namespace Dns;
 
 public class ByteBuffer
 {
-	private static readonly char[]     TrimChars = ['.'];
-	private readonly        List<byte> _mBuffer  = [];
-	private                 int        _mReadPosition;
+	private static readonly char[] TrimChars = ['.'];
+	private readonly List<byte> _mBuffer = [];
+	private int _mReadPosition;
 
 	public ByteBuffer(string buffer = "") => Write(Encoding.Default.GetBytes(buffer));
 	private ByteBuffer(IEnumerable<byte> str) => _mBuffer = str.ToList();
@@ -290,13 +290,13 @@ public class ByteBuffer
 		var data = new byte[8];
 		Read(data);
 		return ((long)data[0] << 56) +
-		       ((long)data[1] << 48) +
-		       ((long)data[2] << 40) +
-		       ((long)data[3] << 32) +
-		       ((long)data[4] << 24) +
-		       ((long)data[5] << 16) +
-		       ((long)data[6] << 8) +
-		       data[7];
+			   ((long)data[1] << 48) +
+			   ((long)data[2] << 40) +
+			   ((long)data[3] << 32) +
+			   ((long)data[4] << 24) +
+			   ((long)data[5] << 16) +
+			   ((long)data[6] << 8) +
+			   data[7];
 	}
 
 	private string ReadCharsAsString(int pCount)
@@ -321,7 +321,7 @@ public class ByteBuffer
 
 	public ByteBuffer ReadDynamicString()
 	{
-		var resourceName      = new StringBuilder();
+		var resourceName = new StringBuilder();
 		var compressionOffset = -1;
 		while (true)
 		{
@@ -337,7 +337,7 @@ public class ByteBuffer
 					compressionOffset = ReadPosition;
 
 				// move pointer to compression segment
-				ReadPosition  = _mBuffer[ReadPosition];
+				ReadPosition = _mBuffer[ReadPosition];
 				segmentLength = _mBuffer[ReadPosition];
 			}
 
@@ -382,7 +382,7 @@ public class ByteBuffer
 
 	public ByteBuffer ReadString(char item)
 	{
-		var pos  = IndexOf(item, ReadPosition) - ReadPosition;
+		var pos = IndexOf(item, ReadPosition) - ReadPosition;
 		var data = new ByteBuffer();
 		Read(data, pos >= 0 ? pos : Length - ReadPosition);
 		ReadPosition++;
@@ -434,23 +434,23 @@ public class ByteBuffer
 		Write(data);
 	}
 
-	public sbyte  ReadByte()                                     => (sbyte)ReadUByte();
-	public ushort ReadUShort()                                   => (ushort)ReadShort();
-	public uint   ReadUInt()                                     => (uint)ReadInt();
-	public ulong  ReadULong()                                    => (ulong)ReadLong();
-	public void   WriteByte(sbyte pByte)                         => WriteByte((byte)pByte);
-	public void   WriteShort(ushort pByte)                       => WriteShort((short)pByte);
-	public void   WriteInt(uint pByte)                           => WriteInt((int)pByte);
-	public void   WriteLong(ulong pByte)                         => WriteLong((long)pByte);
-	public void   WriteByte<T>(T enumVal) where T : struct, Enum => WriteByte(Convert.ToByte(enumVal));
+	public sbyte ReadByte() => (sbyte)ReadUByte();
+	public ushort ReadUShort() => (ushort)ReadShort();
+	public uint ReadUInt() => (uint)ReadInt();
+	public ulong ReadULong() => (ulong)ReadLong();
+	public void WriteByte(sbyte pByte) => WriteByte((byte)pByte);
+	public void WriteShort(ushort pByte) => WriteShort((short)pByte);
+	public void WriteInt(uint pByte) => WriteInt((int)pByte);
+	public void WriteLong(ulong pByte) => WriteLong((long)pByte);
+	public void WriteByte<T>(T enumVal) where T : struct, Enum => WriteByte(Convert.ToByte(enumVal));
 
 	public static implicit operator string(ByteBuffer d) => d.ToString();
 	public static implicit operator ByteBuffer(string b) => new(b);
 	public static implicit operator ByteBuffer(byte[] b) => new(b);
 
 	public override string ToString() => Text;
-	public          string ToLower()  => Text.ToLower();
-	public          bool   ToBool()   => int.Parse(Text) == 1;
+	public string ToLower() => Text.ToLower();
+	public bool ToBool() => int.Parse(Text) == 1;
 
 	public int ToInt()
 	{

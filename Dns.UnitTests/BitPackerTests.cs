@@ -21,7 +21,7 @@ public class BitPackerTests
 		Assert.False(packer.GetBoolean());
 		Assert.True(packer.GetBoolean());
 
-		bytes  = BitConverter.GetBytes(0x0A);
+		bytes = BitConverter.GetBytes(0x0A);
 		packer = new(bytes);
 		Assert.False(packer.GetBoolean());
 		Assert.True(packer.GetBoolean());
@@ -36,10 +36,10 @@ public class BitPackerTests
 	[Fact]
 	public void Test2()
 	{
-		byte[]    bytes;
+		byte[] bytes;
 		BitPacker packer;
 
-		bytes  = BitConverter.GetBytes(0xAFFF);
+		bytes = BitConverter.GetBytes(0xAFFF);
 		packer = new(bytes);
 
 		Assert.True(packer.GetBoolean());
@@ -54,28 +54,28 @@ public class BitPackerTests
 	[Fact]
 	public void Test3()
 	{
-		byte[]    bytes;
+		byte[] bytes;
 		BitPacker packer;
 
-		bytes  = BitConverter.GetBytes(0xAFFF);
+		bytes = BitConverter.GetBytes(0xAFFF);
 		packer = new(bytes);
 
 		Assert.Equal(15, packer.GetByte(4));
 		Assert.Equal(15, packer.GetByte(4));
 		Assert.Equal(0xAF, packer.GetUshort(8));
 
-		bytes  = BitConverter.GetBytes(0x0CD000);
+		bytes = BitConverter.GetBytes(0x0CD000);
 		packer = new(bytes);
 
 		Assert.Equal(0x00, packer.GetByte(8));
 		Assert.Equal(0x0CD0, packer.GetUshort());
 
-		bytes  = BitConverter.GetBytes(0x000F << 1);
+		bytes = BitConverter.GetBytes(0x000F << 1);
 		packer = new(bytes);
 		Assert.False(packer.GetBoolean());
 		Assert.Equal(0xF, packer.GetUshort(8));
 
-		bytes  = BitConverter.GetBytes(0xAABB);
+		bytes = BitConverter.GetBytes(0xAABB);
 		packer = new(bytes);
 		Assert.Equal(0xAABB, packer.GetUshort());
 
@@ -85,7 +85,7 @@ public class BitPackerTests
 		packer.Reset();
 		Assert.Equal(0xBBAA, packer.GetUshort(16, BitPacker.Endian.HiLo));
 
-		bytes  = BitConverter.GetBytes(0x0100);
+		bytes = BitConverter.GetBytes(0x0100);
 		packer = new(bytes);
 		Assert.Equal(0x0001, packer.GetUshort(16, BitPacker.Endian.HiLo));
 	}

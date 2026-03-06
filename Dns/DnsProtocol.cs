@@ -77,29 +77,29 @@ public class DnsProtocol
 		return ret;
 	}
 
-    /// <summary>
-    ///     Reads a DNS domain name from the byte buffer, handling compression pointers.
-    ///     Optimized to minimize allocations using stackalloc and string.Create.
-    /// </summary>
-    /// <param name="bytes">The DNS message buffer.</param>
-    /// <param name="currentOffset">The current read position, updated after reading.</param>
-    /// <returns>The domain name as a string (without trailing dot).</returns>
-    public static string ReadString(byte[] bytes, ref int currentOffset) =>
+	/// <summary>
+	///     Reads a DNS domain name from the byte buffer, handling compression pointers.
+	///     Optimized to minimize allocations using stackalloc and string.Create.
+	/// </summary>
+	/// <param name="bytes">The DNS message buffer.</param>
+	/// <param name="currentOffset">The current read position, updated after reading.</param>
+	/// <returns>The domain name as a string (without trailing dot).</returns>
+	public static string ReadString(byte[] bytes, ref int currentOffset) =>
 		ReadStringOptimized(bytes.AsSpan(), ref currentOffset);
 
-    /// <summary>
-    ///     Reads a DNS domain name from a span, handling compression pointers.
-    ///     Uses stackalloc for intermediate storage to minimize heap allocations.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+	/// <summary>
+	///     Reads a DNS domain name from a span, handling compression pointers.
+	///     Uses stackalloc for intermediate storage to minimize heap allocations.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static string ReadStringOptimized(ReadOnlySpan<byte> bytes, ref int currentOffset)
 	{
 		// Stack-allocate buffer for the domain name (max 255 chars per RFC 1035)
 		Span<char> nameBuffer = stackalloc char[MaxDnsNameLength];
-		var        nameLength = 0;
+		var nameLength = 0;
 
-		var          compressionOffset     = -1;
-		var          readOffset            = currentOffset;
+		var compressionOffset = -1;
+		var readOffset = currentOffset;
 		HashSet<int> pointerVisitedOffsets = null;
 
 		while (true)
@@ -174,15 +174,15 @@ public class DnsProtocol
 		return nameLength == 0 ? string.Empty : new(nameBuffer[..nameLength]);
 	}
 
-    /// <summary>
-    ///     Legacy ReadString implementation using StringBuilder.
-    ///     Kept for compatibility but ReadStringOptimized is preferred.
-    /// </summary>
-    public static string ReadStringLegacy(byte[] bytes, ref int currentOffset)
+	/// <summary>
+	///     Legacy ReadString implementation using StringBuilder.
+	///     Kept for compatibility but ReadStringOptimized is preferred.
+	/// </summary>
+	public static string ReadStringLegacy(byte[] bytes, ref int currentOffset)
 	{
-		var          resourceName          = new StringBuilder();
-		var          compressionOffset     = -1;
-		var          readOffset            = currentOffset;
+		var resourceName = new StringBuilder();
+		var compressionOffset = -1;
+		var readOffset = currentOffset;
 		HashSet<int> pointerVisitedOffsets = null;
 
 		while (true)

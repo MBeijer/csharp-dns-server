@@ -19,7 +19,7 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
 	public delegate void FileWatcherDelegate(object sender, FileSystemEventArgs e);
 
 	private FileSystemWatcher _fileWatcher;
-	private Timer             _timer;
+	private Timer _timer;
 
 	/// <summary>Timespan between last file change and zone generation</summary>
 	private TimeSpan FileSettlementPeriod { get; } = TimeSpan.FromSeconds(10);
@@ -51,10 +51,10 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
 			throw new FileNotFoundException("filename not found", filename);
 
 
-		var directory      = Path.GetDirectoryName(filename);
+		var directory = Path.GetDirectoryName(filename);
 		var fileNameFilter = Path.GetFileName(filename);
 
-		Filename     = filename;
+		Filename = filename;
 		_fileWatcher = new(directory, fileNameFilter);
 
 		_fileWatcher.Created += (s, e) => OnCreated(s, e);
@@ -99,22 +99,22 @@ public abstract class FileWatcherZoneProvider(IDnsResolver resolver) : BaseZoneP
 	{
 		_timer.Change(Timeout.Infinite, Timeout.Infinite);
 		Task.Run(GenerateZone)
-		    .ContinueWith(
-			    t =>
-			    {
-				    if (t.Status == TaskStatus.RanToCompletion)
-				    {
-					    var generatedZone = t.Result;
-					    if (generatedZone != null) Notify([generatedZone]);
-				    }
-				    else if (t.IsFaulted)
-				    {
-					    var ex = t.Exception.GetBaseException();
-					    Console.WriteLine("Zone generation failed: {0}", ex.Message);
-				    }
-			    },
-			    TaskScheduler.Default
-		    );
+			.ContinueWith(
+				t =>
+				{
+					if (t.Status == TaskStatus.RanToCompletion)
+					{
+						var generatedZone = t.Result;
+						if (generatedZone != null) Notify([generatedZone]);
+					}
+					else if (t.IsFaulted)
+					{
+						var ex = t.Exception.GetBaseException();
+						Console.WriteLine("Zone generation failed: {0}", ex.Message);
+					}
+				},
+				TaskScheduler.Default
+			);
 	}
 
 	public override void Dispose()

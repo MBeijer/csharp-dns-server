@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
@@ -9,7 +9,7 @@ public class User
 {
 	[Key, DatabaseGenerated(DatabaseGeneratedOption.Identity), Column("id")] public int Id { get; set; }
 
-	[Column("account")] [MaxLength(100)] public string? Account { get; set; }
+	[Column("account")][MaxLength(100)] public string? Account { get; set; }
 
 	[JsonIgnore, Column("password"), MaxLength(450)]
 	public string? Password { get; set; }

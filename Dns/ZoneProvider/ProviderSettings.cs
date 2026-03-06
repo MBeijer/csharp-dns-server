@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Dns.ZoneProvider.IPProbe;
 using Dns.ZoneProvider.Traefik;
 

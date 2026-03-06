@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -8,7 +8,7 @@ namespace Dns.RDataTypes;
 
 public class ANameRData : RData
 {
-	private readonly IPAddress    _address;
+	private readonly IPAddress _address;
 	private readonly ResourceType _type = ResourceType.A;
 
 	public ANameRData()
@@ -37,7 +37,7 @@ public class ANameRData : RData
 		get => _address;
 		init
 		{
-			_type    = value.GetAddressBytes().Length == 4 ? ResourceType.A : ResourceType.AAAA;
+			_type = value.GetAddressBytes().Length == 4 ? ResourceType.A : ResourceType.AAAA;
 			_address = value;
 		}
 	}

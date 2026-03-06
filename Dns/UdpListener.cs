@@ -24,11 +24,11 @@ public delegate void OnRequestHandler(byte[] buffer, int length, EndPoint remote
 
 public class UdpListener
 {
-	private readonly Lock                    _syncRoot = new();
-	private          CancellationTokenSource _cts;
-	private          Socket                  _listener;
-	private          Task                    _receiveLoopTask;
-	public           OnRequestHandler        OnRequest;
+	private readonly Lock _syncRoot = new();
+	private CancellationTokenSource _cts;
+	private Socket _listener;
+	private Task _receiveLoopTask;
+	public OnRequestHandler OnRequest;
 
 	public EndPoint LocalEndPoint => _listener?.LocalEndPoint;
 
@@ -49,7 +49,7 @@ public class UdpListener
 		{
 			if (_cts != null) throw new InvalidOperationException("UDP listener already started.");
 
-			_cts             = new();
+			_cts = new();
 			_receiveLoopTask = ReceiveLoopAsync(_cts.Token);
 		}
 	}
@@ -57,15 +57,15 @@ public class UdpListener
 	public void Stop()
 	{
 		CancellationTokenSource cts;
-		Task                    receiveLoop;
+		Task receiveLoop;
 
 		lock (_syncRoot)
 		{
 			if (_cts == null) return;
 
-			cts              = _cts;
-			receiveLoop      = _receiveLoopTask;
-			_cts             = null;
+			cts = _cts;
+			receiveLoop = _receiveLoopTask;
+			_cts = null;
 			_receiveLoopTask = null;
 		}
 
@@ -134,8 +134,8 @@ public class UdpListener
 				catch (SocketException ex)
 				{
 					if (ct.IsCancellationRequested &&
-					    (ex.SocketErrorCode == SocketError.OperationAborted ||
-					     ex.SocketErrorCode == SocketError.Interrupted))
+						(ex.SocketErrorCode == SocketError.OperationAborted ||
+						 ex.SocketErrorCode == SocketError.Interrupted))
 						break;
 
 					Console.WriteLine(ex.ToString());
@@ -174,9 +174,9 @@ public sealed class SocketAwaitable : INotifyCompletion
 {
 	private static readonly Action SENTINEL = () => { };
 
-	internal Action               m_continuation;
+	internal Action m_continuation;
 	internal SocketAsyncEventArgs m_eventArgs;
-	internal bool                 m_wasCompleted;
+	internal bool m_wasCompleted;
 
 	public SocketAwaitable(SocketAsyncEventArgs eventArgs)
 	{
@@ -193,7 +193,7 @@ public sealed class SocketAwaitable : INotifyCompletion
 	public void OnCompleted(Action continuation)
 	{
 		if (m_continuation == SENTINEL ||
-		    Interlocked.CompareExchange(ref m_continuation, continuation, null) == SENTINEL)
+			Interlocked.CompareExchange(ref m_continuation, continuation, null) == SENTINEL)
 			Task.Run(continuation);
 	}
 

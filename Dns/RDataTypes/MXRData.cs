@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.Json;
 using Dns.Extensions;
@@ -7,16 +7,16 @@ namespace Dns.RDataTypes;
 
 public class MXRData : RData
 {
-	internal string Name       { get; init; }
+	internal string Name { get; init; }
 	internal ushort Preference { get; init; }
 
 	public MXRData() { }
 
 	private MXRData(byte[] bytes, int offset)
 	{
-		Preference =  BitConverter.ToUInt16(bytes, offset).SwapEndian();
-		offset      += 2;
-		Name       =  DnsProtocol.ReadString(bytes, ref offset);
+		Preference = BitConverter.ToUInt16(bytes, offset).SwapEndian();
+		offset += 2;
+		Name = DnsProtocol.ReadString(bytes, ref offset);
 	}
 
 	public override ushort Length => (ushort)(Name.Length + 2 + 2);

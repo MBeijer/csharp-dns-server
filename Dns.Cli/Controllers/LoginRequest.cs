@@ -11,7 +11,7 @@ public class LoginRequest
 	///
 	/// </summary>
 	[JsonPropertyName("account")]
-	public string Account  { get; set; } = "";
+	public string Account { get; set; } = "";
 
 	/// <summary>
 	///

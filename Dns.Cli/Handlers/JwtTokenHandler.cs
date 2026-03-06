@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -15,7 +15,7 @@ namespace Dns.Cli.Handlers;
 public class JwtTokenHandler : IJwtTokenHandler
 {
 	private readonly JwtSecurityTokenHandler _tokenHandler;
-	private readonly SigningCredentials      _signingCredentials;
+	private readonly SigningCredentials _signingCredentials;
 
 	/// <summary>
 	///
@@ -23,7 +23,7 @@ public class JwtTokenHandler : IJwtTokenHandler
 	/// <param name="serverOptions"></param>
 	public JwtTokenHandler(IOptions<ServerOptions> serverOptions)
 	{
-		_tokenHandler       = new();
+		_tokenHandler = new();
 		var key = Encoding.ASCII.GetBytes(serverOptions.Value.WebServer.JwtSecretKey);
 		_signingCredentials = new(
 			new SymmetricSecurityKey(key),
@@ -47,7 +47,7 @@ public class JwtTokenHandler : IJwtTokenHandler
 					new(ClaimTypes.Upn, user.Account!),
 				]
 			),
-			Expires            = DateTime.UtcNow.AddDays(7),
+			Expires = DateTime.UtcNow.AddDays(7),
 			SigningCredentials = _signingCredentials,
 		};
 		var token = _tokenHandler.CreateToken(tokenDescriptor);

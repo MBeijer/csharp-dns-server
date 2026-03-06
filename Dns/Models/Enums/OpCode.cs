@@ -8,7 +8,7 @@ namespace Dns.Models.Enums;
 
 public enum OpCode
 {
-	QUERY  = 0,
+	QUERY = 0,
 	IQUERY = 1,
 	STATUS = 2,
 	NOTIFY = 4,

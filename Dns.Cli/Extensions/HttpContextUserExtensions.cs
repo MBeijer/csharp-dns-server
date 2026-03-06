@@ -1,4 +1,4 @@
-using Dns.Cli.Middleware;
+﻿using Dns.Cli.Middleware;
 using Dns.Db.Models.EntityFramework;
 using Microsoft.AspNetCore.Http;
 

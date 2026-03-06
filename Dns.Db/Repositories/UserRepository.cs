@@ -28,7 +28,7 @@ public class UserRepository(ILogger<UserRepository> logger, DnsServerDbContext d
 
 		if (!accountResult.Activated) return false;
 
-		var verify = userPasswordHasher.VerifyHashedPassword(accountResult, accountResult.Password??"", password);
+		var verify = userPasswordHasher.VerifyHashedPassword(accountResult, accountResult.Password ?? "", password);
 
 		if (verify == PasswordVerificationResult.Success)
 		{

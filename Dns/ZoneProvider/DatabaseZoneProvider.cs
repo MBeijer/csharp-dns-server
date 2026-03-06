@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -24,8 +24,8 @@ public class DatabaseZoneProvider(
 	IDnsResolver dnsResolver
 ) : BaseZoneProvider(dnsResolver)
 {
-	private CancellationToken Ct          { get; set; }
-	private Task              RunningTask { get; set; }
+	private CancellationToken Ct { get; set; }
+	private Task RunningTask { get; set; }
 
 	/// <summary>Initialize ZoneProvider</summary>
 	/// <param name="zoneOptions">ZoneProvider Configuration Section</param>
@@ -71,33 +71,33 @@ public class DatabaseZoneProvider(
 	private static List<ZoneRecord> GetZoneRecords(ICollection<Db.Models.EntityFramework.ZoneRecord> zoneRecords)
 	{
 		return zoneRecords.Select(z => new ZoneRecord
-			                  {
-				                  Host      = z.Host,
-				                  Addresses = [z.Data],
-				                  Count     = 1,
-				                  Type      = z.Type!.Value,
-				                  Class     = z.Class!.Value,
-			                  }
-		                  )
-		                  .ToList();
+		{
+			Host = z.Host,
+			Addresses = [z.Data],
+			Count = 1,
+			Type = z.Type!.Value,
+			Class = z.Class!.Value,
+		}
+						  )
+						  .ToList();
 	}
 
 	private async Task<List<Zone>> GetZones()
 	{
-		using var scope          = services.CreateScope();
-		var       zoneRepository = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
+		using var scope = services.CreateScope();
+		var zoneRepository = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
 
 		var dbZones = await zoneRepository.GetZones().ConfigureAwait(false);
 		var zones = dbZones.Select(s =>
-			                   {
-				                   var zone = new Zone { Suffix = s.Suffix, Serial = s.Serial };
+							   {
+								   var zone = new Zone { Suffix = s.Suffix, Serial = s.Serial };
 
-				                   zone.Initialize(GetZoneRecords(s.Records));
+								   zone.Initialize(GetZoneRecords(s.Records));
 
-				                   return zone;
-			                   }
-		                   )
-		                   .ToList();
+								   return zone;
+							   }
+						   )
+						   .ToList();
 
 		return zones;
 	}

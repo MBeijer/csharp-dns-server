@@ -16,16 +16,16 @@ public class DnsMessage
 {
 	private readonly byte[] _header = new byte[12];
 
-	private ushort       _additionalCount;
-	private ushort       _answerCount;
-	private ushort       _flags;
-	private ushort       _nameServerCount;
-	private ushort       _queryIdentifier;
-	private ushort       _questionCount;
-	public  ResourceList Additionals = [];
-	public  ResourceList Answers     = [];
-	public  ResourceList Authorities = [];
-	public  QuestionList Questions   = [];
+	private ushort _additionalCount;
+	private ushort _answerCount;
+	private ushort _flags;
+	private ushort _nameServerCount;
+	private ushort _queryIdentifier;
+	private ushort _questionCount;
+	public ResourceList Additionals = [];
+	public ResourceList Answers = [];
+	public ResourceList Authorities = [];
+	public QuestionList Questions = [];
 
 	/// <summary>Provides direct access to the Flags WORD</summary>
 	public ushort Flags
@@ -239,9 +239,9 @@ public class DnsMessage
 		// Phase 5: Use BinaryPrimitives for reading (cleaner, no SwapEndian needed)
 		var headerSpan = _header.AsSpan();
 		_queryIdentifier = BinaryPrimitives.ReadUInt16BigEndian(headerSpan);
-		_flags           = BinaryPrimitives.ReadUInt16LittleEndian(headerSpan[2..]); // Flags stored in little-endian
-		_questionCount   = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[4..]);
-		_answerCount     = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[6..]);
+		_flags = BinaryPrimitives.ReadUInt16LittleEndian(headerSpan[2..]); // Flags stored in little-endian
+		_questionCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[4..]);
+		_answerCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[6..]);
 		_nameServerCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[8..]);
 		_additionalCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[10..]);
 

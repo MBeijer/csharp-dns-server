@@ -1,4 +1,4 @@
-// //------------------------------------------------------------------------------------------------- 
+﻿// //------------------------------------------------------------------------------------------------- 
 // // <copyright file="CsvParser.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -13,12 +13,12 @@ namespace Dns.Utility;
 /// <summary>Parses CSV files</summary>
 public class CsvParser
 {
-	private static readonly char[] CSVDELIMITER   = [','];
+	private static readonly char[] CSVDELIMITER = [','];
 	private static readonly char[] COLONDELIMITER = [':'];
 
 	private readonly string _filePath;
 
-	private string   _currentLine;
+	private string _currentLine;
 	private string[] _fields;
 
 	private CsvParser()
@@ -30,10 +30,10 @@ public class CsvParser
 	/// <summary>List of fields detected in CSV file</summary>
 	public IEnumerable<string> Fields => _fields;
 
-    /// <summary>
-    ///     Returns enumerable collection of rows
-    /// </summary>
-    public IEnumerable<CsvRow> Rows
+	/// <summary>
+	///     Returns enumerable collection of rows
+	/// </summary>
+	public IEnumerable<CsvRow> Rows
 	{
 		get
 		{
@@ -69,12 +69,12 @@ public class CsvParser
 		}
 	}
 
-    /// <summary>
-    ///     Create instance of CSV Parser
-    /// </summary>
-    /// <param name="filePath"> Path of file to parse </param>
-    /// <returns> CSV Parser instance </returns>
-    public static CsvParser Create(string filePath)
+	/// <summary>
+	///     Create instance of CSV Parser
+	/// </summary>
+	/// <param name="filePath"> Path of file to parse </param>
+	/// <returns> CSV Parser instance </returns>
+	public static CsvParser Create(string filePath)
 	{
 		if (filePath == null)
 			throw new ArgumentNullException("filePath");

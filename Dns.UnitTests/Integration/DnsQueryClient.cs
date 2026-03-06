@@ -17,9 +17,9 @@ namespace Dns.UnitTests.Integration;
 
 internal sealed class DnsQueryClient(IPEndPoint endpoint, TimeSpan? timeout = null)
 {
-	private readonly IPEndPoint _endpoint  = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
-	private readonly TimeSpan   _timeout   = timeout ?? TimeSpan.FromSeconds(5);
-	private          int        _messageId = Environment.TickCount;
+	private readonly IPEndPoint _endpoint = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
+	private readonly TimeSpan _timeout = timeout ?? TimeSpan.FromSeconds(5);
+	private int _messageId = Environment.TickCount;
 
 	public async Task<DnsMessage> QueryAsync(
 		string hostName,
@@ -33,7 +33,7 @@ internal sealed class DnsQueryClient(IPEndPoint endpoint, TimeSpan? timeout = nu
 
 		using var udpClient = new UdpClient(AddressFamily.InterNetwork);
 		var queryMessage = CreateQuery(hostName, resourceType, recursionDesired);
-		var payload      = SerializeMessage(queryMessage);
+		var payload = SerializeMessage(queryMessage);
 		await udpClient.SendAsync(payload, payload.Length, _endpoint).ConfigureAwait(false);
 
 		var receiveTask = udpClient.ReceiveAsync();
@@ -76,7 +76,7 @@ internal sealed class DnsQueryClient(IPEndPoint endpoint, TimeSpan? timeout = nu
 
 		var receiveTask = udpClient.ReceiveAsync();
 		var timeoutTask = Task.Delay(_timeout, cancellationToken);
-		var completed   = await Task.WhenAny(receiveTask, timeoutTask).ConfigureAwait(false);
+		var completed = await Task.WhenAny(receiveTask, timeoutTask).ConfigureAwait(false);
 		if (completed != receiveTask)
 		{
 			if (timeoutTask.IsCanceled)
@@ -99,7 +99,7 @@ internal sealed class DnsQueryClient(IPEndPoint endpoint, TimeSpan? timeout = nu
 		using var client = new TcpClient(AddressFamily.InterNetwork);
 		var connectTask = client.ConnectAsync(_endpoint.Address, _endpoint.Port);
 		var timeoutTask = Task.Delay(_timeout, cancellationToken);
-		var completed   = await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false);
+		var completed = await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false);
 		if (completed != connectTask)
 		{
 			if (timeoutTask.IsCanceled)
@@ -121,7 +121,7 @@ internal sealed class DnsQueryClient(IPEndPoint endpoint, TimeSpan? timeout = nu
 		if (prefixRead < 2) throw new InvalidDataException("Incomplete DNS TCP response prefix.");
 
 		var responseLength = BinaryPrimitives.ReadUInt16BigEndian(responsePrefix);
-		var responseBytes  = new byte[responseLength];
+		var responseBytes = new byte[responseLength];
 		var responseRead = await ReadExactAsync(stream, responseBytes, cancellationToken).ConfigureAwait(false);
 		if (responseRead < responseLength) throw new InvalidDataException("Incomplete DNS TCP response payload.");
 
@@ -139,8 +139,8 @@ internal sealed class DnsQueryClient(IPEndPoint endpoint, TimeSpan? timeout = nu
 		var message = new DnsMessage
 		{
 			QueryIdentifier = (ushort)Interlocked.Increment(ref _messageId),
-			QuestionCount   = 1,
-			RD              = recursionDesired,
+			QuestionCount = 1,
+			RD = recursionDesired,
 		};
 		message.Questions.Add(new(hostName, resourceType, ResourceClass.IN));
 		return message;
@@ -159,7 +159,7 @@ internal sealed class DnsQueryClient(IPEndPoint endpoint, TimeSpan? timeout = nu
 		while (offset < buffer.Length)
 		{
 			var read = await stream.ReadAsync(buffer.AsMemory(offset, buffer.Length - offset), cancellationToken)
-			                       .ConfigureAwait(false);
+								   .ConfigureAwait(false);
 			if (read == 0) break;
 			offset += read;
 		}

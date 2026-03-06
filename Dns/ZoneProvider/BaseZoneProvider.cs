@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +11,7 @@ namespace Dns.ZoneProvider;
 public abstract class BaseZoneProvider(IDnsResolver resolver) : IZoneProvider, IDisposable
 {
 	private readonly List<IObserver<List<Zone>>> _observers = [];
-	protected        Zone                        Zone { get; } = new() { Suffix = "", Serial = 0 };
+	protected Zone Zone { get; } = new() { Suffix = "", Serial = 0 };
 
 	public abstract void Dispose();
 

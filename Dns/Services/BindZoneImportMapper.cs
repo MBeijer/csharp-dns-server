@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using Dns.Db.Models.EntityFramework;
 using Dns.Db.Models.EntityFramework.Enums;
 
@@ -10,19 +10,19 @@ public static class BindZoneImportMapper
 	{
 		return new()
 		{
-			Suffix  = zoneSuffix.Trim(),
-			Serial  = parsedZone.Serial,
+			Suffix = zoneSuffix.Trim(),
+			Serial = parsedZone.Serial,
 			Enabled = enabled,
 			Records = parsedZone.Records
-			                  .SelectMany(record => record.Addresses.Select(address => new ZoneRecord
-				                  {
-					                  Host  = record.Host,
-					                  Class = (ResourceClass?)record.Class,
-					                  Type  = (ResourceType?)record.Type,
-					                  Data  = address,
-				                  }
-			                  ))
-			                  .ToList(),
+							  .SelectMany(record => record.Addresses.Select(address => new ZoneRecord
+							  {
+								  Host = record.Host,
+								  Class = (ResourceClass?)record.Class,
+								  Type = (ResourceType?)record.Type,
+								  Data = address,
+							  }
+							  ))
+							  .ToList(),
 		};
 	}
 }

@@ -1,4 +1,4 @@
-namespace Dns.ZoneProvider.IPProbe;
+﻿namespace Dns.ZoneProvider.IPProbe;
 
 public enum AvailabilityMode
 {

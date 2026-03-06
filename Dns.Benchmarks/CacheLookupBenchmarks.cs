@@ -1,4 +1,4 @@
-// //-------------------------------------------------------------------------------------------------
+﻿// //-------------------------------------------------------------------------------------------------
 // // <copyright file="CacheLookupBenchmarks.cs" company="stephbu">
 // // Copyright (c) Steve Butler. All rights reserved.
 // // </copyright>
@@ -21,67 +21,67 @@ namespace Dns.Benchmarks;
 public class CacheLookupBenchmarks
 {
 	// Test data
-	private const string        TestHostname = "www.msn.com.redmond.corp.microsoft.com";
-	private const ushort        TestQueryId  = 0xD303;
-	private const ResourceClass TestClass    = ResourceClass.IN;
-	private const ResourceType  TestType     = ResourceType.A;
+	private const string TestHostname = "www.msn.com.redmond.corp.microsoft.com";
+	private const ushort TestQueryId = 0xD303;
+	private const ResourceClass TestClass = ResourceClass.IN;
+	private const ResourceType TestType = ResourceType.A;
 
 	// Value for lookups
-	private static readonly object        DummyValue = new();
-	private                 DnsRequestKey _precomputedRequestKey;
-	private                 string        _precomputedRequestStringKey;
-	private                 string        _precomputedStringKey;
+	private static readonly object DummyValue = new();
+	private DnsRequestKey _precomputedRequestKey;
+	private string _precomputedRequestStringKey;
+	private string _precomputedStringKey;
 
 	// Pre-computed keys
 	private DnsZoneLookupKey _precomputedZoneKey;
 
 	// Request key dictionaries (simulating DnsServer request map)
-	private Dictionary<string, object>                  _requestStringDict;
+	private Dictionary<string, object> _requestStringDict;
 	private ConcurrentDictionary<DnsRequestKey, object> _requestStructDict;
-	private ConcurrentDictionary<string, object>        _stringConcurrentDict;
+	private ConcurrentDictionary<string, object> _stringConcurrentDict;
 
 	// Legacy string-keyed dictionaries
-	private Dictionary<string, object>                     _stringDictionary;
+	private Dictionary<string, object> _stringDictionary;
 	private ConcurrentDictionary<DnsZoneLookupKey, object> _structConcurrentDict;
 
 	// Optimized struct-keyed dictionaries
-	private Dictionary<DnsZoneLookupKey, object>       _structDictionary;
+	private Dictionary<DnsZoneLookupKey, object> _structDictionary;
 	private FrozenDictionary<DnsZoneLookupKey, object> _structFrozenDict;
 
 	[GlobalSetup]
 	public void Setup()
 	{
 		// Create pre-computed keys
-		_precomputedZoneKey          = new(TestHostname, TestClass, TestType);
-		_precomputedRequestKey       = new(TestQueryId, TestClass, TestType, TestHostname);
-		_precomputedStringKey        = GenerateStringKey(TestHostname, TestClass, TestType);
+		_precomputedZoneKey = new(TestHostname, TestClass, TestType);
+		_precomputedRequestKey = new(TestQueryId, TestClass, TestType, TestHostname);
+		_precomputedStringKey = GenerateStringKey(TestHostname, TestClass, TestType);
 		_precomputedRequestStringKey = GenerateRequestStringKey(TestQueryId, TestClass, TestType, TestHostname);
 
 		// Setup legacy dictionaries
-		_stringDictionary                            = new(StringComparer.OrdinalIgnoreCase) { [_precomputedStringKey] = DummyValue };
-		_stringConcurrentDict                        = new(StringComparer.OrdinalIgnoreCase);
+		_stringDictionary = new(StringComparer.OrdinalIgnoreCase) { [_precomputedStringKey] = DummyValue };
+		_stringConcurrentDict = new(StringComparer.OrdinalIgnoreCase);
 		_stringConcurrentDict[_precomputedStringKey] = DummyValue;
 
 		// Setup optimized dictionaries
-		_structDictionary                          = new() { [_precomputedZoneKey] = DummyValue };
-		_structConcurrentDict                      = new();
+		_structDictionary = new() { [_precomputedZoneKey] = DummyValue };
+		_structConcurrentDict = new();
 		_structConcurrentDict[_precomputedZoneKey] = DummyValue;
 
 		// Setup request dictionaries
-		_requestStringDict                         = new() { [_precomputedRequestStringKey] = DummyValue };
-		_requestStructDict                         = new();
+		_requestStringDict = new() { [_precomputedRequestStringKey] = DummyValue };
+		_requestStructDict = new();
 		_requestStructDict[_precomputedRequestKey] = DummyValue;
 
 		// Add more entries to simulate realistic dictionary size
 		for (var i = 0; i < 1000; i++)
 		{
-			var host    = $"host{i}.example.com";
+			var host = $"host{i}.example.com";
 			var zoneKey = new DnsZoneLookupKey(host, TestClass, TestType);
-			var strKey  = GenerateStringKey(host, TestClass, TestType);
+			var strKey = GenerateStringKey(host, TestClass, TestType);
 
-			_stringDictionary[strKey]      = DummyValue;
-			_stringConcurrentDict[strKey]  = DummyValue;
-			_structDictionary[zoneKey]     = DummyValue;
+			_stringDictionary[strKey] = DummyValue;
+			_stringConcurrentDict[strKey] = DummyValue;
+			_structDictionary[zoneKey] = DummyValue;
 			_structConcurrentDict[zoneKey] = DummyValue;
 		}
 
