@@ -40,11 +40,11 @@ def killall_jobs() {
 
 def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 	def fixed_job_name = env.JOB_NAME.replace('%2F','/')
+	def tag = ''
 	try {
 		checkout scm;
 
 		def buildenv = '';
-		def tag = '';
 		def publish = false;
 		if (env.BRANCH_NAME.equals('master')) {
 			buildenv = 'production';
@@ -89,8 +89,11 @@ set -euo pipefail
 curl -Os https://uploader.codecov.io/latest/linux/codecov
 chmod +x codecov
 
-GIT_SHA="$(git rev-parse HEAD)"
-GIT_BRANCH="${BRANCH_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
+# Jenkins workspaces may be owned by a different uid when running in Docker.
+git config --global --add safe.directory "$PWD" || true
+
+GIT_SHA="${GIT_COMMIT:-$(git rev-parse HEAD)}"
+GIT_BRANCH="${BRANCH_NAME:-${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}}"
 GIT_SLUG="mbeijer/csharp-dns-server"
 BUILD_URL_VALUE="${BUILD_URL:-}"
 
