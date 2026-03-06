@@ -1,6 +1,6 @@
 # csharp-dns-server
 
-[![GitHub Actions Status](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml)
+[![GitHub Actions Status](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml) [![codecov](https://codecov.io/github/MBeijer/csharp-dns-server/branch/master/graph/badge.svg?token=WBG52LZI5G)](https://codecov.io/github/MBeijer/csharp-dns-server)
 
 Fully functional software-extensible DNS server written in C# targeting .NET 8. Ensure the .NET 8 SDK is installed before building or testing.
 
