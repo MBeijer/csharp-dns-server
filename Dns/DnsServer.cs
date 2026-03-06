@@ -200,11 +200,31 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 					if (zoneRecords.Count == 0)
 					{
-						message.RCode = (byte)RCode.NXDOMAIN;
 						var zoneName = CanonicalZoneName(zone.Suffix);
 						var zoneSoa  = zone.Records.FirstOrDefault(record => record.Type == ResourceType.SOA);
-						message.NameServerCount++;
-						message.Authorities.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
+						var isZoneApexQuery = string.Equals(
+							question.Name.Trim().TrimEnd('.'),
+							zoneName,
+							StringComparison.OrdinalIgnoreCase
+						);
+
+						if (question.Type == ResourceType.SOA && isZoneApexQuery)
+						{
+							message.RCode = (byte)RCode.NOERROR;
+							message.AnswerCount++;
+							message.Answers.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
+						}
+						else
+						{
+							var nameExists = isZoneApexQuery ||
+							                 zone.Records.Any(record =>
+								                 string.Equals(record.Host, qName, StringComparison.OrdinalIgnoreCase)
+							                 );
+
+							message.RCode = (byte)(nameExists ? RCode.NOERROR : RCode.NXDOMAIN);
+							message.NameServerCount++;
+							message.Authorities.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
+						}
 					}
 					else
 					{

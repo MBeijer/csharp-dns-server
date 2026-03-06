@@ -8,18 +8,17 @@
 - Reference the prioritized backlog in `docs/task_list.md` when picking up work to stay aligned with near-term goals.
 
 ## 2. Repository Orientation
-| Project | Purpose | Notes |
-|---------|---------|-------|
-| `Dns/` | Core library implementing DNS protocol, server loop, zone providers, HTTP status surface. | Entry point: `Dns/Program.cs`. Zone providers under `Dns/ZoneProvider`. |
-| `dns-cli/` | Console host that runs the DNS server for local testing. | Mirrors `Dns/appsettings.json`. |
-| `dnstest/` | xUnit suite covering protocol/utility components. | Expand here before adding new test assemblies. |
-| `docs/` | Specs, PRD and future design docs. | `docs/product_requirements.md` drives priorities. |
+| Project          | Purpose | Notes |
+|------------------|---------|-------|
+| `Dns/`           | Core library implementing DNS protocol, server loop, zone providers, HTTP status surface. | Entry point: `Dns/Program.cs`. Zone providers under `Dns/ZoneProvider`. |
+| `Dns.Cli/`       | Console host that runs the DNS server for local testing. | Mirrors `Dns/appsettings.json`. |
+| `Dns.UnitTests/` | xUnit suite covering protocol/utility components. | Expand here before adding new test assemblies. |
+| `docs/`          | Specs, PRD and future design docs. | `docs/product_requirements.md` drives priorities. |
 
 Key classes & files:
 - `Dns/Program.cs`: wiring for DI/config/servers via `Microsoft.Extensions.DependencyInjection`.
 - `Dns/DnsServer.cs`: UDP DNS loop and upstream forwarding.
 - `Dns/SmartZoneResolver.cs`: in-memory zone cache & round-robin dispenser.
-- `Dns/HttpServer.cs`: embedded status/diagnostics surface.
 - `Dns/ZoneProvider/**`: implementations (CSV, IP probes, BIND placeholder).
 
 ## 3. Getting Started
@@ -31,7 +30,7 @@ dotnet build csharp-dns-server.sln
 dotnet test csharp-dns-server.sln
 
 # run server (localhost)
-cd dns-cli
+cd Dns.Cli
 dotnet run -- ./appsettings.json
 ```
 Gotchas:
@@ -40,7 +39,7 @@ Gotchas:
 - Zone providers may depend on local files (CSV) or ping-able IPs—mock or isolate tests accordingly.
 
 ## 4. Coding Standards
-- C# 8 / .NET 3.1 currently, migrating to .NET 8 (see PRD). Prefer idiomatic C# and existing project style.
+- C# latest minor / .NET 10 currently. Prefer idiomatic C# and existing project style.
 - Keep ASCII unless file already uses Unicode.
 - Windows (/r/n) line delimiters
 - Prefer spaces not tabs

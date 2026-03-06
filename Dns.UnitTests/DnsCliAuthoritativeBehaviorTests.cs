@@ -114,6 +114,24 @@ public sealed class DnsCliAuthoritativeBehaviorTests(DnsCliHostFixture fixture)
 	}
 
 	[Fact]
+	public async Task ExistingNameWithMissingTypeReturnsAuthoritativeNoData()
+	{
+		var hostName = fixture.BuildHostName("alpha");
+		var response = await fixture.Client.QueryAsync(hostName, ResourceType.SOA);
+
+		Assert.Equal(RCode.NOERROR, (RCode)response.RCode);
+		Assert.True(response.AA);
+		Assert.False(response.RA);
+		Assert.Equal((ushort)0, response.AnswerCount);
+		Assert.Equal((ushort)1, response.NameServerCount);
+
+		var soaRecord = Assert.Single(response.Authorities);
+		Assert.Equal(ResourceType.SOA, soaRecord.Type);
+		var soaData = Assert.IsType<SOARData>(soaRecord.RData);
+		Assert.Equal((uint)300, soaData.MinimumTTL);
+	}
+
+	[Fact]
 	public async Task AxfrOverTcpReturnsSoaEnvelopeAndZoneRecords()
 	{
 		var zoneName         = fixture.BuildHostName("alpha");
