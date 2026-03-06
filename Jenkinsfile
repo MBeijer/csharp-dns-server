@@ -82,6 +82,10 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 						fingerprint: true
 					)
 
+					withCredentials([string(credentialsId: 'MBEIJER_CSHARP_DNS_SERVER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
+					    sh("curl -s https://codecov.io/bash > codecov && chmod +x codecov && ./codecov -f \"Testing/unit_tests.xml\" -t ${env.CODECOV_TOKEN} && ./codecov -f \"Dns.UnitTests/coverage.opencover.xml\" -t ${env.CODECOV_TOKEN}")
+					}
+
 					stage("Xunit") {
 						xunit (
 							testTimeMargin: '3000',
