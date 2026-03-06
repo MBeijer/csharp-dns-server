@@ -149,6 +149,11 @@ public sealed class DnsCliAuthoritativeBehaviorTests(DnsCliHostFixture fixture)
 		Assert.Equal(ResourceType.SOA, last.Type);
 		Assert.Equal(canonicalZoneName, first.Name);
 		Assert.Equal(canonicalZoneName, last.Name);
+		Assert.Contains(
+			response.Answers,
+			record => record.Type == ResourceType.NS &&
+			          string.Equals(record.Name, canonicalZoneName, System.StringComparison.OrdinalIgnoreCase)
+		);
 	}
 
 	[Fact]

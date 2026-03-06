@@ -372,6 +372,12 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			}
 		}
 
+		if (!answers.Any(record =>
+			    record.Type == ResourceType.NS &&
+			    string.Equals(record.Name, zoneName, StringComparison.OrdinalIgnoreCase)
+		    ))
+			answers.Add(CreateNsRecord(zoneName, zone));
+
 		answers.Add(CreateSoaRecord(zoneName, zone));
 		return answers;
 	}
@@ -551,6 +557,29 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		};
 	}
 
+	private static ResourceRecord CreateNsRecord(string zoneName, Zone zone, ZoneRecord zoneRecord = null)
+	{
+		var primaryNameServer = zoneRecord?.Addresses.Count > 0
+			? zoneRecord.Addresses[0]
+			: $"{Environment.MachineName}.{zoneName}";
+
+		var normalizedPrimaryNameServer = primaryNameServer?.Trim().TrimEnd('.');
+		if (string.IsNullOrWhiteSpace(normalizedPrimaryNameServer))
+			normalizedPrimaryNameServer = $"ns1.{zoneName}";
+
+		if (!normalizedPrimaryNameServer.Contains('.'))
+			normalizedPrimaryNameServer = $"{normalizedPrimaryNameServer}.{zoneName}";
+
+		return new()
+		{
+			Name  = zoneName,
+			Class = ResourceClass.IN,
+			Type  = ResourceType.NS,
+			TTL   = 300,
+			RData = new NSRData { Name = normalizedPrimaryNameServer },
+		};
+	}
+
 	private bool IsTransferAllowed(EndPoint remoteEndPoint)
 	{
 		if (remoteEndPoint is not IPEndPoint ipEndpoint) return false;
@@ -682,8 +711,8 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			QuestionCount   = 1,
 		};
 		notifyMessage.Questions.Add(new(zoneName, ResourceType.SOA, ResourceClass.IN));
-		notifyMessage.Authorities.Add(CreateSoaRecord(zoneName, zone));
-		notifyMessage.NameServerCount = 1;
+		notifyMessage.Answers.Add(CreateSoaRecord(zoneName, zone));
+		notifyMessage.AnswerCount = 1;
 
 		var payload = SerializeMessage(notifyMessage);
 		SendUdp(payload, 0, payload.Length, notifyTarget);
