@@ -8,5 +8,6 @@ public interface IZoneRepository
 	Task<Zone?> GetZone(string suffix);
 	Task AddZone(Zone zone);
 	Task UpdateZone(Zone zone);
+	Task<bool> DeleteZone(int id);
 	Task<Zone> UpsertZone(Zone zone, bool replaceRecords = true);
 }

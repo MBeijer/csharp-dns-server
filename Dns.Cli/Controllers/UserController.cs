@@ -1,6 +1,6 @@
 ﻿using Dns.Cli.Extensions;
 using Dns.Cli.Handlers;
-using Dns.Db.Models.EntityFramework;
+using Dns.Cli.Models.Dto;
 using Dns.Db.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -24,7 +24,7 @@ public class UserController(
 	///     Get current user
 	/// </summary>
 	/// <returns></returns>
-	[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(User))]
+	[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
 	[ProducesResponseType(StatusCodes.Status404NotFound)]
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[Authorize]
@@ -33,8 +33,9 @@ public class UserController(
 	public IActionResult? GetUser()
 	{
 		var user = HttpContext.GetCurrentUser();
+		if (user == null) return NotFound();
 
-		return Ok(user);
+		return Ok(user.ToDto());
 	}
 
 	/*

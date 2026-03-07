@@ -110,6 +110,54 @@ The provider reads the file whenever it changes (a 10-second settlement window a
 - `injectedNsAddress`: optional fallback address/target used only when the server auto-injects an apex NS for AXFR validity; IPv4 -> `A`, IPv6 -> `AAAA`, hostname -> `CNAME`.
 - UDP AXFR/IXFR requests are refused by design; use TCP transport.
 
+## React SPA (NSwag + Redux)
+A React SPA is available under `Dns.Spa/` and is designed to interface with the API in `Dns.Cli`.
+
+Highlights:
+- API client generation via **NSwag** (`Dns.Spa/nswag.json`)
+- Redux Toolkit state management for async API calls (`auth` and `zones` slices)
+- UI components and theming with **MUI** (`@mui/material`)
+- Vite dev proxy for `/dns`, `/user`, `/dump` to `http://localhost:5000`
+
+### Run API + SPA locally
+1. Start API:
+```bash
+cd Dns.Cli
+dotnet run -- ./appsettings.json
+```
+2. Start SPA:
+```bash
+cd Dns.Spa
+npm install
+npm run generate:api
+npm run dev
+```
+
+Optional:
+- set `VITE_API_BASE_URL` if your API runs on a different host/port.
+- regenerate the NSwag client whenever API contracts change.
+
+### Host SPA from Dns.Cli
+`Dns.Cli` is configured with ASP.NET Core SPA middleware:
+- **Development**: `UseSpa(...UseProxyToSpaDevelopmentServer("http://localhost:5173"))`
+- **Production**: serves static files from `wwwroot`
+To host the React SPA via ASP.NET:
+
+```bash
+cd Dns.Spa
+npm install
+npm run generate:api
+npm run build
+
+cd ../Dns.Cli
+dotnet run -- ./appsettings.json
+```
+
+On `dotnet build`/`dotnet publish`, `Dns.Cli` copies files from `Dns.Spa/dist` into `Dns.Cli/wwwroot` when `dist` exists.
+
+### Docker build
+`Dockerfile` uses a Node build stage to compile `Dns.Spa` and then copies `dist` into the .NET build stage so the final ASP.NET image serves the SPA in production mode.
+
 ### Import BIND Zone Into Database Zone
 You can convert a BIND zone file into a database-backed zone via the DNS API:
 

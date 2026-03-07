@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Dns.Cli.Models;
-using Dns.Db.Models.EntityFramework;
+using Dns.Cli.Models.Dto;
 using Dns.Db.Repositories;
 using Dns.Services;
 using Dns.ZoneProvider.Bind;
@@ -44,7 +44,11 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[HttpGet("zones")]
 	[Authorize]
-	public async Task<IActionResult?> GetZones() => Ok(await zoneRepository.GetZones().ConfigureAwait(false));
+	public async Task<IActionResult?> GetZones()
+	{
+		var zones = await zoneRepository.GetZones().ConfigureAwait(false);
+		return Ok(zones.Select(z => z.ToDto()).ToList());
+	}
 
 	/// <summary>
 	///     Get database zones
@@ -55,10 +59,18 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[HttpPut("zones")]
 	[Authorize]
-	public async Task<IActionResult?> AddZone([FromBody] Zone zone)
+	public async Task<IActionResult?> AddZone([FromBody] ZoneDto zoneDto)
 	{
-		await zoneRepository.AddZone(zone).ConfigureAwait(false);
-		return Created();
+		try
+		{
+			var zone = zoneDto.ToEntity();
+			await zoneRepository.AddZone(zone).ConfigureAwait(false);
+			return Created();
+		}
+		catch (InvalidOperationException ex)
+		{
+			return BadRequest(ex.Message);
+		}
 	}
 
 	/// <summary>
@@ -70,10 +82,35 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	[ProducesResponseType(StatusCodes.Status400BadRequest)]
 	[HttpPatch("zones")]
 	[Authorize]
-	public async Task<IActionResult?> UpdateZone([FromBody] Zone zone)
+	public async Task<IActionResult?> UpdateZone([FromBody] ZoneDto zoneDto)
 	{
-		await zoneRepository.UpdateZone(zone).ConfigureAwait(false);
-		return Ok();
+		try
+		{
+			var zone = zoneDto.ToEntity();
+			await zoneRepository.UpdateZone(zone).ConfigureAwait(false);
+			return Ok();
+		}
+		catch (InvalidOperationException ex)
+		{
+			return BadRequest(ex.Message);
+		}
+	}
+
+	/// <summary>
+	///     Delete database zone
+	/// </summary>
+	/// <param name="id">Zone identifier.</param>
+	/// <returns>HTTP status code.</returns>
+	[ProducesResponseType(StatusCodes.Status204NoContent)]
+	[ProducesResponseType(StatusCodes.Status404NotFound)]
+	[HttpDelete("zones/{id:int}")]
+	[Authorize]
+	public async Task<IActionResult?> DeleteZone([FromRoute] int id)
+	{
+		var deleted = await zoneRepository.DeleteZone(id).ConfigureAwait(false);
+		if (!deleted) return NotFound();
+
+		return NoContent();
 	}
 
 	/// <summary>

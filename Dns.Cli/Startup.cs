@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -29,6 +30,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.SpaServices.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -144,7 +146,9 @@ public class Startup(IConfiguration configuration)
 				.AddJsonOptions(
 					options => options.JsonSerializerOptions.DefaultIgnoreCondition =
 						JsonIgnoreCondition.WhenWritingNull
-				);
+					);
+
+		services.AddSpaStaticFiles(configuration => { configuration.RootPath = "wwwroot"; });
 
 		services.AddSwaggerGen(
 			c =>
@@ -228,8 +232,52 @@ public class Startup(IConfiguration configuration)
 		app.UseCors(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 		app.UseHttpsRedirection();
 		app.UseResponseCompression();
+		app.UseStaticFiles();
+		if (!env.IsDevelopment()) app.UseSpaStaticFiles();
 
 		app.UseAuthorization();
 		app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+
+		var spaDevServerUrl = configuration["Spa:DevServerUrl"] ?? "http://localhost:5173";
+		var useSpaProxy = env.IsDevelopment() &&
+						  ShouldUseSpaProxy() &&
+						  IsSpaDevServerAvailable(spaDevServerUrl);
+
+		app.UseSpa(spa =>
+		{
+			if (useSpaProxy)
+			{
+				spa.Options.SourcePath = Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "Dns.Spa"));
+				spa.UseProxyToSpaDevelopmentServer(spaDevServerUrl);
+			}
+			else
+			{
+				spa.Options.SourcePath = "wwwroot";
+			}
+		});
+	}
+
+	private bool ShouldUseSpaProxy()
+	{
+		if (bool.TryParse(configuration["Spa:UseProxy"], out var useProxy)) return useProxy;
+
+		return true;
+	}
+
+	private static bool IsSpaDevServerAvailable(string spaDevServerUrl)
+	{
+		if (!Uri.TryCreate(spaDevServerUrl, UriKind.Absolute, out var uri)) return false;
+
+		try
+		{
+			using var tcpClient = new TcpClient();
+			var connectTask = tcpClient.ConnectAsync(uri.Host, uri.Port);
+			var completed = connectTask.Wait(TimeSpan.FromMilliseconds(300));
+			return completed && tcpClient.Connected;
+		}
+		catch
+		{
+			return false;
+		}
 	}
 }

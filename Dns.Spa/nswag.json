@@ -1,0 +1,62 @@
+﻿{
+  "runtime": "Net80",
+  "documentGenerator": {
+    "fromDocument": {
+      "json": "http://localhost:5000/swagger/v1/swagger.json"
+    }
+  },
+  "codeGenerators": {
+    "openApiToTypeScriptClient": {
+      "className": "Client",
+      "moduleName": "",
+      "namespace": "",
+      "typeScriptVersion": 5.0,
+      "template": "Fetch",
+      "promiseType": "Promise",
+      "httpClass": "HttpClient",
+      "useSingletonProvider": false,
+      "injectionTokenType": "InjectionToken",
+      "rxJsVersion": 7.0,
+      "dateTimeType": "Date",
+      "nullValue": "Null",
+      "generateClientClasses": true,
+      "generateClientInterfaces": true,
+      "generateOptionalParameters": false,
+      "exportTypes": true,
+      "wrapDtoExceptions": true,
+      "exceptionClass": "ApiException",
+      "clientBaseClass": "",
+      "wrapResponses": false,
+      "wrapResponseMethods": [],
+      "generateResponseClasses": true,
+      "responseClass": "SwaggerResponse",
+      "protectedMethods": [],
+      "configurationClass": null,
+      "useTransformOptionsMethod": false,
+      "useTransformResultMethod": false,
+      "generateDtoTypes": true,
+      "operationGenerationMode": "SingleClientFromOperationId",
+      "markOptionalProperties": true,
+      "generateCloneMethod": false,
+      "typeStyle": "Class",
+      "enumStyle": "Enum",
+      "useLeafType": false,
+      "classTypes": [],
+      "extendedClasses": [],
+      "extensionCode": "",
+      "generateDefaultValues": true,
+      "excludedTypeNames": [],
+      "excludedParameterNames": [],
+      "handleReferences": true,
+      "generateTypeCheckFunctions": true,
+      "generateConstructorInterface": true,
+      "convertConstructorInterfaceData": false,
+      "importRequiredTypes": true,
+      "useGetBaseUrlMethod": false,
+      "baseUrlTokenName": "API_BASE_URL",
+      "queryNullValue": "",
+      "useAbortSignal": true,
+      "output": "src/clients/generate/client.ts"
+    }
+  }
+}

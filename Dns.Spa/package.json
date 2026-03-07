@@ -1,0 +1,55 @@
+{
+	"name": "dns-spa",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@emotion/react": "^11.14.0",
+		"@emotion/styled": "^11.14.0",
+		"@mui/icons-material": "^7.0.2",
+		"@mui/material": "^7.0.2",
+		"@reduxjs/toolkit": "^2.11.2",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"react-redux": "^9.2.0",
+		"react-resizable": "^3.0.5",
+		"react-router-dom": "^7.0.0",
+		"vite-tsconfig-paths": "^6.0.0"
+	},
+	"scripts": {
+		"start": "vite --mode development",
+		"start-prod": "vite --mode production",
+		"build": "tsc && vite build --mode production",
+		"serve": "vite preview",
+		"test": "vitest",
+		"test:coverage": "vitest run --coverage --watch=false",
+		"generate:api": "npx nswag run nswag.json"
+	},
+	"eslintConfig": {
+		"extends": [
+			"react-app",
+			"react-app/jest"
+		]
+	},
+	"browserslist": {
+		"production": [
+			">0.2%",
+			"not dead",
+			"not op_mini all"
+		],
+		"development": [
+			"last 1 chrome version",
+			"last 1 firefox version",
+			"last 1 safari version"
+		]
+	},
+	"devDependencies": {
+		"@types/node": "^25.3.5",
+		"@types/react": "^19.2.14",
+		"@types/react-dom": "^19.2.3",
+		"@vitejs/plugin-react": "^5.1.4",
+		"nswag": "^14.6.3",
+		"typescript": "^5.7.3",
+		"vite": "^7.0.0"
+	}
+}

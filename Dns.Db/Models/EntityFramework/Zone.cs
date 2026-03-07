@@ -15,5 +15,9 @@ public class Zone
 
 	[Column("serial")] public uint Serial { get; set; }
 	[Column("enabled")] public bool Enabled { get; set; }
+	[Column("master_zone_id")] public int? MasterZoneId { get; set; }
+
+	public Zone? MasterZone { get; set; }
+	public ICollection<Zone>? SlaveZones { get; set; }
 	public ICollection<ZoneRecord>? Records { get; set; }
 }

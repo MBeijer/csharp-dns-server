@@ -1,0 +1,70 @@
+:root {
+  --bg: #0b1f2a;
+  --panel: #123447;
+  --text: #dbe9f1;
+  --muted: #9bb3c2;
+  --accent: #37a8d8;
+  --error: #ff7a7a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 10% 20%, #164a63 0%, var(--bg) 45%);
+  color: var(--text);
+}
+
+.layout {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.panel {
+  background: color-mix(in srgb, var(--panel) 90%, #000 10%);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, #000 80%);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+}
+
+input,
+button {
+  padding: 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #2d5d74;
+  background: #0d2a3a;
+  color: var(--text);
+}
+
+button {
+  background: linear-gradient(135deg, #1f88b4, #37a8d8);
+  color: #061520;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid #2b4e61;
+}
+
+.error {
+  color: var(--error);
+}

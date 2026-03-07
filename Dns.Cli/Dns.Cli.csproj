@@ -44,6 +44,7 @@
         <PackageReference Include="BouncyCastle.NetCore" Version="2.2.1"/>
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3"/>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3"/>
+        <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.3"/>
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4"/>
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
@@ -61,5 +62,22 @@
     <ItemGroup>
         <Folder Include="Configuration\"/>
     </ItemGroup>
+
+    <PropertyGroup>
+        <SpaRoot>..\Dns.Spa\</SpaRoot>
+        <SpaDist>$(SpaRoot)dist\</SpaDist>
+        <SpaWwwRoot>$(MSBuildProjectDirectory)\wwwroot\</SpaWwwRoot>
+    </PropertyGroup>
+
+    <Target Name="CopySpaDistToWwwRoot" BeforeTargets="Build;Publish" Condition="Exists('$(SpaDist)')">
+        <Message Text="Copying SPA assets from $(SpaDist) to $(SpaWwwRoot)" Importance="High"/>
+        <MakeDir Directories="$(SpaWwwRoot)"/>
+        <ItemGroup>
+            <SpaDistFiles Include="$(SpaDist)**\*"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(SpaDistFiles)"
+              DestinationFiles="@(SpaDistFiles->'$(SpaWwwRoot)%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true"/>
+    </Target>
 
 </Project>

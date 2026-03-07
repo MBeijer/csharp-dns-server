@@ -28,7 +28,14 @@ public sealed class DnsServerDbContext : DbContext
 					.WithOne(b => b.ZoneObj)
 					.HasForeignKey(b => b.Zone)
 					.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.HasOne(b => b.MasterZone)
+					.WithMany(b => b.SlaveZones)
+					.HasForeignKey(b => b.MasterZoneId)
+					.OnDelete(DeleteBehavior.SetNull);
+
 		modelBuilder.HasIndex(b => b.Suffix).IsUnique();
+		modelBuilder.HasIndex(b => b.MasterZoneId);
 
 		modelBuilder.Navigation(b => b.Records).AutoInclude();
 	}

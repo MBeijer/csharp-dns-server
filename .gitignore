@@ -163,3 +163,7 @@ $RECYCLE.BIN/
 
 # Project Lock File
 project.lock.json
+
+# SPA artifacts
+Dns.Spa/node_modules/
+Dns.Spa/dist/
