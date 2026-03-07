@@ -65,7 +65,7 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 			}
 
 			stage("Testing ${DOCKERIMAGE}:${tag}...") {
-            	def testImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}", "--build-arg BUILDENV=${buildenv} --network=host --pull --target setup -f ${DOCKERFILE} .");
+            	def testImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}_test", "--build-arg BUILDENV=${buildenv} --network=host --pull --target setup -f ${DOCKERFILE} .");
             	testImage.inside("-u 0") {
 					try{
 						sh("dotnet test --logger \"trx;LogFileName=../../Testing/unit_tests.xml\"");
@@ -82,8 +82,8 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 						fingerprint: true
 					)
 
-						withCredentials([string(credentialsId: 'MBEIJER_CSHARP_DNS_SERVER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
-							sh('''#!/usr/bin/env bash
+                    withCredentials([string(credentialsId: 'MBEIJER_CSHARP_DNS_SERVER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
+                        sh('''#!/usr/bin/env bash
 set -euo pipefail
 
 curl -Os https://uploader.codecov.io/latest/linux/codecov
@@ -109,7 +109,7 @@ BUILD_URL_VALUE="${BUILD_URL:-}"
 	--name "jenkins-${JOB_NAME}-${BUILD_NUMBER}" \
 	--disable-search
 ''')
-						}
+                    }
 
 					stage("Xunit") {
 						xunit (
