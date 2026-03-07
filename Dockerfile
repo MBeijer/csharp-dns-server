@@ -30,7 +30,8 @@ RUN useradd -ms /bin/bash dns
 USER dns
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENV ASPNETCORE_URLS="http://*:80"
+ENV ASPNETCORE_URLS="http://*:5000"
 ENTRYPOINT ["dotnet", "Dns.Cli.dll"]
 EXPOSE 5335/udp
-EXPOSE 80/tcp
+EXPOSE 5335/tcp
+EXPOSE 5000/tcp
