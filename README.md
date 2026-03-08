@@ -7,7 +7,7 @@ Fully functional software-extensible DNS server written in C# targeting .NET 10.
 The project was conceived while working to reduce the cost of cloud datacentre "stamps", providing robust discovery services within a datacentre, while specifically removing the need for expensive load-balancer devices.  The DNS Service would support software-defined/pluggable discovery of healthy hosts and services, and round-robin DNS services.  Such that clients may re-resolve, and retry connectivity instead.
 
 ## Licence
-This software is licenced under MIT terms that permits reuse within proprietary software provided all copies of the licensed software include a copy of the MIT License terms and the copyright notice.  See [LICENSE.mc](./LICENSE.md)
+This software is licenced under MIT terms that permits reuse within proprietary software provided all copies of the licensed software include a copy of the MIT License terms and the copyright notice.  See [LICENSE.md](./LICENSE.md)
 
 ## Getting Started
 
