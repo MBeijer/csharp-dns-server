@@ -2,7 +2,7 @@
 
 [![GitHub Actions Status](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stephbu/csharp-dns-server/actions/workflows/ci.yml) [![codecov](https://codecov.io/github/MBeijer/csharp-dns-server/branch/master/graph/badge.svg?token=WBG52LZI5G)](https://codecov.io/github/MBeijer/csharp-dns-server)
 
-Fully functional software-extensible DNS server written in C# targeting .NET 8. Ensure the .NET 8 SDK is installed before building or testing.
+Fully functional software-extensible DNS server written in C# targeting .NET 10. Ensure the .NET 10 SDK is installed before building or testing.
 
 The project was conceived while working to reduce the cost of cloud datacentre "stamps", providing robust discovery services within a datacentre, while specifically removing the need for expensive load-balancer devices.  The DNS Service would support software-defined/pluggable discovery of healthy hosts and services, and round-robin DNS services.  Such that clients may re-resolve, and retry connectivity instead.
 
@@ -44,7 +44,7 @@ As written, the server has the following features:
  - round-robin load-balancing.  Distribute load and provide failover with a datacentre without expensive hardware.
  - health-checks.  While maintaining a list of machines in round-robin for a name, the code performs periodic healthchecks against the machines, if necessary removing machines that fail the health checks from rotation.
  - Delegates all other DNS lookup to host machines default DNS server(s)
- - Automatic set up of zones for docker instances running on a specific docker server, can be used to get `.local` or `.internal` zones, so you can route traffic by hostname via something like Traefik
+ - Automatic set up of zones for docker instances running on a specific docker server, can be used to get `.local` or `.internal` zones, so you can route traffic by hostname via Traefik
  - Authoritative secondary support primitives: `AXFR`/`IXFR` over TCP and `NOTIFY` request/ack handling
 
 The DNS server has a built-in Web Server providing operational insight into the current server behaviour.
@@ -61,7 +61,7 @@ The server ships with several pluggable providers that publish authoritative dat
   - See `docs/providers/BIND_provider.md` for configuration details, validation rules, and troubleshooting tips.
 
 ### BIND Provider Configuration
-Add the provider via `appsettings.json` (both `Dns` and `dns-cli` hosts read the same shape):
+Add the provider via `appsettings.json` (both `Dns` and `Dns.Cli` hosts read the same shape):
 
 ```json
 {
