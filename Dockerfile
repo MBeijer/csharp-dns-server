@@ -1,7 +1,7 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 
-FROM node:22-alpine AS spa-build
+FROM node:24-alpine AS spa-build
 WORKDIR /src/Dns.Spa
 COPY ["Dns.Spa/package.json", "Dns.Spa/package-lock.json", "./"]
 RUN npm ci
