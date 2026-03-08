@@ -111,4 +111,21 @@ describe("zonesSlice", () => {
     state = store.getState().zones;
     expect(state.error).toContain("import-fail");
   });
+
+  it("sets specific errors for save/delete/importBind failures", async () => {
+    const store = configureStore({ reducer: { zones: zonesReducer } });
+
+    vi.mocked(apiClient.createZone).mockRejectedValueOnce(new Error("create-fail"));
+    await store.dispatch(saveZone({ suffix: "new-zone", records: [] }));
+    expect(store.getState().zones.error).toContain("create-fail");
+
+    vi.mocked(apiClient.deleteZone).mockRejectedValueOnce(new Error("delete-fail"));
+    await store.dispatch(deleteZone(9));
+    expect(store.getState().zones.error).toContain("delete-fail");
+
+    vi.mocked(apiClient.importBindZoneFile).mockRejectedValueOnce(new Error("bind-fail"));
+    const file = new File(["zone"], "example.zone", { type: "text/plain" });
+    await store.dispatch(importBindZone({ file, zoneSuffix: "example.com", enabled: true, replaceExistingRecords: true }));
+    expect(store.getState().zones.error).toContain("bind-fail");
+  });
 });

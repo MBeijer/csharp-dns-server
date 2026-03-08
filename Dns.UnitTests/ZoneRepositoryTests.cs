@@ -211,6 +211,79 @@ public sealed class ZoneRepositoryTests
 	}
 
 	[Fact]
+	public async Task UpsertZone_Throws_WhenMasterDoesNotExist()
+	{
+		await using var connection = new SqliteConnection("Data Source=:memory:");
+		await connection.OpenAsync();
+
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
+					  .UseSqlite(connection)
+					  .Options;
+
+		await using var dbContext = new DnsServerDbContext(options);
+		await dbContext.Database.EnsureCreatedAsync();
+
+		var repository = new ZoneRepository(new FakeLogger<ZoneRepository>(), dbContext);
+
+		await Assert.ThrowsAsync<InvalidOperationException>(
+			() => repository.UpsertZone(
+				new Zone
+				{
+					Suffix = "example.com",
+					Enabled = true,
+					MasterZoneId = 999,
+					Records = [],
+				},
+				true
+			)
+		);
+	}
+
+	[Fact]
+	public async Task UpsertZone_Throws_WhenUpdatingSlaveZoneDirectly()
+	{
+		await using var connection = new SqliteConnection("Data Source=:memory:");
+		await connection.OpenAsync();
+
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
+					  .UseSqlite(connection)
+					  .Options;
+
+		await using var dbContext = new DnsServerDbContext(options);
+		await dbContext.Database.EnsureCreatedAsync();
+
+		var repository = new ZoneRepository(new FakeLogger<ZoneRepository>(), dbContext);
+
+		var master = new Zone
+		{
+			Suffix = "master.example.com",
+			Enabled = true,
+			Records = [],
+		};
+		await repository.AddZone(master);
+
+		var slave = new Zone
+		{
+			Suffix = "slave.example.com",
+			MasterZoneId = master.Id,
+		};
+		await repository.AddZone(slave);
+
+		await Assert.ThrowsAsync<InvalidOperationException>(
+			() => repository.UpsertZone(
+				new Zone
+				{
+					Suffix = "slave.example.com",
+					Enabled = true,
+					MasterZoneId = master.Id,
+					Records = [],
+				},
+				true
+			)
+		);
+	}
+
+	[Fact]
 	public async Task SlaveSynchronization_RewritesCNameApexTargetsToSlaveSuffix()
 	{
 		await using var connection = new SqliteConnection("Data Source=:memory:");

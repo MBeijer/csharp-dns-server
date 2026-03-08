@@ -41,6 +41,36 @@ describe("DnsApiClient", () => {
     expect(token).toBe("spaced-token");
   });
 
+  it("returns unquoted token and null handling from setBearerToken path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "plain-token",
+      json: async () => []
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new DnsApiClient("http://api.local");
+    const token = await client.login("user", "pass");
+    expect(token).toBe("plain-token");
+
+    client.setBearerToken(null);
+    await client.getZones();
+    const headers = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(headers.get("Authorization")).toBeNull();
+  });
+
+  it("handles malformed quoted token fallback branch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "\"unterminated"
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new DnsApiClient("http://api.local");
+    const token = await client.login("user", "pass");
+    expect(token).toBe("\"unterminated");
+  });
+
   it("sends authorization header after token is set", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

@@ -82,35 +82,6 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 						fingerprint: true
 					)
 
-                    withCredentials([string(credentialsId: 'MBEIJER_CSHARP_DNS_SERVER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
-                        sh('''#!/usr/bin/env bash
-set -euo pipefail
-
-curl -Os https://uploader.codecov.io/latest/linux/codecov
-chmod +x codecov
-
-# Jenkins workspaces may be owned by a different uid when running in Docker.
-git config --global --add safe.directory "$PWD" || true
-
-GIT_SHA="${GIT_COMMIT:-$(git rev-parse HEAD)}"
-GIT_BRANCH="${BRANCH_NAME:-${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}}"
-GIT_SLUG="mbeijer/csharp-dns-server"
-BUILD_URL_VALUE="${BUILD_URL:-}"
-
-./codecov \
-	--token "$CODECOV_TOKEN" \
-	--file "Testing/unit_tests.xml" \
-	--file "Dns.UnitTests/coverage.opencover.xml" \
-	--sha "$GIT_SHA" \
-	--branch "$GIT_BRANCH" \
-	--slug "$GIT_SLUG" \
-	--build "$BUILD_NUMBER" \
-	--build-url "$BUILD_URL_VALUE" \
-	--name "jenkins-${JOB_NAME}-${BUILD_NUMBER}" \
-	--disable-search
-''')
-                    }
-
 					stage("Xunit") {
 						xunit (
 							testTimeMargin: '3000',
@@ -155,15 +126,23 @@ BUILD_URL_VALUE="${BUILD_URL:-}"
 					sh('''#!/usr/bin/env bash
 set -euo pipefail
 
+curl -Os https://uploader.codecov.io/latest/linux/codecov
+chmod +x codecov
+
+# Jenkins workspaces may be owned by a different uid when running in Docker.
+git config --global --add safe.directory "$PWD" || true
+
 ./codecov \
 	--token "$CODECOV_TOKEN" \
+	--file "Testing/unit_tests.xml" \
+	--file "Dns.UnitTests/coverage.opencover.xml" \
 	--file "Testing/spa_lcov.info" \
 	--sha "${GIT_COMMIT:-$(git rev-parse HEAD)}" \
 	--branch "${BRANCH_NAME:-${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}}" \
 	--slug "mbeijer/csharp-dns-server" \
 	--build "$BUILD_NUMBER" \
 	--build-url "${BUILD_URL:-}" \
-	--name "jenkins-spa-${JOB_NAME}-${BUILD_NUMBER}" \
+	--name "jenkins-${JOB_NAME}-${BUILD_NUMBER}" \
 	--disable-search
 ''')
 				}
