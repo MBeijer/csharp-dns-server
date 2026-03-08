@@ -66,7 +66,6 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
 
 			stage("Testing ${DOCKERIMAGE}:${tag}...") {
             	def testImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}_test", "--build-arg BUILDENV=${buildenv} --network=host --pull --target setup -f ${DOCKERFILE} .");
-            	def spaTestImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}_spa_test", "--build-arg BUILDENV=${buildenv} --network=host --pull --target spa-setup -f ${DOCKERFILE} .");
             	testImage.inside("-u 0") {
 					try{
 						sh("dotnet test --logger \"trx;LogFileName=../../Testing/unit_tests.xml\"");
@@ -132,8 +131,10 @@ BUILD_URL_VALUE="${BUILD_URL:-}"
 					}
             	}
 
+            	def spaTestImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}_spa_test", "--build-arg BUILDENV=${buildenv} --network=host --pull --target spa-setup -f ${DOCKERFILE} .");
 				spaTestImage.inside("-u 0") {
 					try {
+						sh("cd Dns.Spa && npm ci --include=dev");
 						sh("cd Dns.Spa && npm run test:coverage");
 						sh("mkdir -p Testing");
 						sh("cp Dns.Spa/coverage/lcov.info Testing/spa_lcov.info");
