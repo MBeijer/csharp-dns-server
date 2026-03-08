@@ -18,23 +18,33 @@ This software is licenced under MIT terms that permits reuse within proprietary 
 
 // check you can build the project
 >> cd $repo-root/csharp-dns-server
->> dotnet build
+>> dotnet build csharp-dns-server.sln
 
 // check that the tests run
->> dotnet test
+>> dotnet test csharp-dns-server.sln
 
 // use DIG query appconfig'd local server
 >> dig -p 5335 @127.0.0.1 www.google.com A 
 
 ```
 
-> **Note:** The solution targets `net8.0`; all commands above assume the .NET 8 SDK is available on your PATH.
+> **Note:** The solution targets `net10.0`; all commands above assume the .NET 10 SDK is available on your PATH.
 
 ## Gotchas
 - if you're running on Windows with Docker Tools installed, Docker uses the ICS SharedAccess service to provide DNS resolution for Docker containers - this listens on UDP:53, and will conflict with the DNS project.  Either turn off the the service (```net stop SharedAccess```), or change the UDP port.
 
 ## Continuous Integration
-All pushes and pull requests against `main` run through `.github/workflows/ci.yml`, a GitHub Actions pipeline that restores, builds, and tests the full `csharp-dns-server.sln` on both Ubuntu and Windows runners using the .NET 8 SDK.
+This fork uses Jenkins for CI/CD (`Jenkinsfile`), not GitHub Actions.
+
+Pipeline highlights:
+- builds Docker images from `Dockerfile`
+- runs the test suite inside the build/test container (`dotnet test`)
+- publishes test/coverage artifacts (including Codecov upload)
+- pushes images to Docker Hub for `master` (production tag) and `dev` (`-dev` tag)
+
+Docker image:
+- `mbeijer/dns-traefik` (`latest` on `master`, `latest-dev` on `dev`)
+- https://hub.docker.com/r/mbeijer/dns-traefik
 
 ## Features
 
@@ -44,35 +54,79 @@ As written, the server has the following features:
  - round-robin load-balancing.  Distribute load and provide failover with a datacentre without expensive hardware.
  - health-checks.  While maintaining a list of machines in round-robin for a name, the code performs periodic healthchecks against the machines, if necessary removing machines that fail the health checks from rotation.
  - Delegates all other DNS lookup to host machines default DNS server(s)
- - Automatic set up of zones for docker instances running on a specific docker server, can be used to get `.local` or `.internal` zones, so you can route traffic by hostname via Traefik
+ - Database-backed authoritative zones (CRUD via API + runtime resolution)
+ - Automatic setup of zones for docker instances running on a specific docker host via Traefik route discovery
  - Authoritative secondary support primitives: `AXFR`/`IXFR` over TCP and `NOTIFY` request/ack handling
 
-The DNS server has a built-in Web Server providing operational insight into the current server behaviour.
-- healthcheck for server status
-- counters
-- zone information
+The DNS server has a built-in ASP.NET Core web host with:
+- Swagger/OpenAPI UI
+- JWT-protected zone management API
+- resolver dump endpoints (legacy compatibility)
+- optional React SPA hosting from `Dns.Cli/wwwroot`
 
 ## Zone Providers
-The server ships with several pluggable providers that publish authoritative data into `SmartZoneResolver`:
+The server ships with pluggable providers that publish authoritative data into `SmartZoneResolver`:
 
-- **CSV/AP provider** – watches a simple CSV file (`MachineFunction`, `StaticIP`) and publishes grouped A records for each function. See `docs/providers/AP_provider.md` for schema details.
-- **IPProbe provider** – continuously probes configured endpoints (ping/noop today) and only emits healthy addresses. Configuration and behavior live in `docs/providers/IPProbe_provider.md`.
-- **BIND zone provider** – watches a BIND-style forward zone file, parses `$ORIGIN`, `$TTL`, SOA/NS/A/AAAA/CNAME/MX/TXT records, and emits address records once the zone validates successfully.  Any lexical or semantic validation error (missing SOA/NS, malformed TTLs, unsupported record types, duplicate CNAMEs, etc.) is surfaced with line numbers and the previous zone continues serving traffic.
-  - See `docs/providers/BIND_provider.md` for configuration details, validation rules, and troubleshooting tips.
+- **CSV/AP provider** (`Dns.ZoneProvider.AP.APZoneProvider`) - file-watcher based CSV import (`MachineFunction`, `StaticIP`, `MachineName`) that groups addresses into A records per function. See `docs/providers/AP_provider.md`.
+- **IPProbe provider** (`Dns.ZoneProvider.IPProbe.IPProbeZoneProvider`) - active probing of configured targets with health-based A record publication. See `docs/providers/IPProbe_provider.md`.
+- **BIND provider** (`Dns.ZoneProvider.Bind.BindZoneProvider`) - file-watcher based BIND zone parser/validator (`$ORIGIN`, `$TTL`, SOA/NS/A/AAAA/CNAME/PTR/MX/TXT`) that only publishes valid zones. See `docs/providers/BIND_provider.md`.
+- **Traefik provider** (`Dns.ZoneProvider.Traefik.TraefikZoneProvider`) - polls Traefik routes and emits A records for matching host rules in the configured zone.
+- **Database provider** (`Dns.ZoneProvider.DatabaseZoneProvider`) - continuously loads enabled zones/records from the application database and serves them authoritatively.
+
+Provider settings are configured per zone under `server.zones[*].providerSettings` with a `$type` discriminator:
+- `ipprobe` for `IPProbeZoneProvider`
+- `traefik` for `TraefikZoneProvider`
+- `filewatcher` for file-backed providers (`APZoneProvider`, `BindZoneProvider`)
+- no provider settings required for `DatabaseZoneProvider`
+
+### Provider Configuration Examples
+```json
+{
+  "server": {
+    "zones": [
+      {
+        "name": ".example.com",
+        "provider": "Dns.ZoneProvider.Bind.BindZoneProvider",
+        "providerSettings": {
+          "$type": "filewatcher",
+          "fileName": "/etc/dns/example.com.zone"
+        }
+      },
+      {
+        "name": ".internal",
+        "provider": "Dns.ZoneProvider.Traefik.TraefikZoneProvider",
+        "providerSettings": {
+          "$type": "traefik",
+          "traefikUrl": "https://traefik.local",
+          "username": "traefik-user",
+          "password": "traefik-password",
+          "dockerHostInternalIp": "10.0.0.10"
+        }
+      },
+      {
+        "provider": "Dns.ZoneProvider.DatabaseZoneProvider"
+      }
+    ]
+  }
+}
+```
 
 ### BIND Provider Configuration
-Add the provider via `appsettings.json` (both `Dns` and `Dns.Cli` hosts read the same shape):
+Add the provider via `appsettings.json` using the same `server.zones[]` shape used by all providers:
 
 ```json
 {
   "server": {
-    "zone": {
-      "name": ".example.com",
-      "provider": "Dns.ZoneProvider.Bind.BindZoneProvider"
-    }
-  },
-  "zoneprovider": {
-    "FileName": "C:/zones/example.com.zone"
+    "zones": [
+      {
+        "name": ".example.com",
+        "provider": "Dns.ZoneProvider.Bind.BindZoneProvider",
+        "providerSettings": {
+          "$type": "filewatcher",
+          "fileName": "C:/zones/example.com.zone"
+        }
+      }
+    ]
   }
 }
 ```
@@ -157,6 +211,53 @@ On `dotnet build`/`dotnet publish`, `Dns.Cli` copies files from `Dns.Spa/dist` i
 
 ### Docker build
 `Dockerfile` uses a Node build stage to compile `Dns.Spa` and then copies `dist` into the .NET build stage so the final ASP.NET image serves the SPA in production mode.
+
+### Get Started with Docker (Compose)
+Example `docker-compose.yml` for running the published Docker Hub image with DNS + API + Traefik routing:
+
+```yaml
+services:
+  dns-service:
+    image: mbeijer/dns-traefik:latest
+    environment:
+      ASPNETCORE_URLS: "http://*:5000"
+    restart: always
+    volumes:
+      - ./appsettings.json:/app/appsettings.json
+      - ./data:/app/data
+    ports:
+      - "5000/tcp"
+      - "53:5335/udp"
+      - "53:5335/tcp"
+    dns:
+      - 8.8.8.8
+    networks:
+      - traefik_compose
+    labels:
+      - "traefik.http.routers.dns-service.rule=Host(`dns-service-docker-dns.local`) || Host(`dns-service-docker-dns.internal`) || Host(`dns.local`) || Host(`dns.internal`)"
+      - "traefik.http.routers.dns-service.entrypoints=web"
+      - "traefik.http.routers.dns-service-secured.rule=Host(`dns-service-docker-dns.local`) || Host(`dns-service-docker-dns.internal`) || Host(`dns.local`) || Host(`dns.internal`)"
+      - "traefik.http.routers.dns-service-secured.entrypoints=websecure"
+      - "traefik.http.routers.dns-service-secured.tls=true"
+      - "traefik.http.routers.dns-service-secured.tls.certresolver=myresolver"
+      - "traefik.http.services.dns-service.loadbalancer.server.port=5000"
+
+networks:
+  traefik_compose:
+    external: true
+    name: traefik_compose
+```
+
+Run it:
+```bash
+docker compose up -d
+```
+
+Notes:
+- DNS requests to host port `53` are forwarded to container port `5335` (UDP/TCP).
+- The API/Swagger host runs on container port `5000`.
+- Keep `./appsettings.json` in sync with your desired providers/zones; it is mounted directly into `/app/appsettings.json`.
+- Image source: https://hub.docker.com/r/mbeijer/dns-traefik
 
 ### Import BIND Zone Into Database Zone
 You can convert a BIND zone file into a database-backed zone via the DNS API:
