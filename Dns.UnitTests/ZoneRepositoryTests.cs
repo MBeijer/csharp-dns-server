@@ -279,4 +279,59 @@ public sealed class ZoneRepositoryTests
 		);
 		Assert.Equal("outside.example.net", externalAlias.Data);
 	}
+
+	[Fact]
+	public async Task SlaveSynchronization_RewritesApexAliasesWithTrailingDotAndCaseInsensitiveMasterSuffix()
+	{
+		await using var connection = new SqliteConnection("Data Source=:memory:");
+		await connection.OpenAsync();
+
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
+					  .UseSqlite(connection)
+					  .Options;
+
+		await using var dbContext = new DnsServerDbContext(options);
+		await dbContext.Database.EnsureCreatedAsync();
+
+		var repository = new ZoneRepository(new FakeLogger<ZoneRepository>(), dbContext);
+		var master = new Zone
+		{
+			Suffix = "master.example.com",
+			Enabled = true,
+			Records =
+			[
+				new ZoneRecord
+				{
+					Host = "atdot",
+					Type = ResourceType.CNAME,
+					Class = ResourceClass.IN,
+					Data = "@.",
+				},
+				new ZoneRecord
+				{
+					Host = "rootdot",
+					Type = ResourceType.CNAME,
+					Class = ResourceClass.IN,
+					Data = "MASTER.EXAMPLE.COM.",
+				},
+			],
+		};
+		await repository.AddZone(master);
+
+		var slave = new Zone
+		{
+			Suffix = "slave.example.com.",
+			MasterZoneId = master.Id,
+		};
+		await repository.AddZone(slave);
+
+		var syncedSlave = await repository.GetZone("slave.example.com.");
+		Assert.NotNull(syncedSlave);
+
+		var atdot = Assert.Single(syncedSlave!.Records!, r => r.Host == "atdot");
+		Assert.Equal("slave.example.com.", atdot.Data);
+
+		var rootdot = Assert.Single(syncedSlave.Records!, r => r.Host == "rootdot");
+		Assert.Equal("slave.example.com.", rootdot.Data);
+	}
 }

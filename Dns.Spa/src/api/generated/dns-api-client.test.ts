@@ -19,6 +19,28 @@ describe("DnsApiClient", () => {
     expect(token).toBe("test-token");
   });
 
+  it("throws when login fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new DnsApiClient("http://api.local");
+    await expect(client.login("user", "pass")).rejects.toThrow("Login failed");
+  });
+
+  it("normalizes JSON-parsed token with surrounding spaces", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "\"  spaced-token  \""
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new DnsApiClient("http://api.local");
+    const token = await client.login("user", "pass");
+    expect(token).toBe("spaced-token");
+  });
+
   it("sends authorization header after token is set", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -55,6 +77,31 @@ describe("DnsApiClient", () => {
     const body = init.body as FormData;
     expect(body.get("zoneSuffix")).toBe("example.com");
     expect(body.get("replaceExistingRecords")).toBe("false");
+  });
+
+  it("throws when bind upload import fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 400 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new DnsApiClient("http://api.local");
+    const file = new File(["zone"], "example.zone", { type: "text/plain" });
+
+    await expect(
+      client.importBindZoneFile({
+        file,
+        zoneSuffix: "example.com"
+      })
+    ).rejects.toThrow("Failed to import BIND zone");
+  });
+
+  it("throws for get/create/update/delete failures", async () => {
+    const client = new DnsApiClient("http://api.local");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+
+    await expect(client.getZones()).rejects.toThrow("Failed to fetch zones");
+    await expect(client.createZone({ suffix: "a" })).rejects.toThrow("Failed to create zone");
+    await expect(client.updateZone({ id: 1, suffix: "a" })).rejects.toThrow("Failed to update zone");
+    await expect(client.deleteZone(1)).rejects.toThrow("Failed to delete zone");
   });
 
   it("throws on existing-zone bind import when API fails", async () => {

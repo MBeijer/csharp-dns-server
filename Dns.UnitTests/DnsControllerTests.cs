@@ -212,6 +212,82 @@ public sealed class DnsControllerTests
 	}
 
 	[Fact]
+	public async Task ImportBindZone_ReturnsBadRequest_WhenParseFails()
+	{
+		var controller = CreateController(out _, out _);
+		var zoneFile = WriteTempZoneFile(["not-a-zone"]);
+
+		try
+		{
+			var result = await controller.ImportBindZone(
+							 new BindZoneImportRequest
+							 {
+								 FileName = zoneFile,
+								 ZoneSuffix = "example.com",
+							 }
+						 );
+
+			Assert.IsType<BadRequestObjectResult>(result);
+		}
+		finally
+		{
+			File.Delete(zoneFile);
+		}
+	}
+
+	[Fact]
+	public async Task ImportBindZone_ReturnsOk_WhenZoneAlreadyExists()
+	{
+		var controller = CreateController(out var zoneRepository, out _);
+		var zoneFile = WriteTempZoneFile(
+			[
+				"$TTL 1h",
+				"$ORIGIN example.com.",
+				"@ IN SOA ns1.example.com. hostmaster.example.com. (",
+				"    2024010101",
+				"    7200",
+				"    3600",
+				"    1209600",
+				"    3600 )",
+				"@ IN NS ns1.example.com.",
+				"www IN A 192.0.2.10",
+			]
+		);
+
+		try
+		{
+			var existing = new Zone { Id = 5, Suffix = "example.com", Enabled = true };
+			zoneRepository.GetZone("example.com").Returns(existing);
+			zoneRepository.UpsertZone(Arg.Any<Zone>(), true)
+						  .Returns(
+							  new Zone
+							  {
+								  Id = 5,
+								  Suffix = "example.com",
+								  Serial = 2024010102,
+								  Enabled = true,
+								  Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.10" } },
+							  }
+						  );
+
+			var result = await controller.ImportBindZone(
+							 new BindZoneImportRequest
+							 {
+								 FileName = zoneFile,
+								 ZoneSuffix = "example.com",
+								 ReplaceExistingRecords = true,
+							 }
+						 );
+
+			Assert.IsType<OkObjectResult>(result);
+		}
+		finally
+		{
+			File.Delete(zoneFile);
+		}
+	}
+
+	[Fact]
 	public async Task ImportBindZoneUpload_ReturnsBadRequest_WhenFileMissing()
 	{
 		var controller = CreateController(out _, out _);
@@ -226,6 +302,22 @@ public sealed class DnsControllerTests
 					 );
 
 		Assert.IsType<ObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task ImportBindZoneUpload_ReturnsBadRequest_WhenUploadMissing()
+	{
+		var controller = CreateController(out _, out _);
+
+		var result = await controller.ImportBindZoneUpload(
+						 new BindZoneUploadImportRequest
+						 {
+							 File = null,
+							 ZoneSuffix = "example.com",
+						 }
+					 );
+
+		Assert.IsType<BadRequestObjectResult>(result);
 	}
 
 	[Fact]
