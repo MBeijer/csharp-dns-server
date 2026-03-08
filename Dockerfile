@@ -4,7 +4,7 @@ WORKDIR /app
 FROM node:24-alpine AS spa-setup
 WORKDIR /src
 COPY ["Dns.Spa/package.json", "Dns.Spa/package-lock.json", "Dns.Spa/"]
-RUN cd /src/Dns.Spa && npm ci
+RUN cd /src/Dns.Spa && npm ci --include=dev
 COPY ["Dns.Spa/", "Dns.Spa/"]
 
 FROM spa-setup AS spa-build
