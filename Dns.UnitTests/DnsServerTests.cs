@@ -20,7 +20,7 @@ using Xunit;
 
 namespace Dns.UnitTests;
 
-public class DnsServerCoverageTests
+public class DnsServerTests
 {
 	[Fact]
 	public void BuildBasicResponse_CopiesRequestShape()

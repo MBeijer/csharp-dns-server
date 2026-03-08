@@ -8,3 +8,9 @@ coverage:
         target: 80%
         threshold: 0%
         informational: false
+ignore:
+  - "**/obj/**"
+  - "**/Migrations/**"
+  - "**/*generated.cs"
+  - "Dns.Cli/Program.cs"
+  - "Dns.Cli/Startup.cs"

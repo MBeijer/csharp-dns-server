@@ -16,9 +16,9 @@ using Xunit.Abstractions;
 
 namespace Dns.UnitTests;
 
-public class DnsProtocolTest
+public class DnsProtocolTests
 {
-	public DnsProtocolTest(ITestOutputHelper testOutputHelper)
+	public DnsProtocolTests(ITestOutputHelper testOutputHelper)
 	{
 	}
 

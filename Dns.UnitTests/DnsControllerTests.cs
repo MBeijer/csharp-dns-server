@@ -159,6 +159,23 @@ public sealed class DnsControllerTests
 	}
 
 	[Fact]
+	public async Task ImportBindZone_ReturnsValidationProblem_WhenModelInvalid()
+	{
+		var controller = CreateController(out _, out _);
+		controller.ModelState.AddModelError("ZoneSuffix", "required");
+
+		var result = await controller.ImportBindZone(
+						 new BindZoneImportRequest
+						 {
+							 FileName = "ignored.zone",
+							 ZoneSuffix = "example.com",
+						 }
+					 );
+
+		Assert.IsType<ObjectResult>(result);
+	}
+
+	[Fact]
 	public async Task ImportBindZone_ReturnsCreated_WhenZoneIsNew()
 	{
 		var controller = CreateController(out var zoneRepository, out _);
@@ -318,6 +335,45 @@ public sealed class DnsControllerTests
 					 );
 
 		Assert.IsType<BadRequestObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task ImportBindZoneUpload_ReturnsOk_WhenExistingZoneIsUpdated()
+	{
+		var controller = CreateController(out var zoneRepository, out _);
+		var file = CreateFormFile(
+			string.Join(
+				Environment.NewLine,
+				[
+					"$TTL 1h",
+					"$ORIGIN example.com.",
+					"@ IN SOA ns1.example.com. hostmaster.example.com. (",
+					"    2024010101",
+					"    7200",
+					"    3600",
+					"    1209600",
+					"    3600 )",
+					"@ IN NS ns1.example.com.",
+					"www IN A 192.0.2.10",
+				]
+			),
+			"example.zone"
+		);
+
+		var existing = new Zone { Id = 2, Suffix = "example.com", Enabled = true };
+		zoneRepository.GetZone("example.com").Returns(existing);
+		zoneRepository.UpsertZone(Arg.Any<Zone>(), true).Returns(existing);
+
+		var result = await controller.ImportBindZoneUpload(
+						 new BindZoneUploadImportRequest
+						 {
+							 File = file,
+							 ZoneSuffix = "example.com",
+							 ReplaceExistingRecords = true,
+						 }
+					 );
+
+		Assert.IsType<OkObjectResult>(result);
 	}
 
 	[Fact]
