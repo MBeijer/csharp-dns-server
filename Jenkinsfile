@@ -130,6 +130,43 @@ BUILD_URL_VALUE="${BUILD_URL:-}"
 						);
 					}
             	}
+
+            	def spaTestImage = docker.build("${DOCKER_ROOT}/${DOCKERIMAGE}:${tag}_spa_test", "--build-arg BUILDENV=${buildenv} --network=host --pull --target spa-setup -f ${DOCKERFILE} .");
+				spaTestImage.inside("-u 0") {
+					try {
+						sh("cd Dns.Spa && npm ci --include=dev");
+						sh("cd Dns.Spa && npm run test:coverage");
+						sh("mkdir -p Testing");
+						sh("cp Dns.Spa/coverage/lcov.info Testing/spa_lcov.info");
+						sh("chmod 777 -R .");
+					} catch(err) {
+						currentBuild.result = 'FAILURE'
+						sh("chmod 777 -R .");
+						notify('SPA testing failed')
+					}
+				}
+
+				archiveArtifacts (
+					artifacts: 'Testing/spa_lcov.info',
+					fingerprint: true
+				)
+
+				withCredentials([string(credentialsId: 'MBEIJER_CSHARP_DNS_SERVER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
+					sh('''#!/usr/bin/env bash
+set -euo pipefail
+
+./codecov \
+	--token "$CODECOV_TOKEN" \
+	--file "Testing/spa_lcov.info" \
+	--sha "${GIT_COMMIT:-$(git rev-parse HEAD)}" \
+	--branch "${BRANCH_NAME:-${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}}" \
+	--slug "mbeijer/csharp-dns-server" \
+	--build "$BUILD_NUMBER" \
+	--build-url "${BUILD_URL:-}" \
+	--name "jenkins-spa-${JOB_NAME}-${BUILD_NUMBER}" \
+	--disable-search
+''')
+				}
             }
 
 			if (publish) {

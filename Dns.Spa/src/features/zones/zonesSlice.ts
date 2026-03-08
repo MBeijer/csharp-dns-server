@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { apiClient } from "../../api/client";
-import type { Zone } from "../../api/generated/dns-api-client";
+import type { BindZoneExistingImportUploadRequest, BindZoneImportUploadRequest, Zone } from "../../api/generated/dns-api-client";
 
 interface ZonesState {
   items: Zone[];
@@ -34,6 +34,22 @@ export const deleteZone = createAsyncThunk("zones/delete", async (zoneId: number
   await apiClient.deleteZone(zoneId);
   await dispatch(fetchZones()).unwrap();
 });
+
+export const importBindZone = createAsyncThunk(
+  "zones/importBindZone",
+  async (request: BindZoneImportUploadRequest, { dispatch }) => {
+    await apiClient.importBindZoneFile(request);
+    await dispatch(fetchZones()).unwrap();
+  }
+);
+
+export const importBindZoneIntoZone = createAsyncThunk(
+  "zones/importBindZoneIntoZone",
+  async (request: BindZoneExistingImportUploadRequest, { dispatch }) => {
+    await apiClient.importBindZoneIntoExistingZone(request);
+    await dispatch(fetchZones()).unwrap();
+  }
+);
 
 const zonesSlice = createSlice({
   name: "zones",
@@ -74,6 +90,28 @@ const zonesSlice = createSlice({
       .addCase(deleteZone.rejected, (state, action) => {
         state.saving = false;
         state.error = action.error.message ?? "Failed to delete zone";
+      })
+      .addCase(importBindZone.pending, (state) => {
+        state.saving = true;
+        state.error = null;
+      })
+      .addCase(importBindZone.fulfilled, (state) => {
+        state.saving = false;
+      })
+      .addCase(importBindZone.rejected, (state, action) => {
+        state.saving = false;
+        state.error = action.error.message ?? "Failed to import BIND zone";
+      })
+      .addCase(importBindZoneIntoZone.pending, (state) => {
+        state.saving = true;
+        state.error = null;
+      })
+      .addCase(importBindZoneIntoZone.fulfilled, (state) => {
+        state.saving = false;
+      })
+      .addCase(importBindZoneIntoZone.rejected, (state, action) => {
+        state.saving = false;
+        state.error = action.error.message ?? "Failed to import BIND zone into zone";
       });
   }
 });

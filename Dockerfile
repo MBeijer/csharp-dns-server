@@ -1,11 +1,14 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 
-FROM node:24-alpine AS spa-build
+FROM node:24-alpine AS spa-setup
+WORKDIR /src
+COPY ["Dns.Spa/package.json", "Dns.Spa/package-lock.json", "Dns.Spa/"]
+RUN cd /src/Dns.Spa && npm ci --include=dev
+COPY ["Dns.Spa/", "Dns.Spa/"]
+
+FROM spa-setup AS spa-build
 WORKDIR /src/Dns.Spa
-COPY ["Dns.Spa/package.json", "Dns.Spa/package-lock.json", "./"]
-RUN npm ci
-COPY ["Dns.Spa/", "./"]
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS setup

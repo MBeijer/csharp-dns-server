@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Dns.Cli.Models;
@@ -140,23 +141,73 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 			return BadRequest($"Unable to parse BIND zone file: {ex.Message}");
 		}
 
-		var dbZone = BindZoneImportMapper.ToDbZone(parsedZone, request.ZoneSuffix, request.Enabled);
+		return await UpsertImportedZoneAsync(parsedZone, request.ZoneSuffix, request.Enabled, request.ReplaceExistingRecords)
+			.ConfigureAwait(false);
+	}
 
-		var existing = await zoneRepository.GetZone(dbZone.Suffix!).ConfigureAwait(false);
-		var upserted = await zoneRepository.UpsertZone(dbZone, request.ReplaceExistingRecords).ConfigureAwait(false);
+	/// <summary>
+	///     Import a BIND zone file upload into the database-backed zone model.
+	/// </summary>
+	/// <param name="request">Multipart form import settings.</param>
+	/// <returns>Imported zone summary.</returns>
+	[ProducesResponseType(StatusCodes.Status201Created)]
+	[ProducesResponseType(StatusCodes.Status200OK)]
+	[ProducesResponseType(StatusCodes.Status400BadRequest)]
+	[HttpPost("zones/import-bind-upload")]
+	[Authorize]
+	public async Task<IActionResult?> ImportBindZoneUpload([FromForm] BindZoneUploadImportRequest request)
+	{
+		if (!ModelState.IsValid) return ValidationProblem(ModelState);
+		if (request.File == null || request.File.Length <= 0) return BadRequest("A non-empty BIND zone file is required.");
 
-		var payload = new
-		{
-			id = upserted.Id,
-			suffix = upserted.Suffix,
-			serial = upserted.Serial,
-			enabled = upserted.Enabled,
-			recordCount = upserted.Records?.Count ?? dbZone.Records?.Count ?? 0,
-		};
+		var parseResult = await ParseUploadedZoneAsync(request.File, request.ZoneSuffix).ConfigureAwait(false);
+		if (parseResult.Error != null) return parseResult.Error;
 
-		if (existing == null) return Created($"/dns/zones/{upserted.Id}", payload);
+		return await UpsertImportedZoneAsync(
+				   parseResult.ParsedZone!,
+				   request.ZoneSuffix,
+				   request.Enabled,
+				   request.ReplaceExistingRecords
+			   )
+			   .ConfigureAwait(false);
+	}
 
-		return Ok(payload);
+	/// <summary>
+	///     Import a BIND zone file upload into an existing database zone.
+	/// </summary>
+	/// <param name="id">Target zone id.</param>
+	/// <param name="request">Multipart form import settings.</param>
+	/// <returns>Updated zone summary.</returns>
+	[ProducesResponseType(StatusCodes.Status200OK)]
+	[ProducesResponseType(StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(StatusCodes.Status404NotFound)]
+	[HttpPost("zones/{id:int}/import-bind-upload")]
+	[Authorize]
+	public async Task<IActionResult?> ImportBindZoneIntoExistingZone(
+		[FromRoute] int id,
+		[FromForm] BindZoneExistingUploadImportRequest request
+	)
+	{
+		if (!ModelState.IsValid) return ValidationProblem(ModelState);
+		if (request.File == null || request.File.Length <= 0) return BadRequest("A non-empty BIND zone file is required.");
+
+		var existingZone = await zoneRepository.GetZone(id).ConfigureAwait(false);
+		if (existingZone == null) return NotFound($"Zone '{id}' was not found.");
+
+		var zoneSuffix = existingZone.Suffix;
+		if (string.IsNullOrWhiteSpace(zoneSuffix))
+			return BadRequest($"Zone '{id}' has no suffix and cannot be imported.");
+
+		var parseResult = await ParseUploadedZoneAsync(request.File, zoneSuffix).ConfigureAwait(false);
+		if (parseResult.Error != null) return parseResult.Error;
+
+		return await UpsertImportedZoneAsync(
+				   parseResult.ParsedZone!,
+				   zoneSuffix,
+				   existingZone.Enabled,
+				   request.ReplaceExistingRecords
+			   )
+			   .ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -178,6 +229,59 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 							   .ConfigureAwait(false);
 
 		return Ok(result);
+	}
+
+	private async Task<IActionResult> UpsertImportedZoneAsync(
+		Dns.Models.Zone parsedZone,
+		string zoneSuffix,
+		bool enabled,
+		bool replaceExistingRecords
+	)
+	{
+		var dbZone = BindZoneImportMapper.ToDbZone(parsedZone, zoneSuffix, enabled);
+		var existing = await zoneRepository.GetZone(dbZone.Suffix!).ConfigureAwait(false);
+		var upserted = await zoneRepository.UpsertZone(dbZone, replaceExistingRecords).ConfigureAwait(false);
+
+		var payload = new
+		{
+			id = upserted.Id,
+			suffix = upserted.Suffix,
+			serial = upserted.Serial,
+			enabled = upserted.Enabled,
+			recordCount = upserted.Records?.Count ?? dbZone.Records?.Count ?? 0,
+		};
+
+		return existing == null ? Created($"/dns/zones/{upserted.Id}", payload) : Ok(payload);
+	}
+
+	private static async Task<(Dns.Models.Zone? ParsedZone, IActionResult? Error)> ParseUploadedZoneAsync(
+		IFormFile file,
+		string zoneSuffix
+	)
+	{
+		var tempFilePath = Path.Combine(Path.GetTempPath(), $"bind-import-{Guid.NewGuid():N}.zone");
+		try
+		{
+			using (var target = System.IO.File.Create(tempFilePath))
+			{
+				await file.CopyToAsync(target).ConfigureAwait(false);
+			}
+
+			try
+			{
+				var parsedZone = BindZoneProvider.ParseZoneFile(tempFilePath, zoneSuffix);
+				return (parsedZone, null);
+			}
+			catch (Exception ex)
+			{
+				return (null, new BadRequestObjectResult($"Unable to parse BIND zone file: {ex.Message}"));
+			}
+		}
+		finally
+		{
+			if (System.IO.File.Exists(tempFilePath))
+				System.IO.File.Delete(tempFilePath);
+		}
 	}
 }
 

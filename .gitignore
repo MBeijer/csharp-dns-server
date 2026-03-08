@@ -4,6 +4,9 @@ Dns.Cli/appsettings.Development.json
 Dns.Cli/dns.db*
 Dns.Cli/wwwroot/
 
+# Temporary coverage files
+Dns.Spa/coverage
+
 # User-specific files
 *.suo
 *.user
