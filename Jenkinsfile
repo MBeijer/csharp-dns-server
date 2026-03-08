@@ -69,7 +69,7 @@ def buildStep(DOCKER_ROOT, DOCKERIMAGE, DOCKERTAG, DOCKERFILE, BUILD_NEXT) {
             	testImage.inside("-u 0") {
 					try{
 						sh("dotnet test --logger \"trx;LogFileName=../../Testing/unit_tests.xml\"");
-						sh("dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=opencover");
+						sh('dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:ExcludeByFile="**/obj/**%3B**/Migrations/**%3B**/*generated.cs%3B**/Startup.cs%3B**/Program.cs"');
 						sh("chmod 777 -R .");
 					} catch(err) {
 						currentBuild.result = 'FAILURE'
