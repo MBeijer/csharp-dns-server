@@ -35,10 +35,11 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DnsIcon from "@mui/icons-material/Dns";
 import EditIcon from "@mui/icons-material/Edit";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import type { Zone, ZoneRecord } from "../api/generated/dns-api-client";
-import { deleteZone, fetchZones, saveZone } from "../features/zones/zonesSlice";
+import { deleteZone, fetchZones, importBindZone, importBindZoneIntoZone, saveZone } from "../features/zones/zonesSlice";
 
 const RESOURCE_TYPES = ["A", "AAAA", "CNAME", "NS", "MX", "TXT", "PTR", "SRV"];
 const RESOURCE_CLASSES = ["IN", "CS", "CH", "HS"];
@@ -47,6 +48,7 @@ type EnabledBulkMode = "keep" | "enable" | "disable";
 type SortDirection = "asc" | "desc";
 type ZoneSortKey = "suffix" | "serial" | "enabled" | "records" | "relationship";
 type RecordSortKey = "host" | "type" | "class" | "data";
+type BindImportMode = "add" | "replace";
 
 interface EditableZone {
   id?: number;
@@ -171,9 +173,15 @@ function normalizeZoneForApi(zone: EditableZone): Zone {
         class: record.class?.trim() ?? "",
         data: record.data?.trim() ?? ""
       }))
-      .filter((record) => record.host && record.type && record.class && record.data)
+      // Keep apex records (empty host) such as NS/MX/TXT at the zone root.
+      .filter((record) => record.type && record.class && record.data)
     ]
   };
+}
+
+function inferZoneSuffixFromFileName(fileName: string): string {
+  const strippedPath = fileName.split(/[\\/]/).pop() ?? fileName;
+  return strippedPath.replace(/\.[^.]+$/, "");
 }
 
 export function ZoneList(): JSX.Element {
@@ -191,6 +199,15 @@ export function ZoneList(): JSX.Element {
 
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkEnabledMode, setBulkEnabledMode] = useState<EnabledBulkMode>("keep");
+  const [bindImportDialogOpen, setBindImportDialogOpen] = useState(false);
+  const [bindImportFile, setBindImportFile] = useState<File | null>(null);
+  const [bindImportZoneSuffix, setBindImportZoneSuffix] = useState("");
+  const [bindImportEnabled, setBindImportEnabled] = useState(true);
+  const [bindImportReplaceExisting, setBindImportReplaceExisting] = useState(true);
+  const [hideSlaves, setHideSlaves] = useState(false);
+  const [zoneBindImportDialogOpen, setZoneBindImportDialogOpen] = useState(false);
+  const [zoneBindImportFile, setZoneBindImportFile] = useState<File | null>(null);
+  const [zoneBindImportMode, setZoneBindImportMode] = useState<BindImportMode>("replace");
   const [zoneSortKey, setZoneSortKey] = useState<ZoneSortKey>("suffix");
   const [zoneSortDirection, setZoneSortDirection] = useState<SortDirection>("asc");
   const [recordSortKey, setRecordSortKey] = useState<RecordSortKey>("host");
@@ -223,6 +240,14 @@ export function ZoneList(): JSX.Element {
     });
   }, [zones.items, zoneSortDirection, zoneSortKey]);
 
+  const displayedZones = useMemo(() => {
+    if (!hideSlaves) {
+      return sortedZones;
+    }
+
+    return sortedZones.filter((zone) => zone.masterZoneId == null);
+  }, [hideSlaves, sortedZones]);
+
   const sortedDraftRecords = useMemo(() => {
     const directionFactor = recordSortDirection === "asc" ? 1 : -1;
     const withIndex = zoneDraft.records.map((record, originalIndex) => ({ record, originalIndex }));
@@ -244,8 +269,8 @@ export function ZoneList(): JSX.Element {
   }, [recordSortDirection, recordSortKey, zoneDraft.records]);
 
   const selectableIds = useMemo(
-    () => sortedZones.map((zone) => zone.id).filter((id): id is number => id != null),
-    [sortedZones]
+    () => displayedZones.map((zone) => zone.id).filter((id): id is number => id != null),
+    [displayedZones]
   );
 
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedZoneIds.includes(id));
@@ -345,7 +370,7 @@ export function ZoneList(): JSX.Element {
       return;
     }
 
-    const selectedZones = sortedZones.filter((zone): zone is Zone & { id: number } =>
+    const selectedZones = displayedZones.filter((zone): zone is Zone & { id: number } =>
       zone.id != null ? selectedZoneIds.includes(zone.id) : false
     );
 
@@ -364,6 +389,70 @@ export function ZoneList(): JSX.Element {
 
     setBulkDialogOpen(false);
     setBulkEnabledMode("keep");
+  };
+
+  const openBindImportDialog = () => {
+    setBindImportDialogOpen(true);
+  };
+
+  const closeBindImportDialog = () => {
+    setBindImportDialogOpen(false);
+    setBindImportFile(null);
+    setBindImportZoneSuffix("");
+    setBindImportEnabled(true);
+    setBindImportReplaceExisting(true);
+  };
+
+  const submitBindImport = async () => {
+    if (!bindImportFile) {
+      return;
+    }
+
+    if (bindImportZoneSuffix.trim().length === 0) {
+      return;
+    }
+
+    await dispatch(
+      importBindZone({
+        file: bindImportFile,
+        zoneSuffix: bindImportZoneSuffix.trim(),
+        enabled: bindImportEnabled,
+        replaceExistingRecords: bindImportReplaceExisting
+      })
+    ).unwrap();
+
+    closeBindImportDialog();
+  };
+
+  const openZoneBindImportDialog = () => {
+    if (zoneDraft.id == null || isDraftSlave) {
+      return;
+    }
+
+    setZoneBindImportDialogOpen(true);
+  };
+
+  const closeZoneBindImportDialog = () => {
+    setZoneBindImportDialogOpen(false);
+    setZoneBindImportFile(null);
+    setZoneBindImportMode("replace");
+  };
+
+  const submitZoneBindImport = async () => {
+    if (zoneDraft.id == null || !zoneBindImportFile) {
+      return;
+    }
+
+    await dispatch(
+      importBindZoneIntoZone({
+        zoneId: zoneDraft.id,
+        file: zoneBindImportFile,
+        replaceExistingRecords: zoneBindImportMode === "replace"
+      })
+    ).unwrap();
+
+    closeZoneBindImportDialog();
+    cancelEditZone();
   };
 
   const openCreateRecord = () => {
@@ -418,12 +507,12 @@ export function ZoneList(): JSX.Element {
   };
 
   const availableMasterZones = useMemo(() => {
-    return sortedZones.filter((zone) => {
+    return zones.items.filter((zone) => {
       if (zone.id == null) return false;
       if (zone.id === zoneDraft.id) return false;
       return zone.masterZoneId == null;
     });
-  }, [sortedZones, zoneDraft.id]);
+  }, [zones.items, zoneDraft.id]);
 
   const getRelationshipLabel = (zone: Zone): string => {
     if (zone.masterZoneId != null) {
@@ -452,23 +541,45 @@ export function ZoneList(): JSX.Element {
                 </Typography>
               </Box>
 
-              <Stack direction="row" spacing={1} flexWrap="wrap">
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={1.5}
+                useFlexGap
+                sx={{ width: { xs: "100%", md: "auto" }, alignItems: { xs: "stretch", md: "center" } }}
+              >
                 <Button
                   variant="outlined"
                   startIcon={<RefreshIcon />}
                   onClick={() => void dispatch(fetchZones())}
                   disabled={zones.loading || zones.saving}
+                  sx={{ minWidth: { md: 132 } }}
                 >
                   Refresh
                 </Button>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={startCreateZone} disabled={zones.saving}>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={startCreateZone}
+                  disabled={zones.saving}
+                  sx={{ minWidth: { md: 132 } }}
+                >
                   Add zone
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileIcon />}
+                  onClick={openBindImportDialog}
+                  disabled={zones.saving}
+                  sx={{ minWidth: { md: 152 } }}
+                >
+                  Import BIND
                 </Button>
                 <Button
                   variant="outlined"
                   startIcon={<EditIcon />}
                   disabled={zones.saving || selectedCount === 0}
                   onClick={() => setBulkDialogOpen(true)}
+                  sx={{ minWidth: { md: 164 } }}
                 >
                   Bulk edit ({selectedCount})
                 </Button>
@@ -478,11 +589,16 @@ export function ZoneList(): JSX.Element {
                   startIcon={<DeleteIcon />}
                   disabled={zones.saving || selectedCount === 0}
                   onClick={() => void removeSelectedZones()}
+                  sx={{ minWidth: { md: 174 } }}
                 >
                   Bulk delete ({selectedCount})
                 </Button>
               </Stack>
             </Stack>
+            <FormControlLabel
+              control={<Checkbox checked={hideSlaves} onChange={(event) => setHideSlaves(event.target.checked)} />}
+              label="Hide slave zones"
+            />
 
             {zones.loading ? (
               <Stack direction="row" spacing={1} alignItems="center">
@@ -554,7 +670,7 @@ export function ZoneList(): JSX.Element {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {sortedZones.map((zone) => {
+                  {displayedZones.map((zone) => {
                     const zoneId = zone.id;
                     const isChecked = zoneId != null && selectedZoneIds.includes(zoneId);
 
@@ -608,7 +724,7 @@ export function ZoneList(): JSX.Element {
                       </TableRow>
                     );
                   })}
-                  {sortedZones.length === 0 ? (
+                  {displayedZones.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7}>
                         <Typography variant="body2" color="text.secondary">
@@ -760,9 +876,19 @@ export function ZoneList(): JSX.Element {
                 <Typography variant="subtitle1" fontWeight={600}>
                   Records
                 </Typography>
-                <Button size="small" startIcon={<AddIcon />} onClick={openCreateRecord} disabled={isDraftSlave}>
-                  Add record
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    startIcon={<UploadFileIcon />}
+                    onClick={openZoneBindImportDialog}
+                    disabled={isDraftSlave || zoneDraft.id == null}
+                  >
+                    Import BIND
+                  </Button>
+                  <Button size="small" startIcon={<AddIcon />} onClick={openCreateRecord} disabled={isDraftSlave}>
+                    Add record
+                  </Button>
+                </Stack>
               </Stack>
 
               <TableContainer>
@@ -952,6 +1078,109 @@ export function ZoneList(): JSX.Element {
           <Button onClick={() => setBulkDialogOpen(false)}>Cancel</Button>
           <Button onClick={() => void applyBulkEdit()} variant="contained" disabled={zones.saving || selectedCount === 0}>
             Apply bulk edit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bindImportDialogOpen} onClose={closeBindImportDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Import BIND Zone File</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+              <Button variant="outlined" component="label">
+                Select file
+                <input
+                  hidden
+                  type="file"
+                  accept=".zone,.txt"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setBindImportFile(file);
+                    if (file && bindImportZoneSuffix.trim().length === 0) {
+                      setBindImportZoneSuffix(inferZoneSuffixFromFileName(file.name));
+                    }
+                  }}
+                />
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                {bindImportFile?.name ?? "No file selected"}
+              </Typography>
+            </Stack>
+            <TextField
+              label="Zone suffix"
+              value={bindImportZoneSuffix}
+              onChange={(event) => setBindImportZoneSuffix(event.target.value)}
+              helperText="Example: example.com"
+              fullWidth
+            />
+            <FormControlLabel
+              control={
+                <Switch checked={bindImportEnabled} onChange={(event) => setBindImportEnabled(event.target.checked)} />
+              }
+              label="Enable imported zone"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={bindImportReplaceExisting}
+                  onChange={(event) => setBindImportReplaceExisting(event.target.checked)}
+                />
+              }
+              label="Replace existing records if zone already exists"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeBindImportDialog}>Cancel</Button>
+          <Button
+            onClick={() => void submitBindImport()}
+            variant="contained"
+            disabled={zones.saving || !bindImportFile || bindImportZoneSuffix.trim().length === 0}
+          >
+            Import
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={zoneBindImportDialogOpen} onClose={closeZoneBindImportDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Import BIND Into Existing Zone</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Target zone: {zoneDraft.suffix}
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+              <Button variant="outlined" component="label">
+                Select file
+                <input
+                  hidden
+                  type="file"
+                  accept=".zone,.txt"
+                  onChange={(event) => setZoneBindImportFile(event.target.files?.[0] ?? null)}
+                />
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                {zoneBindImportFile?.name ?? "No file selected"}
+              </Typography>
+            </Stack>
+            <FormControl fullWidth>
+              <InputLabel id="zone-bind-import-mode-label">Import mode</InputLabel>
+              <Select
+                labelId="zone-bind-import-mode-label"
+                label="Import mode"
+                value={zoneBindImportMode}
+                onChange={(event) => setZoneBindImportMode(event.target.value as BindImportMode)}
+              >
+                <MenuItem value="add">Add new records only</MenuItem>
+                <MenuItem value="replace">Replace all records with file contents</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeZoneBindImportDialog}>Cancel</Button>
+          <Button onClick={() => void submitZoneBindImport()} variant="contained" disabled={!zoneBindImportFile || zones.saving}>
+            Import
           </Button>
         </DialogActions>
       </Dialog>

@@ -23,6 +23,19 @@ export interface Zone {
   records?: ZoneRecord[];
 }
 
+export interface BindZoneImportUploadRequest {
+  file: File;
+  zoneSuffix: string;
+  enabled?: boolean;
+  replaceExistingRecords?: boolean;
+}
+
+export interface BindZoneExistingImportUploadRequest {
+  zoneId: number;
+  file: File;
+  replaceExistingRecords?: boolean;
+}
+
 export class DnsApiClient {
   private readonly baseUrl: string;
   private token: string | null = null;
@@ -78,6 +91,40 @@ export class DnsApiClient {
 
     if (!response.ok) {
       throw new Error(`Failed to update zone: ${response.status}`);
+    }
+  }
+
+  public async importBindZoneFile(request: BindZoneImportUploadRequest): Promise<void> {
+    const formData = new FormData();
+    formData.append("file", request.file);
+    formData.append("zoneSuffix", request.zoneSuffix);
+    formData.append("enabled", String(request.enabled ?? true));
+    formData.append("replaceExistingRecords", String(request.replaceExistingRecords ?? true));
+
+    const response = await fetch(`${this.baseUrl}/dns/zones/import-bind-upload`, {
+      method: "POST",
+      headers: this.authHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to import BIND zone: ${response.status}`);
+    }
+  }
+
+  public async importBindZoneIntoExistingZone(request: BindZoneExistingImportUploadRequest): Promise<void> {
+    const formData = new FormData();
+    formData.append("file", request.file);
+    formData.append("replaceExistingRecords", String(request.replaceExistingRecords ?? true));
+
+    const response = await fetch(`${this.baseUrl}/dns/zones/${request.zoneId}/import-bind-upload`, {
+      method: "POST",
+      headers: this.authHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to import BIND zone into existing zone: ${response.status}`);
     }
   }
 

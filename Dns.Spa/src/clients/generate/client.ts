@@ -50,6 +50,25 @@ export interface IClient {
     importBind(body: BindZoneImportRequest | undefined, signal?: AbortSignal): Promise<void>;
 
     /**
+     * Import a BIND zone file upload into the database-backed zone model.
+     * @param file (optional) Uploaded BIND zone file content.
+     * @param zoneSuffix (optional) Zone suffix to use as the database zone key (for example, "example.com").
+     * @param enabled (optional) Marks the imported database zone as enabled when true.
+     * @param replaceExistingRecords (optional) Replaces existing database records for the same zone suffix when true.
+     * @return OK
+     */
+    importBindUpload(file: FileParameter | undefined, zoneSuffix: string | undefined, enabled: boolean | undefined, replaceExistingRecords: boolean | undefined, signal?: AbortSignal): Promise<void>;
+
+    /**
+     * Import a BIND zone file upload into an existing database zone.
+     * @param id Target zone id.
+     * @param file (optional) Uploaded BIND zone file content.
+     * @param replaceExistingRecords (optional) Replaces all records in the target zone when true; otherwise only new records are added.
+     * @return OK
+     */
+    importBindUpload2(id: number, file: FileParameter | undefined, replaceExistingRecords: boolean | undefined, signal?: AbortSignal): Promise<void>;
+
+    /**
      * Import all currently active BIND zones into database zones and disable those BIND providers at runtime.
      * @param body (optional) Bulk import settings.
      * @return OK
@@ -450,6 +469,159 @@ export class Client implements IClient {
         } else if (status === 403) {
             return response.text().then((_responseText) => {
             return throwException("Forbidden", status, _responseText, _headers);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Import a BIND zone file upload into the database-backed zone model.
+     * @param file (optional) Uploaded BIND zone file content.
+     * @param zoneSuffix (optional) Zone suffix to use as the database zone key (for example, "example.com").
+     * @param enabled (optional) Marks the imported database zone as enabled when true.
+     * @param replaceExistingRecords (optional) Replaces existing database records for the same zone suffix when true.
+     * @return OK
+     */
+    importBindUpload(file: FileParameter | undefined, zoneSuffix: string | undefined, enabled: boolean | undefined, replaceExistingRecords: boolean | undefined, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/dns/zones/import-bind-upload";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = new FormData();
+        if (file === null || file === undefined)
+            throw new globalThis.Error("The parameter 'file' cannot be null.");
+        else
+            content_.append("File", file.data, file.fileName ? file.fileName : "File");
+        if (zoneSuffix === null || zoneSuffix === undefined)
+            throw new globalThis.Error("The parameter 'zoneSuffix' cannot be null.");
+        else
+            content_.append("ZoneSuffix", zoneSuffix.toString());
+        if (enabled === null || enabled === undefined)
+            throw new globalThis.Error("The parameter 'enabled' cannot be null.");
+        else
+            content_.append("Enabled", enabled.toString());
+        if (replaceExistingRecords === null || replaceExistingRecords === undefined)
+            throw new globalThis.Error("The parameter 'replaceExistingRecords' cannot be null.");
+        else
+            content_.append("ReplaceExistingRecords", replaceExistingRecords.toString());
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processImportBindUpload(_response);
+        });
+    }
+
+    protected processImportBindUpload(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _mappings: { source: any, target: any }[] = [];
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 201) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+            result400 = ProblemDetails.fromJS(resultData400, _mappings);
+            return throwException("Bad Request", status, _responseText, _headers, result400);
+            });
+        } else if (status === 401) {
+            return response.text().then((_responseText) => {
+            return throwException("Unauthorized", status, _responseText, _headers);
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            return throwException("Forbidden", status, _responseText, _headers);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Import a BIND zone file upload into an existing database zone.
+     * @param id Target zone id.
+     * @param file (optional) Uploaded BIND zone file content.
+     * @param replaceExistingRecords (optional) Replaces all records in the target zone when true; otherwise only new records are added.
+     * @return OK
+     */
+    importBindUpload2(id: number, file: FileParameter | undefined, replaceExistingRecords: boolean | undefined, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/dns/zones/{id}/import-bind-upload";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = new FormData();
+        if (file === null || file === undefined)
+            throw new globalThis.Error("The parameter 'file' cannot be null.");
+        else
+            content_.append("File", file.data, file.fileName ? file.fileName : "File");
+        if (replaceExistingRecords === null || replaceExistingRecords === undefined)
+            throw new globalThis.Error("The parameter 'replaceExistingRecords' cannot be null.");
+        else
+            content_.append("ReplaceExistingRecords", replaceExistingRecords.toString());
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processImportBindUpload2(_response);
+        });
+    }
+
+    protected processImportBindUpload2(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _mappings: { source: any, target: any }[] = [];
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+            result400 = ProblemDetails.fromJS(resultData400, _mappings);
+            return throwException("Bad Request", status, _responseText, _headers, result400);
+            });
+        } else if (status === 401) {
+            return response.text().then((_responseText) => {
+            return throwException("Unauthorized", status, _responseText, _headers);
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            return throwException("Forbidden", status, _responseText, _headers);
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+            result404 = ProblemDetails.fromJS(resultData404, _mappings);
+            return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
@@ -1332,6 +1504,11 @@ function createInstance<T>(data: any, mappings: any, type: any): T | null {
   mappings.push({ source: data, target: result });
   result.init(data, mappings);
   return result;
+}
+
+export interface FileParameter {
+    data: any;
+    fileName: string;
 }
 
 export class ApiException extends Error {

@@ -20,6 +20,12 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 				 .Include(z => z.SlaveZones)
 				 .ToListAsync();
 
+	public Task<Zone?> GetZone(int id) =>
+		dbContext.Zones!
+				 .Include(z => z.MasterZone)
+				 .Include(z => z.SlaveZones)
+				 .SingleOrDefaultAsync(x => x.Id == id);
+
 	public Task<Zone?> GetZone(string suffix) =>
 		dbContext.Zones!
 				 .Include(z => z.MasterZone)
@@ -158,6 +164,33 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 				record.Zone = existing.Id;
 			}
 		}
+		else
+		{
+			existing.Records ??= [];
+			var incomingRecords = zone.Records ?? [];
+			foreach (var incoming in incomingRecords)
+			{
+				if (incoming.Type == Models.EntityFramework.Enums.ResourceType.SOA) continue;
+				if (incoming.Type == null || incoming.Class == null) continue;
+				if (string.IsNullOrWhiteSpace(incoming.Data)) continue;
+
+				if (existing.Records.Any(existingRecord => AreEquivalentRecords(existingRecord, incoming)))
+					continue;
+
+				existing.Records.Add(
+					new()
+					{
+						Id = null,
+						Host = incoming.Host,
+						Type = incoming.Type,
+						Class = incoming.Class,
+						Data = incoming.Data,
+						ZoneObj = existing,
+						Zone = existing.Id,
+					}
+				);
+			}
+		}
 
 		await dbContext.SaveChangesAsync().ConfigureAwait(false);
 		if (existing.MasterZoneId == null && existing.Id != null)
@@ -216,7 +249,8 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 
 		if (slave.Records?.Count > 0) dbContext.ZoneRecords!.RemoveRange(slave.Records);
 
-		slave.Records = master.Records?.Select(CloneRecord).ToList() ?? new List<ZoneRecord>();
+		slave.Records = master.Records?.Select(record => CloneRecordForSlave(record, master.Suffix, slave.Suffix)).ToList() ??
+						new List<ZoneRecord>();
 		foreach (var record in slave.Records)
 		{
 			record.Id = null;
@@ -225,14 +259,55 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 		}
 	}
 
-	private static ZoneRecord CloneRecord(ZoneRecord source) =>
-		new()
+	private static ZoneRecord CloneRecordForSlave(ZoneRecord source, string? masterSuffix, string? slaveSuffix)
+	{
+		var clone = new ZoneRecord
 		{
 			Host = source.Host,
 			Class = source.Class,
 			Type = source.Type,
 			Data = source.Data,
 		};
+
+		if (clone.Type == Models.EntityFramework.Enums.ResourceType.CNAME)
+			clone.Data = RewriteSlaveCNameTarget(clone.Data, masterSuffix, slaveSuffix);
+
+		return clone;
+	}
+
+	private static string? RewriteSlaveCNameTarget(string? target, string? masterSuffix, string? slaveSuffix)
+	{
+		if (string.IsNullOrWhiteSpace(target)) return target;
+
+		var normalizedSlaveSuffix = NormalizeSuffix(slaveSuffix);
+		if (string.IsNullOrWhiteSpace(normalizedSlaveSuffix)) return target;
+
+		var trimmedTarget = target.Trim();
+		var preserveTrailingDot = trimmedTarget.EndsWith('.');
+
+		if (trimmedTarget == "@" || trimmedTarget == "@.")
+			return preserveTrailingDot ? $"{normalizedSlaveSuffix}." : normalizedSlaveSuffix;
+
+		var normalizedMasterSuffix = NormalizeSuffix(masterSuffix);
+		var normalizedTarget = trimmedTarget.TrimEnd('.');
+		if (!string.IsNullOrWhiteSpace(normalizedMasterSuffix) &&
+			string.Equals(normalizedTarget, normalizedMasterSuffix, StringComparison.OrdinalIgnoreCase))
+			return preserveTrailingDot ? $"{normalizedSlaveSuffix}." : normalizedSlaveSuffix;
+
+		return target;
+	}
+
+	private static string NormalizeSuffix(string? suffix) => suffix?.Trim().TrimEnd('.') ?? string.Empty;
+
+	private static bool AreEquivalentRecords(ZoneRecord left, ZoneRecord right)
+	{
+		return left.Type == right.Type &&
+			   left.Class == right.Class &&
+			   string.Equals(NormalizeField(left.Host), NormalizeField(right.Host), StringComparison.OrdinalIgnoreCase) &&
+			   string.Equals(NormalizeField(left.Data), NormalizeField(right.Data), StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static string NormalizeField(string? value) => value?.Trim() ?? string.Empty;
 
 	private static void NormalizeSoaSerial(ICollection<ZoneRecord>? records, uint serial)
 	{
