@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using Dns.Extensions;
 
 namespace Dns.RDataTypes;
@@ -9,10 +10,11 @@ public class NSRData : RData
 	public string Name { get; init; }
 
 	public override ushort Length =>
-		// dots replaced by bytes
-		// + 1 segment prefix
-		// + 1 null terminator
-		(ushort)(Name.Length + 2);
+		(ushort)(
+			(Name ?? string.Empty)
+			.Split(['.'], StringSplitOptions.RemoveEmptyEntries)
+			.Sum(segment => segment.Length + 1) + 1
+		);
 
 	public static NSRData Parse(byte[] bytes, int offset, int size) =>
 		new() { Name = DnsProtocol.ReadString(bytes, ref offset) };

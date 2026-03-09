@@ -17,6 +17,15 @@ public sealed class StringExtensionsTests
 	}
 
 	[Fact]
+	public void GetResourceBytes_IgnoresTrailingDot()
+	{
+		var bytes = "ns1.example.com.".GetResourceBytes();
+		Assert.Equal(17, bytes.Length);
+		Assert.Equal(3, bytes[0]);
+		Assert.Equal(0, bytes[^1]);
+	}
+
+	[Fact]
 	public void GetBytes_UsesProvidedEncoding()
 	{
 		var bytes = "abc".GetBytes(Encoding.UTF8);

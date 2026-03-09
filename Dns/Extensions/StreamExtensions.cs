@@ -13,7 +13,7 @@ public static class StreamExtensions
 	{
 		if (!string.IsNullOrWhiteSpace(str))
 		{
-			var segments = str.Split(new[] { segmentSplit });
+			var segments = str.Split(new[] { segmentSplit }, System.StringSplitOptions.RemoveEmptyEntries);
 			foreach (var segment in segments)
 			{
 				stream.WriteByte((byte)segment.Length);
