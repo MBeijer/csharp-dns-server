@@ -438,7 +438,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 					Class = zoneRecord.Class,
 					Type = zoneRecord.Type,
 					TTL = 10,
-					RData = new CNameRData { Name = address },
+					RData = new CNameRData { Name = NormalizeAliasTarget(address, zoneName) },
 				}
 				));
 				break;
@@ -480,6 +480,17 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		if (normalizedHost.EndsWith(zoneName, StringComparison.OrdinalIgnoreCase)) return normalizedHost;
 
 		return $"{normalizedHost}.{zoneName}";
+	}
+
+	private static string NormalizeAliasTarget(string address, string zoneName)
+	{
+		if (string.IsNullOrWhiteSpace(address)) return address;
+
+		var normalized = address.Trim();
+		if (normalized is "@" or "@." or "\\@" or "\\@.")
+			return zoneName;
+
+		return normalized;
 	}
 
 	private static string CanonicalZoneName(string suffix) => suffix?.Trim().Trim('.') ?? string.Empty;

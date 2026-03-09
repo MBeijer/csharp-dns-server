@@ -6,148 +6,147 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace Dns.Cli.Migrations
+namespace Dns.Cli.Migrations;
+
+[DbContext(typeof(DnsServerDbContext))]
+partial class DnsServerDbContextModelSnapshot : ModelSnapshot
 {
-    [DbContext(typeof(DnsServerDbContext))]
-    partial class DnsServerDbContextModelSnapshot : ModelSnapshot
-    {
-        protected override void BuildModel(ModelBuilder modelBuilder)
-        {
+	protected override void BuildModel(ModelBuilder modelBuilder)
+	{
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
+		modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
 
-            modelBuilder.Entity("Dns.Db.Models.EntityFramework.User", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("id");
+		modelBuilder.Entity("Dns.Db.Models.EntityFramework.User", b =>
+		{
+			b.Property<int>("Id")
+			 .ValueGeneratedOnAdd()
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("id");
 
-                    b.Property<string>("Account")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("account");
+			b.Property<string>("Account")
+			 .IsRequired()
+			 .HasMaxLength(100)
+			 .HasColumnType("TEXT")
+			 .HasColumnName("account");
 
-                    b.Property<bool>("Activated")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("activated");
+			b.Property<bool>("Activated")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("activated");
 
-                    b.Property<byte>("AdminLevel")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("adminlevel");
+			b.Property<byte>("AdminLevel")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("adminlevel");
 
-                    b.Property<string>("Password")
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("password");
+			b.Property<string>("Password")
+			 .HasMaxLength(450)
+			 .HasColumnType("TEXT")
+			 .HasColumnName("password");
 
-                    b.HasKey("Id");
+			b.HasKey("Id");
 
-                    b.HasIndex("Account")
-                        .IsUnique();
+			b.HasIndex("Account")
+			 .IsUnique();
 
-                    b.ToTable("users");
-                });
+			b.ToTable("users");
+		});
 
-            modelBuilder.Entity("Dns.Db.Models.EntityFramework.Zone", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("id");
+		modelBuilder.Entity("Dns.Db.Models.EntityFramework.Zone", b =>
+		{
+			b.Property<int>("Id")
+			 .ValueGeneratedOnAdd()
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("id");
 
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("enabled");
+			b.Property<bool>("Enabled")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("enabled");
 
-                    b.Property<int?>("MasterZoneId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("master_zone_id");
+			b.Property<int?>("MasterZoneId")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("master_zone_id");
 
-                    b.Property<uint>("Serial")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("serial");
+			b.Property<uint>("Serial")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("serial");
 
-                    b.Property<string>("Suffix")
-                        .HasMaxLength(120)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("suffix");
+			b.Property<string>("Suffix")
+			 .HasMaxLength(120)
+			 .HasColumnType("TEXT")
+			 .HasColumnName("suffix");
 
-                    b.HasKey("Id");
+			b.HasKey("Id");
 
-                    b.HasIndex("MasterZoneId");
+			b.HasIndex("MasterZoneId");
 
-                    b.HasIndex("Suffix")
-                        .IsUnique();
+			b.HasIndex("Suffix")
+			 .IsUnique();
 
-                    b.ToTable("zones");
-                });
+			b.ToTable("zones");
+		});
 
-            modelBuilder.Entity("Dns.Db.Models.EntityFramework.ZoneRecord", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("id");
+		modelBuilder.Entity("Dns.Db.Models.EntityFramework.ZoneRecord", b =>
+		{
+			b.Property<int>("Id")
+			 .ValueGeneratedOnAdd()
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("id");
 
-                    b.Property<ushort?>("Class")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("class");
+			b.Property<ushort?>("Class")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("class");
 
-                    b.Property<string>("Data")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("data");
+			b.Property<string>("Data")
+			 .HasColumnType("TEXT")
+			 .HasColumnName("data");
 
-                    b.Property<string>("Host")
-                        .HasMaxLength(120)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("host");
+			b.Property<string>("Host")
+			 .HasMaxLength(120)
+			 .HasColumnType("TEXT")
+			 .HasColumnName("host");
 
-                    b.Property<ushort?>("Type")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("type");
+			b.Property<ushort?>("Type")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("type");
 
-                    b.Property<int?>("Zone")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("zone");
+			b.Property<int?>("Zone")
+			 .HasColumnType("INTEGER")
+			 .HasColumnName("zone");
 
-                    b.HasKey("Id");
+			b.HasKey("Id");
 
-                    b.HasIndex("Host");
+			b.HasIndex("Host");
 
-                    b.HasIndex("Zone");
+			b.HasIndex("Zone");
 
-                    b.ToTable("zone_records");
-                });
+			b.ToTable("zone_records");
+		});
 
-            modelBuilder.Entity("Dns.Db.Models.EntityFramework.Zone", b =>
-                {
-                    b.HasOne("Dns.Db.Models.EntityFramework.Zone", "MasterZone")
-                        .WithMany("SlaveZones")
-                        .HasForeignKey("MasterZoneId")
-                        .OnDelete(DeleteBehavior.SetNull);
+		modelBuilder.Entity("Dns.Db.Models.EntityFramework.Zone", b =>
+		{
+			b.HasOne("Dns.Db.Models.EntityFramework.Zone", "MasterZone")
+			 .WithMany("SlaveZones")
+			 .HasForeignKey("MasterZoneId")
+			 .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("MasterZone");
-                });
+			b.Navigation("MasterZone");
+		});
 
-            modelBuilder.Entity("Dns.Db.Models.EntityFramework.ZoneRecord", b =>
-                {
-                    b.HasOne("Dns.Db.Models.EntityFramework.Zone", "ZoneObj")
-                        .WithMany("Records")
-                        .HasForeignKey("Zone")
-                        .OnDelete(DeleteBehavior.Cascade);
+		modelBuilder.Entity("Dns.Db.Models.EntityFramework.ZoneRecord", b =>
+		{
+			b.HasOne("Dns.Db.Models.EntityFramework.Zone", "ZoneObj")
+			 .WithMany("Records")
+			 .HasForeignKey("Zone")
+			 .OnDelete(DeleteBehavior.Cascade);
 
-                    b.Navigation("ZoneObj");
-                });
+			b.Navigation("ZoneObj");
+		});
 
-            modelBuilder.Entity("Dns.Db.Models.EntityFramework.Zone", b =>
-                {
-                    b.Navigation("Records");
+		modelBuilder.Entity("Dns.Db.Models.EntityFramework.Zone", b =>
+		{
+			b.Navigation("Records");
 
-                    b.Navigation("SlaveZones");
-                });
+			b.Navigation("SlaveZones");
+		});
 #pragma warning restore 612, 618
-        }
-    }
+	}
 }

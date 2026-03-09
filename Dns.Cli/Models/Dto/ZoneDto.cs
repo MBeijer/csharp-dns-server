@@ -47,4 +47,3 @@ public sealed class ZoneDto
 	/// </summary>
 	public ICollection<ZoneRecordDto>? Records { get; set; }
 }
-

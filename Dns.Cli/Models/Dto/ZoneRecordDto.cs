@@ -40,4 +40,3 @@ public sealed class ZoneRecordDto
 	/// </summary>
 	public int? Zone { get; set; }
 }
-

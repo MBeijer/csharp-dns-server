@@ -210,6 +210,27 @@ public class DnsServerTests
 	}
 
 	[Fact]
+	public void BuildResourceRecords_CnameAtShorthandTargetsResolveToZoneApex()
+	{
+		var server = CreateServer();
+		var zone = new Zone { Suffix = "example.com", Serial = 3 };
+
+		foreach (var alias in new[] { "@", "@.", "\\@", "\\@." })
+		{
+			var records = InvokePrivate<List<ResourceRecord>>(
+				server,
+				"BuildResourceRecords",
+				new ZoneRecord { Host = "www", Type = ResourceType.CNAME, Class = ResourceClass.IN, Addresses = [alias] },
+				zone,
+				"example.com"
+			);
+
+			var cname = Assert.Single(records);
+			Assert.Equal("example.com", Assert.IsType<CNameRData>(cname.RData).Name);
+		}
+	}
+
+	[Fact]
 	public void BuildAxfrRecords_AddsSoaEnvelopeAndFallbackNsWithInjectedAddress()
 	{
 		var server = CreateServer(injectedNsAddress: "192.0.2.53");

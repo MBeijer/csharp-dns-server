@@ -25,4 +25,3 @@ public sealed class UserDto
 	/// </summary>
 	public byte AdminLevel { get; set; }
 }
-
