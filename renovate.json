@@ -5,7 +5,7 @@
     "group:all"
   ],
   "baseBranchPatterns": [
-    "master"
+    "dev"
   ],
   "forkProcessing": "enabled",
   "packageRules": [

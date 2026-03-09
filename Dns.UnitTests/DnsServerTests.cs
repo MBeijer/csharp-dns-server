@@ -601,6 +601,31 @@ public class DnsServerTests
 		Assert.Contains(message.Answers, answer => answer.Type == ResourceType.SOA);
 	}
 
+	[Fact]
+	public void HandleRecords_CnameAtShorthandTargetResolvesToZoneApex()
+	{
+		var server = CreateServer();
+		var message = new DnsMessage();
+		var zone = new Zone { Suffix = "example.com", Serial = 5 };
+		var zoneRecords = new List<ZoneRecord>
+		{
+			new() { Host = "www", Type = ResourceType.CNAME, Class = ResourceClass.IN, Addresses = ["@."] },
+		};
+
+		InvokePrivateVoid(
+			server,
+			"HandleRecords",
+			zoneRecords,
+			new Question("www.example.com", ResourceType.ANY, ResourceClass.IN),
+			message,
+			zone,
+			new IPEndPoint(IPAddress.Loopback, 5300)
+		);
+
+		var cname = Assert.Single(message.Answers, answer => answer.Type == ResourceType.CNAME);
+		Assert.Equal("example.com", Assert.IsType<CNameRData>(cname.RData).Name);
+	}
+
 	private static DnsServer CreateServer(
 		bool zoneTransferEnabled = true,
 		List<string> allowTransfersFrom = null,

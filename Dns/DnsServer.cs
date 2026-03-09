@@ -840,13 +840,14 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 					break;
 				case ResourceType.CNAME:
+					var zoneName = CanonicalZoneName(zone.Suffix);
 					foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
 					{
 						Name = question.Name,
 						Class = zoneRecord.Class,
 						Type = zoneRecord.Type,
 						TTL = 10,
-						RData = new CNameRData { Name = address },
+						RData = new CNameRData { Name = NormalizeAliasTarget(address, zoneName) },
 					}
 							 ))
 					{
