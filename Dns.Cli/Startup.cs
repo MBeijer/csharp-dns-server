@@ -55,8 +55,6 @@ public class Startup(IConfiguration configuration)
 	/// <exception cref="InvalidOperationException"></exception>
 	public void ConfigureServices(IServiceCollection services)
 	{
-		services.AddAutoMapper(typeof(Startup).Assembly);
-
 		services.AddOptions();
 		services.Configure<JsonSerializerOptions>(opts =>
 			{
