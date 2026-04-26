@@ -29,6 +29,7 @@
         <PackageReference Include="IdentityModel" Version="7.0.0"/>
         <PackageReference Include="MimeKit" Version="4.16.0"/>
         <PackageReference Include="Sini" Version="1.1.1"/>
+        <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7" />
     </ItemGroup>
 
     <ItemGroup>
