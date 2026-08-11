@@ -676,6 +676,10 @@ public class DnsServerTests
 
 		await WaitForZoneSerialAsync(firstResolver, 1);
 		await WaitForZoneSerialAsync(secondResolver, 1);
+		Assert.Contains(
+			firstResolver.GetZones().Single(zone => zone.Suffix == "replicated.example").Records,
+			record => record.Type == ResourceType.TXT && record.Addresses.Single() == new string('x', 200)
+		);
 
 		primaryZone = CreateReplicationZone(2, "192.0.2.20");
 		((IObserver<List<Zone>>)primaryResolver).OnNext([primaryZone]);
@@ -753,6 +757,10 @@ public class DnsServerTests
 				new()
 				{
 					Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = [address],
+				},
+				new()
+				{
+					Host = "txt", Type = ResourceType.TXT, Class = ResourceClass.IN, Addresses = [new string('x', 200)],
 				},
 			]
 		);
