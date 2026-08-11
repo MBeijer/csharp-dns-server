@@ -208,6 +208,7 @@ On each secondary, point `secondarySync.master` at the primary DNS TCP endpoint:
 - Replicated zones take precedence over same-named local zones. Local zones not present on the primary continue to be served.
 - When a zone disappears from a valid primary catalog, its replicated copy is removed and any same-named local zone becomes visible again.
 - `cacheFile` is optional. When configured on persistent storage, its last-known-good zones are loaded before reconnecting so a restarted secondary can keep answering during a primary outage.
+- Cached zones restore their complete record sets. Cache entries without records or an SOA are treated as incomplete and transferred again even when their serial matches the primary catalog.
 - Losing the catalog connection never removes replicated zones. The in-memory resolver and `cacheFile` retain their last-known-good snapshots until a complete, valid primary catalog explicitly removes a zone.
 - Once the primary is ready, its complete catalog is authoritative: zones omitted from that snapshot are removed from the secondary as the synchronization delta.
 - Zone transfers run independently, up to `maxConcurrentTransfers` at a time, so a stalled AXFR does not block catalog processing or other zones. Failed and timed-out transfers retry after `transferRetryDelaySeconds` until they succeed or disappear from the primary catalog.

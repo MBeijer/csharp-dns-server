@@ -29,6 +29,7 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 	private long          _misses;
 	private IZoneProvider _provider;
 	private long          _queries;
+	private int           _readinessDeferred;
 	private IDisposable   _subscription;
 	private List<Zone>    _zones = [];
 
@@ -41,7 +42,7 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 		{
 			_zones         = value ?? throw new ArgumentNullException(nameof(value));
 			LastZoneReload = DateTime.Now;
-			_initialLoadCompletion.TrySetResult();
+			if (Volatile.Read(ref _readinessDeferred) == 0) _initialLoadCompletion.TrySetResult();
 			logger.LogInformation("Zone reloaded: {Zones}", string.Join(',', _zones.Select(z => z.Suffix)));
 			ZonesChanged?.Invoke(this, EventArgs.Empty);
 		}
@@ -114,6 +115,10 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 	}
 
 	public bool AreZonesLoaded() => _zones.Count > 0;
+
+	public void DeferReadiness() => Interlocked.Exchange(ref _readinessDeferred, 1);
+
+	public void MarkReady() => _initialLoadCompletion.TrySetResult();
 
 	public Task WaitUntilReadyAsync(CancellationToken cancellationToken) =>
 		_initialLoadCompletion.Task.WaitAsync(cancellationToken);

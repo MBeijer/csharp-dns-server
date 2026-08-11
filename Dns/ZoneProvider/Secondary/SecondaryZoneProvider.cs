@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Dns.Config;
@@ -30,7 +31,10 @@ public sealed class SecondaryZoneProvider(
 	IOptions<ServerOptions> serverOptions
 ) : BaseZoneProvider(resolver)
 {
-	private static readonly JsonSerializerOptions CacheSerializerOptions = new() { WriteIndented = true, };
+	private static readonly JsonSerializerOptions CacheSerializerOptions = new()
+	{
+		WriteIndented = true, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
+	};
 
 	private readonly Dictionary<string, uint>              _catalogSerials = new(StringComparer.OrdinalIgnoreCase);
 	private readonly SemaphoreSlim                         _publishLock    = new(1, 1);
@@ -53,6 +57,7 @@ public sealed class SecondaryZoneProvider(
 			throw new InvalidOperationException("Secondary synchronization requires a master endpoint.");
 
 		_transferSlots = new(Math.Max(1, _settings.MaxConcurrentTransfers));
+		Resolver.DeferReadiness();
 
 		base.Initialize(zoneOptions);
 	}
@@ -380,6 +385,14 @@ public sealed class SecondaryZoneProvider(
 		lock (_syncRoot) return _zones.Count;
 	}
 
+	private bool IsCatalogSynchronized()
+	{
+		lock (_syncRoot)
+			return _catalogSerials.All(entry => _zones.TryGetValue(entry.Key, out var zone) &&
+			                                    zone.Serial == entry.Value
+			);
+	}
+
 	private async Task PublishSnapshotAsync(CancellationToken cancellationToken)
 	{
 		await _publishLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -398,6 +411,8 @@ public sealed class SecondaryZoneProvider(
 			{
 				logger.LogWarning(ex, "Unable to save secondary zone cache {CacheFile}", _settings.CacheFile);
 			}
+
+			if (IsCatalogSynchronized()) Resolver.MarkReady();
 		}
 		finally
 		{
@@ -530,17 +545,36 @@ public sealed class SecondaryZoneProvider(
 					                                  cancellationToken: cancellationToken
 				                                  )
 				                                  .ConfigureAwait(false);
+			var        cacheIsComplete = true;
 			List<Zone> snapshot;
 			lock (_syncRoot)
 			{
 				foreach (var zone in cachedZones ?? [])
-					if (!string.IsNullOrWhiteSpace(zone.Suffix))
-						_zones[CanonicalName(zone.Suffix)] = zone;
+				{
+					if (string.IsNullOrWhiteSpace(zone.Suffix) ||
+					    zone.Records.Count == 0 ||
+					    !zone.Records.Any(record => record.Type == ResourceType.SOA))
+					{
+						cacheIsComplete = false;
+						logger.LogWarning(
+							"Ignoring incomplete cached secondary zone {Zone} from {CacheFile}; it will be transferred again",
+							zone.Suffix,
+							path
+						);
+						continue;
+					}
+
+					_zones[CanonicalName(zone.Suffix)] = zone;
+				}
 
 				snapshot = _zones.Values.ToList();
 			}
 
-			Notify(snapshot);
+			if (cacheIsComplete)
+			{
+				Notify(snapshot);
+				Resolver.MarkReady();
+			}
 		}
 		catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
 		{

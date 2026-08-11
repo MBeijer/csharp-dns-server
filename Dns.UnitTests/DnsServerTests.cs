@@ -978,7 +978,6 @@ public class DnsServerTests
 		var cacheFile = Path.Combine(Path.GetTempPath(), $"secondary-zones-{Guid.NewGuid():N}.json");
 		try
 		{
-			var resolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
 			var options = Options.Create(
 				new ServerOptions
 				{
@@ -988,21 +987,92 @@ public class DnsServerTests
 					},
 				}
 			);
-			using var provider = new SecondaryZoneProvider(new FakeLogger<SecondaryZoneProvider>(), resolver, options);
-			provider.Initialize(new ZoneOptions());
-			var zones = Assert.IsType<Dictionary<string, Zone>>(
-				typeof(SecondaryZoneProvider).GetField("_zones", BindingFlags.Instance | BindingFlags.NonPublic)!
-				                             .GetValue(provider)
-			);
-			zones["cached.example"] = CreateReplicationZone(9, "192.0.2.9", "cached.example");
+			var resolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+			using (var provider = new SecondaryZoneProvider(new FakeLogger<SecondaryZoneProvider>(), resolver, options))
+			{
+				provider.Initialize(new ZoneOptions());
+				var zones = Assert.IsType<Dictionary<string, Zone>>(
+					typeof(SecondaryZoneProvider).GetField("_zones", BindingFlags.Instance | BindingFlags.NonPublic)!
+					                             .GetValue(provider)
+				);
+				zones["cached.example"] = CreateReplicationZone(9, "192.0.2.9", "cached.example");
 
-			await InvokePrivate<Task>(provider, "PublishSnapshotAsync", CancellationToken.None);
+				await InvokePrivate<Task>(provider, "PublishSnapshotAsync", CancellationToken.None);
 
-			Assert.Contains(resolver.GetZones(), zone => zone.Suffix == "cached.example");
+				Assert.Contains(resolver.GetZones(), zone => zone.Suffix == "cached.example");
+			}
+
 			Assert.Contains("cached.example", await File.ReadAllTextAsync(cacheFile));
+
+			var restoredResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+			using var restoredProvider = new SecondaryZoneProvider(
+				new FakeLogger<SecondaryZoneProvider>(),
+				restoredResolver,
+				options
+			);
+			restoredProvider.Initialize(new ZoneOptions());
+			await InvokePrivate<Task>(restoredProvider, "LoadCacheAsync", CancellationToken.None);
+
+			var restoredZone = Assert.Single(restoredResolver.GetZones());
+			Assert.Equal("cached.example", restoredZone.Suffix);
+			Assert.Equal(4, restoredZone.Records.Count);
+			Assert.Contains(restoredZone.Records, record => record.Type == ResourceType.A);
+			Assert.Contains(restoredZone.Records, record => record.Type == ResourceType.TXT);
 		}
 		finally
 		{
+			File.Delete(cacheFile);
+			File.Delete($"{cacheFile}.tmp");
+		}
+	}
+
+	[Fact]
+	public async Task SecondarySync_RetransfersIncompleteCachedZoneEvenWhenSerialMatches()
+	{
+		var port      = GetAvailableTcpPort();
+		var cacheFile = Path.Combine(Path.GetTempPath(), $"secondary-zones-{Guid.NewGuid():N}.json");
+		await File.WriteAllTextAsync(
+			cacheFile,
+			"""
+			[
+			  {
+			    "Suffix": "repair.example",
+			    "Serial": 15,
+			    "Records": []
+			  }
+			]
+			"""
+		);
+
+		var primaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		((IObserver<List<Zone>>)primaryResolver).OnNext([CreateReplicationZone(15, "192.0.2.15", "repair.example")]);
+		var       primary    = CreateReplicationPrimary(port, primaryResolver);
+		using var primaryCts = new CancellationTokenSource();
+		await primary.Start(primaryCts.Token);
+
+		var secondaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		using var secondary = CreateSecondaryProvider(
+			secondaryResolver,
+			port,
+			settings => settings.CacheFile = cacheFile
+		);
+		secondary.Start(CancellationToken.None);
+
+		try
+		{
+			var repaired = await WaitForNamedZoneSerialAsync(
+				secondaryResolver,
+				"repair.example",
+				15,
+				TimeSpan.FromSeconds(10)
+			);
+			Assert.Equal(4, repaired.Records.Count);
+			Assert.Contains(repaired.Records, record => record.Type == ResourceType.A);
+			Assert.Contains(repaired.Records, record => record.Type == ResourceType.TXT);
+		}
+		finally
+		{
+			await primaryCts.CancelAsync();
 			File.Delete(cacheFile);
 			File.Delete($"{cacheFile}.tmp");
 		}

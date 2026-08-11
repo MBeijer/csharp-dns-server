@@ -68,7 +68,7 @@ The source address observed by the application must match the ACL. Verify this w
 
 `master` accepts a hostname, an IPv4 address, an IPv6 address, or an endpoint with a port. Brackets are required when specifying a port for IPv6, for example `[2001:db8::53]:5353`.
 
-`cacheFile` is optional. For Docker, place it on a persistent volume. The provider atomically replaces the cache after a successful catalog change and loads it before connecting on the next start.
+`cacheFile` is optional. For Docker, place it on a persistent volume. The provider atomically replaces the cache after a successful catalog change and loads complete record sets before connecting on the next start. Entries without records or an SOA are rejected as incomplete and transferred again, even when their cached serial matches the primary catalog.
 
 `maxConcurrentTransfers` bounds the number of AXFR connections running at once. Catalog snapshots are processed without waiting for those transfers, and each zone has an independent worker, so a slow or broken zone cannot delay other zones or newer catalog snapshots. `transferTimeoutSeconds` limits each AXFR attempt. Failed and timed-out attempts release their concurrency slot and retry after `transferRetryDelaySeconds` until the zone succeeds, is removed from the primary catalog, or the secondary stops.
 

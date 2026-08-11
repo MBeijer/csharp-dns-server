@@ -19,6 +19,14 @@ public interface IDnsResolver : IObserver<List<Zone>>, IHtmlDump
 
 	bool IsReady => true;
 
+	void DeferReadiness()
+	{
+	}
+
+	void MarkReady()
+	{
+	}
+
 	public void       SubscribeTo(IObservable<List<Zone>> zoneProvider);
 	IEnumerable<Zone> GetZones();
 	bool              TryGetZone(string hostname, out Zone zone);
