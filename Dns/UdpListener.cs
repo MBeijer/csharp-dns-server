@@ -98,15 +98,21 @@ public class UdpListener
 		cts.Dispose();
 	}
 
-	public async void SendToAsync(SocketAsyncEventArgs args)
+	public async Task SendToAsync(SocketAsyncEventArgs args)
 	{
-		if (_listener == null) throw new InvalidOperationException("Listener is not initialized.");
-		if (_listener.AddressFamily == AddressFamily.InterNetworkV6 &&
+		var listener = _listener ?? throw new InvalidOperationException("Listener is not initialized.");
+		if (listener.AddressFamily == AddressFamily.InterNetworkV6 &&
 		    args.RemoteEndPoint is IPEndPoint { AddressFamily: AddressFamily.InterNetwork } ipv4Endpoint)
 			args.RemoteEndPoint = new IPEndPoint(ipv4Endpoint.Address.MapToIPv6(), ipv4Endpoint.Port);
 
-		var awaitable = new SocketAwaitable(args);
-		await _listener.SendToAsync(awaitable);
+		if (args.Buffer == null) throw new InvalidOperationException("A send buffer is required.");
+
+		await listener.SendToAsync(
+			              new ReadOnlyMemory<byte>(args.Buffer, args.Offset, args.Count),
+			              SocketFlags.None,
+			              args.RemoteEndPoint
+		              )
+		              .ConfigureAwait(false);
 	}
 
 	private async Task ReceiveLoopAsync(CancellationToken ct)

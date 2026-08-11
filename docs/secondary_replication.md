@@ -84,3 +84,5 @@ Other local zones continue to work normally. A secondary may also enable its own
 ## Failure behavior
 
 The secondary retains its last successfully transferred version when a transfer fails or the primary becomes unreachable. A changed zone is published only after a complete AXFR ending in the matching closing SOA. A valid catalog can remove a replicated zone; a broken or rejected catalog connection cannot.
+
+An unreachable UDP NOTIFY target is logged as a warning and does not stop the primary DNS service or its active catalog streams.

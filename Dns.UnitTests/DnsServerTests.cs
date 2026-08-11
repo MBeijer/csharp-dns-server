@@ -858,9 +858,26 @@ public class DnsServerTests
 		var response = new DnsMessage { QueryIdentifier = 0xAAAA, QuestionCount = 1 };
 		response.Questions.Add(new Question("example.com", ResourceType.A, ResourceClass.IN));
 		InvokePrivateVoid(server, "SendUdpResponse", response, new IPEndPoint(IPAddress.Loopback, 5302));
+	}
 
-		var args = new SocketAsyncEventArgs();
-		InvokePrivateStaticVoid(typeof(DnsServer), "OnSendCompleted", null, args);
+	[Fact]
+	public async Task SendUdpAsync_DoesNotPropagateSocketShutdownFailure()
+	{
+		var server      = CreateServer();
+		var udpListener = new UdpListener();
+		udpListener.Initialize(0);
+		udpListener.Start();
+		udpListener.Stop();
+		SetPrivateField(server, "_udpListener", udpListener);
+
+		await InvokePrivate<Task>(
+			server,
+			"SendUdpAsync",
+			new byte[] { 0x53 },
+			0,
+			1,
+			new IPEndPoint(IPAddress.Loopback, 53)
+		);
 	}
 
 	[Fact]
@@ -1077,12 +1094,6 @@ public class DnsServerTests
 	{
 		var method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)!;
 		method.Invoke(instance, args);
-	}
-
-	private static void InvokePrivateStaticVoid(Type type, string methodName, params object[] args)
-	{
-		var method = type.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic)!;
-		method.Invoke(null, args);
 	}
 
 	private static T InvokePrivateStatic<T>(Type type, string methodName, params object[] args)

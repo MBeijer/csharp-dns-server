@@ -1196,27 +1196,34 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 	/// <param name="remoteEndpoint">The destination endpoint.</param>
 	private void SendUdp(byte[] bytes, int offset, int count, EndPoint remoteEndpoint)
 	{
-		// Get a pooled SocketAsyncEventArgs
+		_ = SendUdpAsync(bytes, offset, count, remoteEndpoint);
+	}
+
+	private async Task SendUdpAsync(byte[] bytes, int offset, int count, EndPoint remoteEndpoint)
+	{
 		var args = BufferPool.RentSocketAsyncEventArgs();
 		args.RemoteEndPoint = remoteEndpoint;
 
-		// Copy data to a new buffer since the source may be reused
-		// TODO: Future optimization - pool these send buffers too
 		var sendBuffer = new byte[count];
 		Buffer.BlockCopy(bytes, offset, sendBuffer, 0, count);
 		args.SetBuffer(sendBuffer, 0, count);
 
-		// Set up completion callback to return args to pool
-		args.Completed += OnSendCompleted;
-
-		_udpListener.SendToAsync(args);
-	}
-
-	/// <summary>Callback when send completes - returns SocketAsyncEventArgs to pool.</summary>
-	private static void OnSendCompleted(object sender, SocketAsyncEventArgs args)
-	{
-		args.Completed -= OnSendCompleted;
-		BufferPool.ReturnSocketAsyncEventArgs(args);
+		try
+		{
+			await _udpListener.SendToAsync(args).ConfigureAwait(false);
+		}
+		catch (Exception ex) when (ex is SocketException or ObjectDisposedException)
+		{
+			logger.LogWarning(ex, "Unable to send UDP packet to {@RemoteEndPoint}", remoteEndpoint);
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "Unexpected error while sending UDP packet to {@RemoteEndPoint}", remoteEndpoint);
+		}
+		finally
+		{
+			BufferPool.ReturnSocketAsyncEventArgs(args);
+		}
 	}
 
 	/// <summary>Returns list of manual or DHCP specified DNS addresses</summary>

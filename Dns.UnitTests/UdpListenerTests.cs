@@ -34,7 +34,7 @@ public class UdpListenerTests
 			args.RemoteEndPoint = receiver.Client.LocalEndPoint;
 			args.SetBuffer(new byte[] { 0x53 }, 0, 1);
 
-			listener.SendToAsync(args);
+			await listener.SendToAsync(args);
 			var result = await receiver.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
 			Assert.Equal(new byte[] { 0x53 }, result.Buffer);
@@ -43,6 +43,17 @@ public class UdpListenerTests
 		{
 			listener.Stop();
 		}
+	}
+
+	[Fact]
+	public async Task SendToAsync_ReportsFailureThroughReturnedTask()
+	{
+		var       listener = new UdpListener();
+		using var args     = new SocketAsyncEventArgs();
+		args.RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 53);
+		args.SetBuffer(new byte[] { 0x53 }, 0, 1);
+
+		await Assert.ThrowsAsync<InvalidOperationException>(() => listener.SendToAsync(args));
 	}
 
 	[Fact]
