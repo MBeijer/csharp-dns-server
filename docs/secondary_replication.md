@@ -73,6 +73,10 @@ Replicated zones are served from a dedicated high-priority resolver. If the seco
 
 Other local zones continue to work normally. A secondary may also enable its own `zoneTransfer` settings and act as a primary for downstream instances.
 
+## Admin visibility
+
+The web administration zone overview includes zones from every active provider. Database-backed zones remain editable, while replicated, Traefik, BIND, probe, and other runtime-provider zones are identified by their source and displayed read-only. When a local database zone and a higher-priority provider zone use the same suffix, both rows remain visible so the configured zone is not hidden from administration.
+
 ## Network and security requirements
 
 - Expose the DNS listener over TCP between primary and secondary. AXFR and the catalog stream do not use UDP.

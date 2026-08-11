@@ -38,6 +38,27 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 
 	public List<IDnsResolver> Resolvers => ZoneResolvers;
 
+	public IReadOnlyList<ActiveZoneSnapshot> ActiveZones
+	{
+		get
+		{
+			lock (RuntimeSyncRoot)
+			{
+				return ActiveProviders.Where(runtime => runtime.Provider is not DatabaseZoneProvider)
+				                      .SelectMany(runtime => runtime.Provider.Resolver.GetZones()
+				                                                    .Select(zone => new ActiveZoneSnapshot(
+					                                                            zone,
+					                                                            GetProviderSource(runtime.Provider),
+					                                                            runtime.Provider is
+						                                                            SecondaryZoneProvider
+				                                                            )
+				                                                    )
+				                      )
+				                      .ToList();
+			}
+		}
+	}
+
 	public async Task StartAsync(CancellationToken ct)
 	{
 		Cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -84,6 +105,21 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 
 		dnsServer.Initialize(ZoneResolvers);
 		await dnsServer.Start(Cts.Token).ConfigureAwait(false);
+	}
+
+	private string GetProviderSource(IZoneProvider provider)
+	{
+		if (provider is SecondaryZoneProvider)
+		{
+			var master = serverOptions.Value.SecondarySync.Master;
+			return string.IsNullOrWhiteSpace(master) ? "Secondary" : $"Secondary ({master})";
+		}
+
+		if (provider is BindZoneProvider) return "BIND";
+
+		var          name   = provider.GetType().Name;
+		const string suffix = "ZoneProvider";
+		return name.EndsWith(suffix, StringComparison.Ordinal) ? name[..^suffix.Length] : name;
 	}
 
 	public async Task StopAsync(CancellationToken cancellationToken)
@@ -137,7 +173,7 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 				item.RecordCount = upserted.Records?.Count ?? dbZone.Records?.Count ?? 0;
 				result.ImportedCount++;
 
-				((IObserver<List<Dns.Models.Zone>>)runtime.Provider.Resolver).OnNext([]);
+				runtime.Provider.Resolver.OnNext([]);
 				if (runtime.Provider is IDisposable disposableProvider)
 					disposableProvider.Dispose();
 				item.Disabled = true;

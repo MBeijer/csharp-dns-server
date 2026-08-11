@@ -5,6 +5,7 @@
 //----------------------
 
 /* eslint-disable */
+
 // ReSharper disable InconsistentNaming
 
 export interface IClient {
@@ -23,14 +24,14 @@ export interface IClient {
 
     /**
      * Get database zones
-     * @param body (optional) 
+     * @param body (optional)
      * @return OK
      */
     zonesPUT(body: ZoneDto | undefined, signal?: AbortSignal): Promise<void>;
 
     /**
      * Get database zones
-     * @param body (optional) 
+     * @param body (optional)
      * @return OK
      */
     zonesPATCH(body: ZoneDto | undefined, signal?: AbortSignal): Promise<void>;
@@ -97,15 +98,15 @@ export interface IClient {
 
     /**
      * Log in
-     * @param body (optional) 
+     * @param body (optional)
      * @return OK
      */
     loginPOST(body: LoginRequest | undefined, signal?: AbortSignal): Promise<string>;
 
     /**
      * Log in
-     * @param account (optional) 
-     * @param password (optional) 
+     * @param account (optional)
+     * @param password (optional)
      * @return OK
      */
     loginGET(account: string | undefined, password: string | undefined, signal?: AbortSignal): Promise<string>;
@@ -132,8 +133,7 @@ export class Client implements IClient {
         let options_: RequestInit = {
             method: "GET",
             signal,
-            headers: {
-            }
+            headers: {}
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
@@ -143,37 +143,41 @@ export class Client implements IClient {
 
     protected processResolvers(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -190,8 +194,7 @@ export class Client implements IClient {
         let options_: RequestInit = {
             method: "GET",
             signal,
-            headers: {
-            }
+            headers: {}
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
@@ -201,37 +204,41 @@ export class Client implements IClient {
 
     protected processZonesGET(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -239,7 +246,7 @@ export class Client implements IClient {
 
     /**
      * Get database zones
-     * @param body (optional) 
+     * @param body (optional)
      * @return OK
      */
     zonesPUT(body: ZoneDto | undefined, signal?: AbortSignal): Promise<void> {
@@ -264,37 +271,41 @@ export class Client implements IClient {
 
     protected processZonesPUT(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -302,7 +313,7 @@ export class Client implements IClient {
 
     /**
      * Get database zones
-     * @param body (optional) 
+     * @param body (optional)
      * @return OK
      */
     zonesPATCH(body: ZoneDto | undefined, signal?: AbortSignal): Promise<void> {
@@ -327,37 +338,41 @@ export class Client implements IClient {
 
     protected processZonesPATCH(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -378,8 +393,7 @@ export class Client implements IClient {
         let options_: RequestInit = {
             method: "DELETE",
             signal,
-            headers: {
-            }
+            headers: {}
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
@@ -389,30 +403,34 @@ export class Client implements IClient {
 
     protected processZonesDELETE(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 204) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -445,34 +463,38 @@ export class Client implements IClient {
 
     protected processImportBind(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 201) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -512,8 +534,7 @@ export class Client implements IClient {
             body: content_,
             method: "POST",
             signal,
-            headers: {
-            }
+            headers: {}
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
@@ -523,34 +544,38 @@ export class Client implements IClient {
 
     protected processImportBindUpload(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 201) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -584,8 +609,7 @@ export class Client implements IClient {
             body: content_,
             method: "POST",
             signal,
-            headers: {
-            }
+            headers: {}
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
@@ -595,37 +619,41 @@ export class Client implements IClient {
 
     protected processImportBindUpload2(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -658,30 +686,34 @@ export class Client implements IClient {
 
     protected processImportActiveBind(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -699,8 +731,7 @@ export class Client implements IClient {
         let options_: RequestInit = {
             method: "GET",
             signal,
-            headers: {
-            }
+            headers: {}
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
@@ -710,29 +741,33 @@ export class Client implements IClient {
 
     protected processDnsresolver(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -750,8 +785,7 @@ export class Client implements IClient {
         let options_: RequestInit = {
             method: "GET",
             signal,
-            headers: {
-            }
+            headers: {}
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
@@ -761,29 +795,33 @@ export class Client implements IClient {
 
     protected processDnsserver(response: Response): Promise<void> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+                return;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<void>(null as any);
@@ -812,40 +850,44 @@ export class Client implements IClient {
 
     protected processUser(response: Response): Promise<UserDto> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            let resultData200 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result200 = UserDto.fromJS(resultData200, _mappings);
-            return result200;
+                let result200: any = null;
+                let resultData200 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result200 = UserDto.fromJS(resultData200, _mappings);
+                return result200;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status === 401) {
             return response.text().then((_responseText) => {
-            return throwException("Unauthorized", status, _responseText, _headers);
+                return throwException("Unauthorized", status, _responseText, _headers);
             });
         } else if (status === 403) {
             return response.text().then((_responseText) => {
-            return throwException("Forbidden", status, _responseText, _headers);
+                return throwException("Forbidden", status, _responseText, _headers);
             });
         } else if (status === 404) {
             return response.text().then((_responseText) => {
-            let result404: any = null;
-            let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result404 = ProblemDetails.fromJS(resultData404, _mappings);
-            return throwException("Not Found", status, _responseText, _headers, result404);
+                let result404: any = null;
+                let resultData404 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result404 = ProblemDetails.fromJS(resultData404, _mappings);
+                return throwException("Not Found", status, _responseText, _headers, result404);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<UserDto>(null as any);
@@ -853,7 +895,7 @@ export class Client implements IClient {
 
     /**
      * Log in
-     * @param body (optional) 
+     * @param body (optional)
      * @return OK
      */
     loginPOST(body: LoginRequest | undefined, signal?: AbortSignal): Promise<string> {
@@ -879,26 +921,30 @@ export class Client implements IClient {
 
     protected processLoginPOST(response: Response): Promise<string> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            let resultData200 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                let result200: any = null;
+                let resultData200 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
                 result200 = resultData200 !== undefined ? resultData200 : null as any;
-    
-            return result200;
+
+                return result200;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<string>(null as any);
@@ -906,8 +952,8 @@ export class Client implements IClient {
 
     /**
      * Log in
-     * @param account (optional) 
-     * @param password (optional) 
+     * @param account (optional)
+     * @param password (optional)
      * @return OK
      */
     loginGET(account: string | undefined, password: string | undefined, signal?: AbortSignal): Promise<string> {
@@ -937,26 +983,30 @@ export class Client implements IClient {
 
     protected processLoginGET(response: Response): Promise<string> {
         const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        let _headers: any = {};
+        if (response.headers && response.headers.forEach) {
+            response.headers.forEach((v: any, k: any) => _headers[k] = v);
+        }
+        ;
         let _mappings: { source: any, target: any }[] = [];
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            let resultData200 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                let result200: any = null;
+                let resultData200 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
                 result200 = resultData200 !== undefined ? resultData200 : null as any;
-    
-            return result200;
+
+                return result200;
             });
         } else if (status === 400) {
             return response.text().then((_responseText) => {
-            let result400: any = null;
-            let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
-            result400 = ProblemDetails.fromJS(resultData400, _mappings);
-            return throwException("Bad Request", status, _responseText, _headers, result400);
+                let result400: any = null;
+                let resultData400 = _responseText === "" ? null : jsonParse(_responseText, this.jsonParseReviver);
+                result400 = ProblemDetails.fromJS(resultData400, _mappings);
+                return throwException("Bad Request", status, _responseText, _headers, result400);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+                return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<string>(null as any);
@@ -1306,6 +1356,12 @@ export class ZoneDto implements IZoneDto {
     masterZoneSuffix?: string | null;
     /** Number of slave zones linked to this zone. */
     slaveZoneCount?: number;
+    /** Provider or backing store that supplies this zone. */
+    source?: string | null;
+    /** Indicates that the zone cannot be edited through the database administration API. */
+    isReadOnly?: boolean;
+    /** Indicates that the zone is synchronized from the configured replication primary. */
+    isReplicated?: boolean;
     /** Zone records. */
     records?: ZoneRecordDto[] | null;
 
@@ -1327,12 +1383,14 @@ export class ZoneDto implements IZoneDto {
             this.masterZoneId = _data["masterZoneId"] !== undefined ? _data["masterZoneId"] : null as any;
             this.masterZoneSuffix = _data["masterZoneSuffix"] !== undefined ? _data["masterZoneSuffix"] : null as any;
             this.slaveZoneCount = _data["slaveZoneCount"] !== undefined ? _data["slaveZoneCount"] : null as any;
+            this.source = _data["source"] !== undefined ? _data["source"] : null as any;
+            this.isReadOnly = _data["isReadOnly"] !== undefined ? _data["isReadOnly"] : null as any;
+            this.isReplicated = _data["isReplicated"] !== undefined ? _data["isReplicated"] : null as any;
             if (Array.isArray(_data["records"])) {
                 this.records = [] as any;
                 for (let item of _data["records"])
                     this.records!.push(ZoneRecordDto.fromJS(item, _mappings));
-            }
-            else {
+            } else {
                 this.records = null as any;
             }
         }
@@ -1352,6 +1410,9 @@ export class ZoneDto implements IZoneDto {
         data["masterZoneId"] = this.masterZoneId !== undefined ? this.masterZoneId : null as any;
         data["masterZoneSuffix"] = this.masterZoneSuffix !== undefined ? this.masterZoneSuffix : null as any;
         data["slaveZoneCount"] = this.slaveZoneCount !== undefined ? this.slaveZoneCount : null as any;
+        data["source"] = this.source !== undefined ? this.source : null as any;
+        data["isReadOnly"] = this.isReadOnly !== undefined ? this.isReadOnly : null as any;
+        data["isReplicated"] = this.isReplicated !== undefined ? this.isReplicated : null as any;
         if (Array.isArray(this.records)) {
             data["records"] = [];
             for (let item of this.records)
@@ -1377,6 +1438,12 @@ export interface IZoneDto {
     masterZoneSuffix?: string | null;
     /** Number of slave zones linked to this zone. */
     slaveZoneCount?: number;
+    /** Provider or backing store that supplies this zone. */
+    source?: string | null;
+    /** Indicates that the zone cannot be edited through the database administration API. */
+    isReadOnly?: boolean;
+    /** Indicates that the zone is synchronized from the configured replication primary. */
+    isReplicated?: boolean;
     /** Zone records. */
     records?: ZoneRecordDto[] | null;
 }
@@ -1453,7 +1520,7 @@ function jsonParse(json: any, reviver?: any) {
     json = (function recurse(obj: any, prop?: any, parent?: any) {
         if (typeof obj !== 'object' || !obj)
             return obj;
-        
+
         if ("$ref" in obj) {
             let ref = obj.$ref;
             if (ref in byid)
@@ -1467,7 +1534,7 @@ function jsonParse(json: any, reviver?: any) {
                 obj = obj.$values;
             byid[id] = obj;
         }
-        
+
         if (Array.isArray(obj)) {
             obj = obj.map((v, i) => recurse(v, i, obj));
         } else {
@@ -1489,21 +1556,21 @@ function jsonParse(json: any, reviver?: any) {
 }
 
 function createInstance<T>(data: any, mappings: any, type: any): T | null {
-  if (!mappings)
-    mappings = [];
-  if (!data)
-    return null;
+    if (!mappings)
+        mappings = [];
+    if (!data)
+        return null;
 
-  const mappingIndexName = "__mappingIndex";
-  if (data[mappingIndexName])
-    return <T>mappings[data[mappingIndexName]].target;
+    const mappingIndexName = "__mappingIndex";
+    if (data[mappingIndexName])
+        return <T>mappings[data[mappingIndexName]].target;
 
-  data[mappingIndexName] = mappings.length;
+    data[mappingIndexName] = mappings.length;
 
-  let result: any = new type();
-  mappings.push({ source: data, target: result });
-  result.init(data, mappings);
-  return result;
+    let result: any = new type();
+    mappings.push({source: data, target: result});
+    result.init(data, mappings);
+    return result;
 }
 
 export interface FileParameter {
@@ -1535,6 +1602,8 @@ export class ApiException extends Error {
     }
 }
 
-function throwException(message: string, status: number, response: string, headers: { [key: string]: any; }, result?: any): any {
+function throwException(message: string, status: number, response: string, headers: {
+    [key: string]: any;
+}, result?: any): any {
     throw new ApiException(message, status, response, headers, result);
 }
