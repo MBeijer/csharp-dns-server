@@ -11,5 +11,7 @@ public class ServerOptions
 
 	[JsonPropertyName("zoneTransfer")] public ZoneTransferOptions ZoneTransfer { get; set; } = new();
 
+	[JsonPropertyName("secondarySync")] public SecondarySyncOptions SecondarySync { get; set; } = new();
+
 	[JsonPropertyName("webServer")] public WebServerOptions WebServer { get; set; }
 }

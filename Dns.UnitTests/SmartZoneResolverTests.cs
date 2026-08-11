@@ -44,9 +44,11 @@ public class SmartZoneResolverTests
 	[Fact]
 	public void ObserverOnNext_LoadsZonesAndUpdatesReloadTime()
 	{
-		var resolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
-		var observer = (IObserver<List<Zone>>)resolver;
-		var before = DateTime.Now;
+		var resolver    = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		var observer    = (IObserver<List<Zone>>)resolver;
+		var before      = DateTime.Now;
+		var changeCount = 0;
+		resolver.ZonesChanged += (_, _) => changeCount++;
 
 		observer.OnNext(
 			[
@@ -57,6 +59,7 @@ public class SmartZoneResolverTests
 		Assert.True(resolver.AreZonesLoaded());
 		Assert.True(resolver.LastZoneReload >= before);
 		Assert.Single(resolver.GetZones());
+		Assert.Equal(1, changeCount);
 	}
 
 	[Fact]
@@ -97,8 +100,8 @@ public class SmartZoneResolverTests
 	[Fact]
 	public void SubscribeTo_DisposesPreviousSubscription()
 	{
-		var resolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
-		var firstProvider = new FakeZoneProvider();
+		var resolver       = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		var firstProvider  = new FakeZoneProvider();
 		var secondProvider = new FakeZoneProvider();
 
 		resolver.SubscribeTo(firstProvider);

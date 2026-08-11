@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -10,14 +11,22 @@ namespace Dns;
 
 public delegate Task<byte[]> OnTcpRequestHandler(byte[] buffer, int length, EndPoint remoteEndPoint);
 
+public delegate IAsyncEnumerable<byte[]> OnTcpStreamRequestHandler(
+	byte[] buffer,
+	int length,
+	EndPoint remoteEndPoint,
+	CancellationToken cancellationToken
+);
+
 public class TcpDnsListener
 {
-	private readonly Lock _syncRoot = new();
-	private CancellationTokenSource _cts;
-	private TcpListener _listener;
-	private Task _acceptLoopTask;
+	private readonly Lock                    _syncRoot = new();
+	private          CancellationTokenSource _cts;
+	private          TcpListener             _listener;
+	private          Task                    _acceptLoopTask;
 
-	public OnTcpRequestHandler OnRequest;
+	public OnTcpRequestHandler       OnRequest;
+	public OnTcpStreamRequestHandler OnStreamRequest;
 
 	public EndPoint LocalEndPoint => _listener?.LocalEndpoint;
 
@@ -25,7 +34,15 @@ public class TcpDnsListener
 	{
 		if (_listener != null) throw new InvalidOperationException("Listener already initialized.");
 
-		_listener = new(IPAddress.Any, port);
+		if (Socket.OSSupportsIPv6)
+		{
+			_listener                 = new(IPAddress.IPv6Any, port);
+			_listener.Server.DualMode = true;
+		}
+		else
+		{
+			_listener = new(IPAddress.Any, port);
+		}
 	}
 
 	public void Start()
@@ -37,7 +54,7 @@ public class TcpDnsListener
 			if (_cts != null) throw new InvalidOperationException("TCP listener already started.");
 
 			_listener.Start();
-			_cts = new();
+			_cts            = new();
 			_acceptLoopTask = AcceptLoopAsync(_cts.Token);
 		}
 	}
@@ -45,15 +62,15 @@ public class TcpDnsListener
 	public void Stop()
 	{
 		CancellationTokenSource cts;
-		Task acceptLoop;
+		Task                    acceptLoop;
 
 		lock (_syncRoot)
 		{
 			if (_cts == null) return;
 
-			cts = _cts;
-			acceptLoop = _acceptLoopTask;
-			_cts = null;
+			cts             = _cts;
+			acceptLoop      = _acceptLoopTask;
+			_cts            = null;
 			_acceptLoopTask = null;
 		}
 
@@ -98,36 +115,57 @@ public class TcpDnsListener
 
 	private async Task HandleClientAsync(TcpClient client, CancellationToken ct)
 	{
-		using (client)
+		try
 		{
-			var remote = client.Client.RemoteEndPoint;
-			var stream = client.GetStream();
-
-			while (!ct.IsCancellationRequested)
+			using (client)
 			{
-				var lengthBuffer = new byte[2];
-				var lengthRead = await ReadExactAsync(stream, lengthBuffer, ct).ConfigureAwait(false);
-				if (lengthRead == 0) return;
-				if (lengthRead < 2) return;
+				var remote = client.Client.RemoteEndPoint;
+				var stream = client.GetStream();
 
-				var messageLength = BinaryPrimitives.ReadUInt16BigEndian(lengthBuffer);
-				if (messageLength == 0) return;
+				while (!ct.IsCancellationRequested)
+				{
+					var lengthBuffer = new byte[2];
+					var lengthRead   = await ReadExactAsync(stream, lengthBuffer, ct).ConfigureAwait(false);
+					if (lengthRead < 2) return;
 
-				var payload = new byte[messageLength];
-				var read = await ReadExactAsync(stream, payload, ct).ConfigureAwait(false);
-				if (read < messageLength) return;
+					var messageLength = BinaryPrimitives.ReadUInt16BigEndian(lengthBuffer);
+					if (messageLength == 0) return;
 
-				if (OnRequest == null) continue;
+					var payload = new byte[messageLength];
+					var read    = await ReadExactAsync(stream, payload, ct).ConfigureAwait(false);
+					if (read < messageLength) return;
 
-				var response = await OnRequest(payload, payload.Length, remote).ConfigureAwait(false);
-				if (response == null) continue;
+					var streamingResponses = OnStreamRequest?.Invoke(payload, payload.Length, remote, ct);
+					if (streamingResponses != null)
+					{
+						await foreach (var streamingResponse in streamingResponses.ConfigureAwait(false))
+							await WriteResponseAsync(stream, streamingResponse, ct).ConfigureAwait(false);
+						return;
+					}
 
-				var responsePrefix = new byte[2];
-				BinaryPrimitives.WriteUInt16BigEndian(responsePrefix, (ushort)response.Length);
-				await stream.WriteAsync(responsePrefix, ct).ConfigureAwait(false);
-				await stream.WriteAsync(response, ct).ConfigureAwait(false);
+					if (OnRequest == null) continue;
+
+					var response = await OnRequest(payload, payload.Length, remote).ConfigureAwait(false);
+					if (response != null)
+						await WriteResponseAsync(stream, response, ct).ConfigureAwait(false);
+				}
 			}
 		}
+		catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException)
+		{
+			// A DNS-over-TCP peer may disconnect at any time, including while subscribed to the catalog stream.
+		}
+	}
+
+	private static async Task WriteResponseAsync(NetworkStream stream, byte[] response, CancellationToken ct)
+	{
+		if (response.Length > ushort.MaxValue)
+			throw new InvalidDataException("A DNS-over-TCP message cannot exceed 65535 bytes.");
+
+		var responsePrefix = new byte[2];
+		BinaryPrimitives.WriteUInt16BigEndian(responsePrefix, (ushort)response.Length);
+		await stream.WriteAsync(responsePrefix, ct).ConfigureAwait(false);
+		await stream.WriteAsync(response, ct).ConfigureAwait(false);
 	}
 
 	private static async Task<int> ReadExactAsync(Stream stream, byte[] buffer, CancellationToken ct)
@@ -135,7 +173,8 @@ public class TcpDnsListener
 		var offset = 0;
 		while (offset < buffer.Length)
 		{
-			var read = await stream.ReadAsync(buffer.AsMemory(offset, buffer.Length - offset), ct).ConfigureAwait(false);
+			var read = await stream.ReadAsync(buffer.AsMemory(offset, buffer.Length - offset), ct)
+			                       .ConfigureAwait(false);
 			if (read == 0) break;
 			offset += read;
 		}
