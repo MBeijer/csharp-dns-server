@@ -648,6 +648,38 @@ public class DnsServerTests
 	}
 
 	[Fact]
+	public async Task CatalogStream_WaitsForInitialResolverSnapshotAndAcceptsLoadedEmptyResolver()
+	{
+		var resolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		var server = CreateServer(
+			zoneTransferEnabled: true,
+			allowTransfersFrom: ["127.0.0.1/32"],
+			resolvers: [resolver]
+		);
+		var request = new DnsMessage { QueryIdentifier = 0x5252, QuestionCount = 1 };
+		request.Questions.Add(new Question(DnsServer.CatalogZoneName, ResourceType.AXFR, ResourceClass.IN));
+		var payload = Serialize(request);
+		var stream = InvokePrivate<IAsyncEnumerable<byte[]>>(
+			server,
+			"ProcessTcpStreamRequest",
+			payload,
+			payload.Length,
+			new IPEndPoint(IPAddress.Loopback, 5300),
+			CancellationToken.None
+		);
+
+		await using var enumerator    = stream.GetAsyncEnumerator();
+		var             firstSnapshot = enumerator.MoveNextAsync().AsTask();
+		await Task.Delay(100);
+		Assert.False(firstSnapshot.IsCompleted);
+
+		((IObserver<List<Zone>>)resolver).OnNext([]);
+
+		Assert.True(await firstSnapshot.WaitAsync(TimeSpan.FromSeconds(5)));
+		AssertCatalogSnapshot(enumerator.Current);
+	}
+
+	[Fact]
 	public async Task SecondarySync_ReplicatesInitialAndChangedZoneToMultipleSecondaries()
 	{
 		var port            = GetAvailableTcpPort();
@@ -716,6 +748,114 @@ public class DnsServerTests
 		Assert.Contains(secondResolver.GetZones(), zone => zone.Suffix == "new.example");
 
 		await restartedCts.CancelAsync();
+	}
+
+	[Fact]
+	public async Task SecondarySync_RetainsLastKnownGoodZoneWhilePrimaryIsDisconnected()
+	{
+		var port            = GetAvailableTcpPort();
+		var cacheFile       = Path.Combine(Path.GetTempPath(), $"secondary-zones-{Guid.NewGuid():N}.json");
+		var primaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		((IObserver<List<Zone>>)primaryResolver).OnNext([CreateReplicationZone(12, "192.0.2.12", "retained.example")]);
+		var       primary    = CreateReplicationPrimary(port, primaryResolver);
+		using var primaryCts = new CancellationTokenSource();
+		await primary.Start(primaryCts.Token);
+
+		var secondaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		var secondary = CreateSecondaryProvider(secondaryResolver, port, settings => settings.CacheFile = cacheFile);
+		secondary.Start(CancellationToken.None);
+
+		try
+		{
+			var transferred = await WaitForNamedZoneAsync(
+				secondaryResolver,
+				"retained.example",
+				TimeSpan.FromSeconds(10)
+			);
+			Assert.Equal((uint)12, transferred.Serial);
+			var cachedSnapshot = await WaitForFileContainingAsync(
+				cacheFile,
+				"retained.example",
+				TimeSpan.FromSeconds(5)
+			);
+			var lastZoneReload = secondaryResolver.LastZoneReload;
+
+			await primaryCts.CancelAsync();
+			await Task.Delay(TimeSpan.FromSeconds(3));
+
+			var retained = Assert.Single(secondaryResolver.GetZones());
+			Assert.Equal("retained.example", retained.Suffix);
+			Assert.Equal((uint)12, retained.Serial);
+			Assert.Equal(lastZoneReload, secondaryResolver.LastZoneReload);
+			Assert.Equal(cachedSnapshot, await File.ReadAllTextAsync(cacheFile));
+		}
+		finally
+		{
+			await primaryCts.CancelAsync();
+			secondary.Dispose();
+			File.Delete(cacheFile);
+			File.Delete($"{cacheFile}.tmp");
+		}
+	}
+
+	[Fact]
+	public async Task SecondarySync_WaitsForRestartedPrimaryReadinessBeforeRemovingCatalogDelta()
+	{
+		var port            = GetAvailableTcpPort();
+		var primaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		((IObserver<List<Zone>>)primaryResolver).OnNext(
+			[
+				CreateReplicationZone(1, "192.0.2.10", "retained.example"),
+				CreateReplicationZone(1, "192.0.2.20", "removed.example"),
+			]
+		);
+		var       primary    = CreateReplicationPrimary(port, primaryResolver);
+		using var primaryCts = new CancellationTokenSource();
+		await primary.Start(primaryCts.Token);
+
+		var       secondaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		using var secondary         = CreateSecondaryProvider(secondaryResolver, port);
+		secondary.Start(CancellationToken.None);
+		await WaitForZoneCountAsync(secondaryResolver, 2);
+
+		await primaryCts.CancelAsync();
+
+		var       restartedResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		var       restartedPrimary  = CreateReplicationPrimary(port, restartedResolver);
+		using var restartedCts      = new CancellationTokenSource();
+		await restartedPrimary.Start(restartedCts.Token);
+
+		try
+		{
+			var reloadBeforePrimaryReady = secondaryResolver.LastZoneReload;
+			await Task.Delay(TimeSpan.FromSeconds(3));
+
+			Assert.Equal(2, secondaryResolver.GetZones().Count());
+			Assert.Contains(secondaryResolver.GetZones(), zone => zone.Suffix == "retained.example");
+			Assert.Contains(secondaryResolver.GetZones(), zone => zone.Suffix == "removed.example");
+			Assert.Equal(reloadBeforePrimaryReady, secondaryResolver.LastZoneReload);
+
+			((IObserver<List<Zone>>)restartedResolver).OnNext(
+				[CreateReplicationZone(2, "192.0.2.11", "retained.example")]
+			);
+
+			await WaitForZoneCountAsync(secondaryResolver, 1);
+			var retained = await WaitForNamedZoneSerialAsync(
+				secondaryResolver,
+				"retained.example",
+				2,
+				TimeSpan.FromSeconds(10)
+			);
+			Assert.Equal(
+				"192.0.2.11",
+				retained.Records.Single(record => record.Type == ResourceType.A).Addresses.Single()
+			);
+			Assert.DoesNotContain(secondaryResolver.GetZones(), zone => zone.Suffix == "removed.example");
+		}
+		finally
+		{
+			await restartedCts.CancelAsync();
+		}
 	}
 
 	[Fact]
@@ -942,6 +1082,48 @@ public class DnsServerTests
 		}
 
 		throw new TimeoutException($"Secondary did not load {suffix}.");
+	}
+
+	private static async Task<Zone> WaitForNamedZoneSerialAsync(
+		IDnsResolver resolver,
+		string suffix,
+		uint serial,
+		TimeSpan timeout
+	)
+	{
+		using var timeoutCts = new CancellationTokenSource(timeout);
+		while (!timeoutCts.IsCancellationRequested)
+		{
+			var zone = resolver.GetZones()
+			                   .SingleOrDefault(item => string.Equals(
+				                                            item.Suffix,
+				                                            suffix,
+				                                            StringComparison.OrdinalIgnoreCase
+			                                            ) &&
+			                                            item.Serial == serial
+			                   );
+			if (zone != null) return zone;
+			await Task.Delay(25, timeoutCts.Token);
+		}
+
+		throw new TimeoutException($"Secondary did not load {suffix} at serial {serial}.");
+	}
+
+	private static async Task<string> WaitForFileContainingAsync(string path, string expectedContent, TimeSpan timeout)
+	{
+		using var timeoutCts = new CancellationTokenSource(timeout);
+		while (!timeoutCts.IsCancellationRequested)
+		{
+			if (File.Exists(path))
+			{
+				var content = await File.ReadAllTextAsync(path, timeoutCts.Token);
+				if (content.Contains(expectedContent, StringComparison.Ordinal)) return content;
+			}
+
+			await Task.Delay(25, timeoutCts.Token);
+		}
+
+		throw new TimeoutException($"File '{path}' did not contain '{expectedContent}'.");
 	}
 
 	private static ushort GetAvailableTcpPort()

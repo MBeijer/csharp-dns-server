@@ -98,7 +98,12 @@ public sealed class SecondaryZoneProvider(
 				}
 				catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException)
 				{
-					logger.LogWarning(ex, "Secondary catalog connection to {Master} was lost", _settings.Master);
+					logger.LogWarning(
+						ex,
+						"Secondary catalog connection to {Master} was lost; retaining {RetainedZoneCount} last-known-good zones",
+						_settings.Master,
+						GetZoneCount()
+					);
 				}
 
 				try
@@ -209,7 +214,8 @@ public sealed class SecondaryZoneProvider(
 			);
 		}
 
-		if (removedZones.Count > 0) await PublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
+		if (removedZones.Count > 0 || !Resolver.IsReady)
+			await PublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
 		logger.LogInformation(
 			"Processed secondary catalog from {Master}: {AdvertisedCount} advertised, {AvailableCount} available, {QueuedCount} queued, {RemovedCount} removed",
@@ -534,7 +540,7 @@ public sealed class SecondaryZoneProvider(
 				snapshot = _zones.Values.ToList();
 			}
 
-			if (snapshot.Count > 0) Notify(snapshot);
+			Notify(snapshot);
 		}
 		catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
 		{

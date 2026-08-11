@@ -204,12 +204,15 @@ On each secondary, point `secondarySync.master` at the primary DNS TCP endpoint:
 
 - The primary accepts multiple simultaneous secondary catalog connections.
 - Every connection and reconnect receives the full current zone list, so missed changes do not require manual recovery.
+- After primary startup, catalog streams wait until every configured resolver has published its initial snapshot. This prevents reconnecting secondaries from treating a partially loaded primary as an authoritative deletion.
 - Replicated zones take precedence over same-named local zones. Local zones not present on the primary continue to be served.
 - When a zone disappears from a valid primary catalog, its replicated copy is removed and any same-named local zone becomes visible again.
 - `cacheFile` is optional. When configured on persistent storage, its last-known-good zones are loaded before reconnecting so a restarted secondary can keep answering during a primary outage.
+- Losing the catalog connection never removes replicated zones. The in-memory resolver and `cacheFile` retain their last-known-good snapshots until a complete, valid primary catalog explicitly removes a zone.
+- Once the primary is ready, its complete catalog is authoritative: zones omitted from that snapshot are removed from the secondary as the synchronization delta.
 - Zone transfers run independently, up to `maxConcurrentTransfers` at a time, so a stalled AXFR does not block catalog processing or other zones. Failed and timed-out transfers retry after `transferRetryDelaySeconds` until they succeed or disappear from the primary catalog.
 - Each successfully transferred zone is published to DNS and persisted immediately.
-- The web admin zone overview lists zones from every active provider. Database zones are editable; synchronized, Traefik, BIND, probe, and other provider-managed zones are labeled by source and shown read-only.
+- The web admin zone overview lists zones from every active provider. Database zones are editable; synchronized, Traefik, BIND, probe, and other provider-managed zones are labeled by source and open in a read-only record view.
 - The catalog connection carries 30-second heartbeat snapshots. A broken connection is retried after `reconnectDelaySeconds`.
 - Both the catalog subscription and each AXFR are checked against the primary's `allowTransfersFrom` ACL.
 - Publish the configured DNS port over TCP on both hosts. UDP alone is insufficient for replication.

@@ -74,6 +74,8 @@ The source address observed by the application must match the ACL. Verify this w
 
 Successful zones are published to the resolver and written to `cacheFile` immediately. The web admin refreshes its zone snapshot periodically and shows this progress without requiring a page reload.
 
+After the primary starts, it accepts the secondary's catalog TCP connection but does not send the initial snapshot until every configured resolver has completed its first publication. Empty-but-loaded resolvers count as ready. This readiness barrier prevents a reconnecting secondary from deleting zones while database, Traefik, BIND, probe, or upstream-secondary providers are still loading.
+
 ## Zone precedence and removal
 
 Replicated zones are served from a dedicated high-priority resolver. If the secondary also has a local zone with the same suffix, the replicated copy wins while that zone remains in the primary catalog. The local copy is not overwritten or deleted. If the primary later removes the zone, the replicated overlay is removed and the local copy becomes authoritative again.
@@ -82,7 +84,7 @@ Other local zones continue to work normally. A secondary may also enable its own
 
 ## Admin visibility
 
-The web administration zone overview includes zones from every active provider. Database-backed zones remain editable, while replicated, Traefik, BIND, probe, and other runtime-provider zones are identified by their source and displayed read-only. When a local database zone and a higher-priority provider zone use the same suffix, both rows remain visible so the configured zone is not hidden from administration.
+The web administration zone overview includes zones from every active provider. Database-backed zones remain editable, while replicated, Traefik, BIND, probe, and other runtime-provider zones are identified by their source. Selecting a provider-managed zone opens the normal zone record view with every field and mutation control read-only. When a local database zone and a higher-priority provider zone use the same suffix, both rows remain visible so the configured zone is not hidden from administration.
 
 ## Network and security requirements
 
@@ -94,6 +96,6 @@ The web administration zone overview includes zones from every active provider. 
 
 ## Failure behavior
 
-The secondary retains its last successfully transferred version when a transfer fails or the primary becomes unreachable. A changed zone is published only after a complete AXFR ending in the matching closing SOA. A valid catalog can remove a replicated zone; a broken or rejected catalog connection cannot.
+The secondary retains its last successfully transferred version when a transfer fails or the primary becomes unreachable. Connection loss does not modify the in-memory resolver or `cacheFile`. A changed zone is published only after a complete AXFR ending in the matching closing SOA. After the primary readiness barrier opens, a complete, valid catalog is authoritative and omitted zones are removed as the synchronization delta. A broken, incomplete, rejected, or not-yet-ready catalog connection cannot remove replicated zones.
 
 An unreachable UDP NOTIFY target is logged as a warning and does not stop the primary DNS service or its active catalog streams.

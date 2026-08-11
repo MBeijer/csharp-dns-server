@@ -1,11 +1,17 @@
 import type {Zone} from "../api/generated/dns-api-client";
 
+export type ZoneAccessMode = "edit" | "view";
+
 export function isReadOnlyZone(zone: Zone): boolean {
     return zone.isReadOnly === true || zone.masterZoneId != null;
 }
 
 export function isSlaveZone(zone: Zone): boolean {
     return zone.isReplicated === true || zone.masterZoneId != null;
+}
+
+export function getZoneAccessMode(zone: Zone): ZoneAccessMode {
+    return isReadOnlyZone(zone) ? "view" : "edit";
 }
 
 export function getZoneRelationshipLabel(zone: Zone): string {

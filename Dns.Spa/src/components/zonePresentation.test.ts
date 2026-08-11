@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {getZoneRelationshipLabel, isReadOnlyZone, isSlaveZone} from "./zonePresentation";
+import {getZoneAccessMode, getZoneRelationshipLabel, isReadOnlyZone, isSlaveZone} from "./zonePresentation";
 
 describe("zonePresentation", () => {
     it("marks runtime provider zones as read-only", () => {
@@ -7,6 +7,7 @@ describe("zonePresentation", () => {
 
         expect(isReadOnlyZone(zone)).toBe(true);
         expect(isSlaveZone(zone)).toBe(false);
+        expect(getZoneAccessMode(zone)).toBe("view");
         expect(getZoneRelationshipLabel(zone)).toBe("Provider managed");
     });
 
@@ -15,10 +16,12 @@ describe("zonePresentation", () => {
 
         expect(isReadOnlyZone(zone)).toBe(true);
         expect(isSlaveZone(zone)).toBe(true);
+        expect(getZoneAccessMode(zone)).toBe("view");
         expect(getZoneRelationshipLabel(zone)).toBe("Synced secondary");
     });
 
     it("preserves database master and slave relationship labels", () => {
+        expect(getZoneAccessMode({id: 1})).toBe("edit");
         expect(getZoneRelationshipLabel({masterZoneId: 4, masterZoneSuffix: "master.example"})).toBe(
             "Slave of master.example"
         );

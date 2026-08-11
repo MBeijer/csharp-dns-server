@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Dns.Contracts;
 using Dns.Db.Models.EntityFramework.Enums;
 using Dns.Models;
@@ -20,7 +21,11 @@ namespace Dns;
 
 public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 {
-	private long          _hits;
+	private long _hits;
+
+	private readonly TaskCompletionSource _initialLoadCompletion =
+		new(TaskCreationOptions.RunContinuationsAsynchronously);
+
 	private long          _misses;
 	private IZoneProvider _provider;
 	private long          _queries;
@@ -36,12 +41,15 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 		{
 			_zones         = value ?? throw new ArgumentNullException(nameof(value));
 			LastZoneReload = DateTime.Now;
+			_initialLoadCompletion.TrySetResult();
 			logger.LogInformation("Zone reloaded: {Zones}", string.Join(',', _zones.Select(z => z.Suffix)));
 			ZonesChanged?.Invoke(this, EventArgs.Empty);
 		}
 	}
 
 	public event EventHandler ZonesChanged;
+
+	public bool IsReady => _initialLoadCompletion.Task.IsCompletedSuccessfully;
 
 	public DateTime LastZoneReload { get; private set; } = DateTime.MinValue;
 
@@ -106,4 +114,7 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 	}
 
 	public bool AreZonesLoaded() => _zones.Count > 0;
+
+	public Task WaitUntilReadyAsync(CancellationToken cancellationToken) =>
+		_initialLoadCompletion.Task.WaitAsync(cancellationToken);
 }

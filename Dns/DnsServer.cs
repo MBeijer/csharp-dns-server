@@ -166,6 +166,8 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		[EnumeratorCancellation] CancellationToken cancellationToken
 	)
 	{
+		await WaitForCatalogReadinessAsync(cancellationToken).ConfigureAwait(false);
+
 		var subscriptionId = Guid.NewGuid();
 		var updates = Channel.CreateBounded<bool>(
 			new BoundedChannelOptions(1)
@@ -199,6 +201,20 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			if (_catalogSubscribers.TryRemove(subscriptionId, out var removed))
 				removed.Writer.TryComplete();
 		}
+	}
+
+	private async Task WaitForCatalogReadinessAsync(CancellationToken cancellationToken)
+	{
+		var pendingResolvers = (_resolvers ?? []).Where(resolver => !resolver.IsReady).ToList();
+		if (pendingResolvers.Count == 0) return;
+
+		logger.LogInformation(
+			"Holding primary catalog stream until {PendingResolverCount} resolver(s) finish their initial load",
+			pendingResolvers.Count
+		);
+		await Task.WhenAll(pendingResolvers.Select(resolver => resolver.WaitUntilReadyAsync(cancellationToken)))
+		          .ConfigureAwait(false);
+		logger.LogInformation("Primary catalog is ready after all resolvers completed their initial load");
 	}
 
 	private DnsMessage BuildCatalogResponse(DnsMessage request)

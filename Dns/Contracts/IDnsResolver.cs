@@ -6,6 +6,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Dns.Models;
 
 namespace Dns.Contracts;
@@ -15,7 +17,10 @@ public interface IDnsResolver : IObserver<List<Zone>>, IHtmlDump
 {
 	event EventHandler ZonesChanged;
 
+	bool IsReady => true;
+
 	public void       SubscribeTo(IObservable<List<Zone>> zoneProvider);
 	IEnumerable<Zone> GetZones();
 	bool              TryGetZone(string hostname, out Zone zone);
+	Task              WaitUntilReadyAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

@@ -35,12 +35,13 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DnsIcon from "@mui/icons-material/Dns";
 import EditIcon from "@mui/icons-material/Edit";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import {useAppDispatch, useAppSelector} from "../app/hooks";
 import type {Zone, ZoneRecord} from "../api/generated/dns-api-client";
 import {deleteZone, fetchZones, importBindZone, importBindZoneIntoZone, saveZone} from "../features/zones/zonesSlice";
-import {getZoneRelationshipLabel, isReadOnlyZone, isSlaveZone} from "./zonePresentation";
+import {getZoneAccessMode, getZoneRelationshipLabel, isReadOnlyZone, isSlaveZone} from "./zonePresentation";
 
 const RESOURCE_TYPES = ["A", "AAAA", "CNAME", "NS", "MX", "TXT", "PTR", "SRV"];
 const RESOURCE_CLASSES = ["IN", "CS", "CH", "HS"];
@@ -50,6 +51,7 @@ type SortDirection = "asc" | "desc";
 type ZoneSortKey = "suffix" | "serial" | "enabled" | "records" | "source" | "relationship";
 type RecordSortKey = "host" | "type" | "class" | "data";
 type BindImportMode = "add" | "replace";
+type ZoneDialogMode = "closed" | "create" | "edit" | "view";
 
 interface EditableZone {
     id?: number;
@@ -191,7 +193,8 @@ export function ZoneList(): JSX.Element {
 
     const [selectedZoneIds, setSelectedZoneIds] = useState<number[]>([]);
 
-    const [editing, setEditing] = useState(false);
+    const [zoneDialogMode, setZoneDialogMode] = useState<ZoneDialogMode>("closed");
+    const [zoneReadOnlySource, setZoneReadOnlySource] = useState<string | null>(null);
     const [zoneDraft, setZoneDraft] = useState<EditableZone>(emptyZone());
 
     const [recordDialogOpen, setRecordDialogOpen] = useState(false);
@@ -285,6 +288,8 @@ export function ZoneList(): JSX.Element {
     const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedZoneIds.includes(id));
     const selectedCount = selectedZoneIds.length;
     const isDraftSlave = zoneDraft.masterZoneId != null;
+    const isViewingReadOnlyZone = zoneDialogMode === "view";
+    const areDraftRecordsReadOnly = isViewingReadOnlyZone || isDraftSlave;
 
     const toggleSelectAll = () => {
         if (allSelected) {
@@ -323,25 +328,24 @@ export function ZoneList(): JSX.Element {
 
     const startCreateZone = () => {
         setZoneDraft(emptyZone());
-        setEditing(true);
+        setZoneReadOnlySource(null);
+        setZoneDialogMode("create");
     };
 
-    const startEditZone = (zone: Zone) => {
-        if (isReadOnlyZone(zone)) {
-            return;
-        }
-
+    const openZone = (zone: Zone) => {
         setZoneDraft(mapZoneToEditable(zone));
-        setEditing(true);
+        setZoneReadOnlySource(zone.source ?? null);
+        setZoneDialogMode(getZoneAccessMode(zone));
     };
 
     const cancelEditZone = () => {
         setZoneDraft(emptyZone());
-        setEditing(false);
+        setZoneReadOnlySource(null);
+        setZoneDialogMode("closed");
     };
 
     const submitZone = async () => {
-        if (zoneDraft.suffix.trim().length === 0) {
+        if (isViewingReadOnlyZone || zoneDraft.suffix.trim().length === 0) {
             return;
         }
 
@@ -438,7 +442,7 @@ export function ZoneList(): JSX.Element {
     };
 
     const openZoneBindImportDialog = () => {
-        if (zoneDraft.id == null || isDraftSlave) {
+        if (zoneDraft.id == null || areDraftRecordsReadOnly) {
             return;
         }
 
@@ -469,7 +473,7 @@ export function ZoneList(): JSX.Element {
     };
 
     const openCreateRecord = () => {
-        if (isDraftSlave) {
+        if (areDraftRecordsReadOnly) {
             return;
         }
 
@@ -479,7 +483,7 @@ export function ZoneList(): JSX.Element {
     };
 
     const openEditRecord = (index: number) => {
-        if (isDraftSlave) {
+        if (areDraftRecordsReadOnly) {
             return;
         }
 
@@ -509,7 +513,7 @@ export function ZoneList(): JSX.Element {
     };
 
     const deleteRecord = (index: number) => {
-        if (isDraftSlave) {
+        if (areDraftRecordsReadOnly) {
             return;
         }
 
@@ -693,11 +697,21 @@ export function ZoneList(): JSX.Element {
                                         return (
                                             <TableRow
                                                 key={zone.id != null ? `database-${zone.id}` : `${zone.source}-${zone.suffix}`}
-                                                hover>
+                                                hover
+                                                tabIndex={0}
+                                                onClick={() => openZone(zone)}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === "Enter" && event.target === event.currentTarget) {
+                                                        openZone(zone);
+                                                    }
+                                                }}
+                                                sx={{cursor: "pointer"}}
+                                            >
                                                 <TableCell padding="checkbox">
                                                     <Checkbox
                                                         checked={isChecked}
                                                         disabled={zoneId == null}
+                                                        onClick={(event) => event.stopPropagation()}
                                                         onChange={() => {
                                                             if (zoneId != null) {
                                                                 toggleSelectZone(zoneId);
@@ -726,15 +740,18 @@ export function ZoneList(): JSX.Element {
                                                 <TableCell align="right">
                                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                                         <Tooltip
-                                                            title={isReadOnly ? `${zone.source ?? "Provider"} zones are read-only.` : "Edit zone"}>
+                                                            title={isReadOnly ? "View read-only zone" : "Edit zone"}>
                               <span>
                                 <IconButton
                                     size="small"
                                     color="primary"
-                                    onClick={() => startEditZone(zone)}
-                                    disabled={isReadOnly}
+                                    aria-label={isReadOnly ? "View zone" : "Edit zone"}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        openZone(zone);
+                                    }}
                                 >
-                                  <EditIcon fontSize="small"/>
+                                  {isReadOnly ? <VisibilityIcon fontSize="small"/> : <EditIcon fontSize="small"/>}
                                 </IconButton>
                               </span>
                                                         </Tooltip>
@@ -742,7 +759,10 @@ export function ZoneList(): JSX.Element {
                                                             title={zoneId == null ? "Provider-managed zones cannot be deleted here." : "Delete zone"}>
                               <span>
                               <IconButton size="small" color="error" disabled={zoneId == null}
-                                          onClick={() => void removeZone(zone)}>
+                                          onClick={(event) => {
+                                              event.stopPropagation();
+                                              void removeZone(zone);
+                                          }}>
                                 <DeleteIcon fontSize="small"/>
                               </IconButton>
                               </span>
@@ -768,8 +788,12 @@ export function ZoneList(): JSX.Element {
                 </CardContent>
             </Card>
 
-            <Dialog open={editing} onClose={cancelEditZone} maxWidth="md" fullWidth>
-                <DialogTitle>{zoneDraft.id == null ? "Create zone" : `Edit zone: ${zoneDraft.suffix}`}</DialogTitle>
+            <Dialog open={zoneDialogMode !== "closed"} onClose={cancelEditZone} maxWidth="md" fullWidth>
+                <DialogTitle>
+                    {zoneDialogMode === "create"
+                        ? "Create zone"
+                        : `${isViewingReadOnlyZone ? "View" : "Edit"} zone: ${zoneDraft.suffix}`}
+                </DialogTitle>
                 <DialogContent
                     dividers
                     sx={{
@@ -800,6 +824,7 @@ export function ZoneList(): JSX.Element {
                             value={zoneDraft.suffix}
                             onChange={(event) => setZoneDraft((current) => ({...current, suffix: event.target.value}))}
                             fullWidth
+                            disabled={isViewingReadOnlyZone}
                         />
 
                         <Typography variant="subtitle1" fontWeight={600}>
@@ -814,7 +839,7 @@ export function ZoneList(): JSX.Element {
                                     soaPrimaryNs: event.target.value
                                 }))}
                                 fullWidth
-                                disabled={isDraftSlave}
+                                disabled={areDraftRecordsReadOnly}
                             />
                             <TextField
                                 label="Hostmaster"
@@ -824,7 +849,7 @@ export function ZoneList(): JSX.Element {
                                     soaHostmaster: event.target.value
                                 }))}
                                 fullWidth
-                                disabled={isDraftSlave}
+                                disabled={areDraftRecordsReadOnly}
                             />
                         </Stack>
                         <Stack direction={{xs: "column", sm: "row"}} spacing={2}>
@@ -836,7 +861,7 @@ export function ZoneList(): JSX.Element {
                                     soaRefresh: event.target.value
                                 }))}
                                 fullWidth
-                                disabled={isDraftSlave}
+                                disabled={areDraftRecordsReadOnly}
                             />
                             <TextField
                                 label="Retry"
@@ -846,7 +871,7 @@ export function ZoneList(): JSX.Element {
                                     soaRetry: event.target.value
                                 }))}
                                 fullWidth
-                                disabled={isDraftSlave}
+                                disabled={areDraftRecordsReadOnly}
                             />
                             <TextField
                                 label="Expiry"
@@ -856,7 +881,7 @@ export function ZoneList(): JSX.Element {
                                     soaExpiry: event.target.value
                                 }))}
                                 fullWidth
-                                disabled={isDraftSlave}
+                                disabled={areDraftRecordsReadOnly}
                             />
                             <TextField
                                 label="Minimum"
@@ -866,7 +891,7 @@ export function ZoneList(): JSX.Element {
                                     soaMinimum: event.target.value
                                 }))}
                                 fullWidth
-                                disabled={isDraftSlave}
+                                disabled={areDraftRecordsReadOnly}
                             />
                         </Stack>
 
@@ -876,6 +901,7 @@ export function ZoneList(): JSX.Element {
                                 labelId="master-zone-label"
                                 label="Master zone"
                                 value={zoneDraft.masterZoneId ?? ""}
+                                disabled={isViewingReadOnlyZone}
                                 onChange={(event) => {
                                     const raw = event.target.value;
                                     const nextMasterId = raw === "" ? null : Number(raw);
@@ -891,7 +917,12 @@ export function ZoneList(): JSX.Element {
                             </Select>
                         </FormControl>
 
-                        {isDraftSlave ? (
+                        {isViewingReadOnlyZone ? (
+                            <Alert severity="info">
+                                {zoneReadOnlySource ?? "The active provider"} manages this zone. All fields and records
+                                are read-only.
+                            </Alert>
+                        ) : isDraftSlave ? (
                             <Alert severity="info">
                                 This zone is configured as a slave. Serial, enabled state, and records are synchronized
                                 from its master.
@@ -914,7 +945,7 @@ export function ZoneList(): JSX.Element {
                                             ...current,
                                             enabled: event.target.checked
                                         }))}
-                                        disabled={isDraftSlave}
+                                        disabled={areDraftRecordsReadOnly}
                                     />
                                 }
                                 label="Enabled"
@@ -931,12 +962,12 @@ export function ZoneList(): JSX.Element {
                                         size="small"
                                         startIcon={<UploadFileIcon/>}
                                         onClick={openZoneBindImportDialog}
-                                        disabled={isDraftSlave || zoneDraft.id == null}
+                                        disabled={areDraftRecordsReadOnly || zoneDraft.id == null}
                                     >
                                         Import BIND
                                     </Button>
                                     <Button size="small" startIcon={<AddIcon/>} onClick={openCreateRecord}
-                                            disabled={isDraftSlave}>
+                                            disabled={areDraftRecordsReadOnly}>
                                         Add record
                                     </Button>
                                 </Stack>
@@ -998,25 +1029,27 @@ export function ZoneList(): JSX.Element {
                                                 <TableCell>{record.data}</TableCell>
                                                 <TableCell align="right">
                                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                        <Tooltip title="Edit record">
+                                                        <Tooltip
+                                                            title={areDraftRecordsReadOnly ? "Read-only record" : "Edit record"}>
                               <span>
                                 <IconButton
                                     size="small"
                                     color="primary"
                                     onClick={() => openEditRecord(originalIndex)}
-                                    disabled={isDraftSlave}
+                                    disabled={areDraftRecordsReadOnly}
                                 >
                                   <EditIcon fontSize="small"/>
                                 </IconButton>
                               </span>
                                                         </Tooltip>
-                                                        <Tooltip title="Delete record">
+                                                        <Tooltip
+                                                            title={areDraftRecordsReadOnly ? "Read-only record" : "Delete record"}>
                               <span>
                                 <IconButton
                                     size="small"
                                     color="error"
                                     onClick={() => deleteRecord(originalIndex)}
-                                    disabled={isDraftSlave}
+                                    disabled={areDraftRecordsReadOnly}
                                 >
                                   <DeleteIcon fontSize="small"/>
                                 </IconButton>
@@ -1042,10 +1075,12 @@ export function ZoneList(): JSX.Element {
                     </Stack>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={cancelEditZone}>Cancel</Button>
-                    <Button onClick={() => void submitZone()} variant="contained" disabled={zones.saving}>
-                        Save zone
-                    </Button>
+                    <Button onClick={cancelEditZone}>{isViewingReadOnlyZone ? "Close" : "Cancel"}</Button>
+                    {!isViewingReadOnlyZone ? (
+                        <Button onClick={() => void submitZone()} variant="contained" disabled={zones.saving}>
+                            Save zone
+                        </Button>
+                    ) : null}
                 </DialogActions>
             </Dialog>
 
