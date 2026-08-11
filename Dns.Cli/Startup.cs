@@ -23,6 +23,7 @@ using Dns.ZoneProvider;
 using Dns.ZoneProvider.AP;
 using Dns.ZoneProvider.Bind;
 using Dns.ZoneProvider.IPProbe;
+using Dns.ZoneProvider.Secondary;
 using Dns.ZoneProvider.Traefik;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -64,26 +65,27 @@ public class Startup(IConfiguration configuration)
 			}
 		);
 		services.AddOptions<ServerOptions>()
-				.Configure<IConfiguration, IOptions<JsonSerializerOptions>>((opt, cfg, json) =>
-					{
-						var section = cfg.GetRequiredSection("server");
+		        .Configure<IConfiguration, IOptions<JsonSerializerOptions>>((opt, cfg, json) =>
+			        {
+				        var section = cfg.GetRequiredSection("server");
 
-						var element = section.ReadJsonElement();
+				        var element = section.ReadJsonElement();
 
-						var parsed = element.Deserialize<ServerOptions>(json.Value) ??
-									 throw new InvalidOperationException("Failed to deserialize ServerOptions.");
+				        var parsed = element.Deserialize<ServerOptions>(json.Value) ??
+				                     throw new InvalidOperationException("Failed to deserialize ServerOptions.");
 
-						opt.Zones = parsed.Zones;
-						opt.DnsListener = parsed.DnsListener;
-						opt.ZoneTransfer = parsed.ZoneTransfer;
-						opt.WebServer = parsed.WebServer;
-					}
-				);
+				        opt.Zones         = parsed.Zones;
+				        opt.DnsListener   = parsed.DnsListener;
+				        opt.ZoneTransfer  = parsed.ZoneTransfer;
+				        opt.SecondarySync = parsed.SecondarySync;
+				        opt.WebServer     = parsed.WebServer;
+			        }
+		        );
 
 		services.AddOptions<DatabaseSettings>().Bind(configuration.GetSection(nameof(DatabaseSettings)));
 
 		var databaseSettings = configuration.GetSection(nameof(DatabaseSettings)).Get<DatabaseSettings>() ??
-							   throw new InvalidOperationException("Missing DatabaseSettings configuration.");
+		                       throw new InvalidOperationException("Missing DatabaseSettings configuration.");
 
 		var appConfig = configuration.Get<AppConfig>();
 
@@ -98,6 +100,7 @@ public class Startup(IConfiguration configuration)
 		services.AddTransient<APZoneProvider>();
 		services.AddTransient<TraefikZoneProvider>();
 		services.AddTransient<DatabaseZoneProvider>();
+		services.AddTransient<SecondaryZoneProvider>();
 
 		#endregion
 
@@ -109,47 +112,43 @@ public class Startup(IConfiguration configuration)
 
 		services.AddCors();
 
-		services.AddResponseCompression(
-			options =>
+		services.AddResponseCompression(options =>
 			{
 				options.EnableForHttps = true;
 				options.Providers.Add<GzipCompressionProvider>();
 			}
 		);
 
-		services.AddLogging(
-			configure =>
+		services.AddLogging(configure =>
 			{
 				configure.AddSimpleConsole(options =>
-				{
-					options.IncludeScopes = true;
-					options.SingleLine = true;
-					options.TimestampFormat = "[hh:mm:ss] ";
-					options.ColorBehavior = LoggerColorBehavior.Enabled;
-				});
+					{
+						options.IncludeScopes   = true;
+						options.SingleLine      = true;
+						options.TimestampFormat = "[hh:mm:ss] ";
+						options.ColorBehavior   = LoggerColorBehavior.Enabled;
+					}
+				);
 			}
 		);
 
 		services.AddControllers(options =>
-					{
-						options.RespectBrowserAcceptHeader = true;
-						options.EnableEndpointRouting = false;
-					}
-				)
-				.AddMvcOptions(
-					o => o.OutputFormatters.Add(
-						new XmlSerializerOutputFormatter(new XmlWriterSettings { Indent = true })
-					)
-				)
-				.AddJsonOptions(
-					options => options.JsonSerializerOptions.DefaultIgnoreCondition =
-						JsonIgnoreCondition.WhenWritingNull
-					);
+			        {
+				        options.RespectBrowserAcceptHeader = true;
+				        options.EnableEndpointRouting      = false;
+			        }
+		        )
+		        .AddMvcOptions(o => o.OutputFormatters.Add(
+			                       new XmlSerializerOutputFormatter(new XmlWriterSettings { Indent = true })
+		                       )
+		        )
+		        .AddJsonOptions(options => options.JsonSerializerOptions.DefaultIgnoreCondition =
+			                        JsonIgnoreCondition.WhenWritingNull
+		        );
 
 		services.AddSpaStaticFiles(configuration => { configuration.RootPath = "wwwroot"; });
 
-		services.AddSwaggerGen(
-			c =>
+		services.AddSwaggerGen(c =>
 			{
 				c.IncludeXmlComments(
 					Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml")
@@ -160,11 +159,11 @@ public class Startup(IConfiguration configuration)
 					new OpenApiSecurityScheme
 					{
 						BearerFormat = "JWT",
-						Name = "Authorization",
-						In = ParameterLocation.Header,
-						Type = SecuritySchemeType.Http,
-						Scheme = JwtBearerDefaults.AuthenticationScheme,
-						Description = "Put **_ONLY_** your JWT Bearer token on textbox below!",
+						Name         = "Authorization",
+						In           = ParameterLocation.Header,
+						Type         = SecuritySchemeType.Http,
+						Scheme       = JwtBearerDefaults.AuthenticationScheme,
+						Description  = "Put **_ONLY_** your JWT Bearer token on textbox below!",
 					}
 				);
 
@@ -175,21 +174,20 @@ public class Startup(IConfiguration configuration)
 		services.AddHttpContextAccessor();
 
 		services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-				.AddJwtBearer(
-					options =>
-					{
-						options.TokenValidationParameters = new()
-						{
-							ValidateIssuerSigningKey = true,
-							IssuerSigningKey =
-								new SymmetricSecurityKey(
-									Encoding.ASCII.GetBytes(appConfig!.Server.WebServer.JwtSecretKey)
-								),
-							ValidateIssuer = false,
-							ValidateAudience = false,
-						};
-					}
-				);
+		        .AddJwtBearer(options =>
+			        {
+				        options.TokenValidationParameters = new()
+				        {
+					        ValidateIssuerSigningKey = true,
+					        IssuerSigningKey =
+						        new SymmetricSecurityKey(
+							        Encoding.ASCII.GetBytes(appConfig!.Server.WebServer.JwtSecretKey)
+						        ),
+					        ValidateIssuer   = false,
+					        ValidateAudience = false,
+				        };
+			        }
+		        );
 		services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 		services.AddSingleton<IJwtTokenHandler, JwtTokenHandler>();
@@ -237,22 +235,21 @@ public class Startup(IConfiguration configuration)
 		app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
 
 		var spaDevServerUrl = configuration["Spa:DevServerUrl"] ?? "http://localhost:5173";
-		var useSpaProxy = env.IsDevelopment() &&
-						  ShouldUseSpaProxy() &&
-						  IsSpaDevServerAvailable(spaDevServerUrl);
+		var useSpaProxy     = env.IsDevelopment() && ShouldUseSpaProxy() && IsSpaDevServerAvailable(spaDevServerUrl);
 
 		app.UseSpa(spa =>
-		{
-			if (useSpaProxy)
 			{
-				spa.Options.SourcePath = Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "Dns.Spa"));
-				spa.UseProxyToSpaDevelopmentServer(spaDevServerUrl);
+				if (useSpaProxy)
+				{
+					spa.Options.SourcePath = Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "Dns.Spa"));
+					spa.UseProxyToSpaDevelopmentServer(spaDevServerUrl);
+				}
+				else
+				{
+					spa.Options.SourcePath = "wwwroot";
+				}
 			}
-			else
-			{
-				spa.Options.SourcePath = "wwwroot";
-			}
-		});
+		);
 	}
 
 	private bool ShouldUseSpaProxy()
@@ -268,9 +265,9 @@ public class Startup(IConfiguration configuration)
 
 		try
 		{
-			using var tcpClient = new TcpClient();
-			var connectTask = tcpClient.ConnectAsync(uri.Host, uri.Port);
-			var completed = connectTask.Wait(TimeSpan.FromMilliseconds(300));
+			using var tcpClient   = new TcpClient();
+			var       connectTask = tcpClient.ConnectAsync(uri.Host, uri.Port);
+			var       completed   = connectTask.Wait(TimeSpan.FromMilliseconds(300));
 			return completed && tcpClient.Connected;
 		}
 		catch

@@ -1,1189 +1,1290 @@
-import { useEffect, useMemo, useState } from "react";
+import {useEffect, useMemo, useState} from "react";
 import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Checkbox,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormControlLabel,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TableSortLabel,
-  TextField,
-  Tooltip,
-  Typography
+    Alert,
+    Box,
+    Button,
+    Card,
+    CardContent,
+    Checkbox,
+    Chip,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControl,
+    FormControlLabel,
+    IconButton,
+    InputLabel,
+    MenuItem,
+    Select,
+    Stack,
+    Switch,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TableSortLabel,
+    TextField,
+    Tooltip,
+    Typography
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DnsIcon from "@mui/icons-material/Dns";
 import EditIcon from "@mui/icons-material/Edit";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { useAppDispatch, useAppSelector } from "../app/hooks";
-import type { Zone, ZoneRecord } from "../api/generated/dns-api-client";
-import { deleteZone, fetchZones, importBindZone, importBindZoneIntoZone, saveZone } from "../features/zones/zonesSlice";
+import {useAppDispatch, useAppSelector} from "../app/hooks";
+import type {Zone, ZoneRecord} from "../api/generated/dns-api-client";
+import {deleteZone, fetchZones, importBindZone, importBindZoneIntoZone, saveZone} from "../features/zones/zonesSlice";
+import {getZoneAccessMode, getZoneRelationshipLabel, isReadOnlyZone, isSlaveZone} from "./zonePresentation";
 
 const RESOURCE_TYPES = ["A", "AAAA", "CNAME", "NS", "MX", "TXT", "PTR", "SRV"];
 const RESOURCE_CLASSES = ["IN", "CS", "CH", "HS"];
 
 type EnabledBulkMode = "keep" | "enable" | "disable";
 type SortDirection = "asc" | "desc";
-type ZoneSortKey = "suffix" | "serial" | "enabled" | "records" | "relationship";
+type ZoneSortKey = "suffix" | "serial" | "enabled" | "records" | "source" | "relationship";
 type RecordSortKey = "host" | "type" | "class" | "data";
 type BindImportMode = "add" | "replace";
+type ZoneDialogMode = "closed" | "create" | "edit" | "view";
 
 interface EditableZone {
-  id?: number;
-  suffix: string;
-  serial: number;
-  enabled: boolean;
-  masterZoneId?: number | null;
-  soaRecordId?: number;
-  soaPrimaryNs: string;
-  soaHostmaster: string;
-  soaRefresh: string;
-  soaRetry: string;
-  soaExpiry: string;
-  soaMinimum: string;
-  records: ZoneRecord[];
+    id?: number;
+    suffix: string;
+    serial: number;
+    enabled: boolean;
+    masterZoneId?: number | null;
+    soaRecordId?: number;
+    soaPrimaryNs: string;
+    soaHostmaster: string;
+    soaRefresh: string;
+    soaRetry: string;
+    soaExpiry: string;
+    soaMinimum: string;
+    records: ZoneRecord[];
 }
 
 interface SoaFields {
-  soaRecordId?: number;
-  soaPrimaryNs: string;
-  soaHostmaster: string;
-  soaRefresh: string;
-  soaRetry: string;
-  soaExpiry: string;
-  soaMinimum: string;
+    soaRecordId?: number;
+    soaPrimaryNs: string;
+    soaHostmaster: string;
+    soaRefresh: string;
+    soaRetry: string;
+    soaExpiry: string;
+    soaMinimum: string;
 }
 
 const DEFAULT_SOA: SoaFields = {
-  soaPrimaryNs: "ns1.eevul.net.",
-  soaHostmaster: "hostmaster.eevul.net.",
-  soaRefresh: "1H",
-  soaRetry: "15M",
-  soaExpiry: "1W",
-  soaMinimum: "1D"
+    soaPrimaryNs: "ns1.eevul.net.",
+    soaHostmaster: "hostmaster.eevul.net.",
+    soaRefresh: "1H",
+    soaRetry: "15M",
+    soaExpiry: "1W",
+    soaMinimum: "1D"
 };
 
 function emptyZone(): EditableZone {
-  return {
-    suffix: "",
-    serial: 1,
-    enabled: true,
-    masterZoneId: null,
-    ...DEFAULT_SOA,
-    records: []
-  };
+    return {
+        suffix: "",
+        serial: 1,
+        enabled: true,
+        masterZoneId: null,
+        ...DEFAULT_SOA,
+        records: []
+    };
 }
 
 function parseSoaData(rawData: string | undefined): Partial<SoaFields> {
-  if (!rawData) {
-    return {};
-  }
+    if (!rawData) {
+        return {};
+    }
 
-  const normalized = rawData
-    .replace(/[()]/g, " ")
-    .split("\n")
-    .map((line) => line.split(";")[0]?.trim() ?? "")
-    .join(" ");
+    const normalized = rawData
+        .replace(/[()]/g, " ")
+        .split("\n")
+        .map((line) => line.split(";")[0]?.trim() ?? "")
+        .join(" ");
 
-  const parts = normalized.split(/\s+/).filter((token) => token.length > 0);
-  if (parts.length < 7) {
-    return {};
-  }
+    const parts = normalized.split(/\s+/).filter((token) => token.length > 0);
+    if (parts.length < 7) {
+        return {};
+    }
 
-  return {
-    soaPrimaryNs: parts[0],
-    soaHostmaster: parts[1],
-    soaRefresh: parts[3],
-    soaRetry: parts[4],
-    soaExpiry: parts[5],
-    soaMinimum: parts[6]
-  };
+    return {
+        soaPrimaryNs: parts[0],
+        soaHostmaster: parts[1],
+        soaRefresh: parts[3],
+        soaRetry: parts[4],
+        soaExpiry: parts[5],
+        soaMinimum: parts[6]
+    };
 }
 
 function buildSoaRecord(zone: EditableZone): ZoneRecord {
-  return {
-    id: zone.soaRecordId,
-    host: "@",
-    type: "SOA",
-    class: "IN",
-    data: `${zone.soaPrimaryNs.trim()} ${zone.soaHostmaster.trim()} ${zone.serial} ${zone.soaRefresh.trim()} ${zone.soaRetry.trim()} ${zone.soaExpiry.trim()} ${zone.soaMinimum.trim()}`
-  };
+    return {
+        id: zone.soaRecordId,
+        host: "@",
+        type: "SOA",
+        class: "IN",
+        data: `${zone.soaPrimaryNs.trim()} ${zone.soaHostmaster.trim()} ${zone.serial} ${zone.soaRefresh.trim()} ${zone.soaRetry.trim()} ${zone.soaExpiry.trim()} ${zone.soaMinimum.trim()}`
+    };
 }
 
 function mapZoneToEditable(zone: Zone): EditableZone {
-  const soaRecord = (zone.records ?? []).find((record) => (record.type ?? "").toUpperCase() === "SOA");
-  const soaParsed = parseSoaData(soaRecord?.data);
-  const nonSoaRecords = (zone.records ?? []).filter((record) => (record.type ?? "").toUpperCase() !== "SOA");
+    const soaRecord = (zone.records ?? []).find((record) => (record.type ?? "").toUpperCase() === "SOA");
+    const soaParsed = parseSoaData(soaRecord?.data);
+    const nonSoaRecords = (zone.records ?? []).filter((record) => (record.type ?? "").toUpperCase() !== "SOA");
 
-  return {
-    id: zone.id,
-    suffix: zone.suffix ?? "",
-    serial: zone.serial ?? 1,
-    enabled: zone.enabled ?? true,
-    masterZoneId: zone.masterZoneId ?? null,
-    soaRecordId: soaRecord?.id,
-    soaPrimaryNs: soaParsed.soaPrimaryNs ?? DEFAULT_SOA.soaPrimaryNs,
-    soaHostmaster: soaParsed.soaHostmaster ?? DEFAULT_SOA.soaHostmaster,
-    soaRefresh: soaParsed.soaRefresh ?? DEFAULT_SOA.soaRefresh,
-    soaRetry: soaParsed.soaRetry ?? DEFAULT_SOA.soaRetry,
-    soaExpiry: soaParsed.soaExpiry ?? DEFAULT_SOA.soaExpiry,
-    soaMinimum: soaParsed.soaMinimum ?? DEFAULT_SOA.soaMinimum,
-    records: nonSoaRecords.map((record) => ({ ...record }))
-  };
+    return {
+        id: zone.id,
+        suffix: zone.suffix ?? "",
+        serial: zone.serial ?? 1,
+        enabled: zone.enabled ?? true,
+        masterZoneId: zone.masterZoneId ?? null,
+        soaRecordId: soaRecord?.id,
+        soaPrimaryNs: soaParsed.soaPrimaryNs ?? DEFAULT_SOA.soaPrimaryNs,
+        soaHostmaster: soaParsed.soaHostmaster ?? DEFAULT_SOA.soaHostmaster,
+        soaRefresh: soaParsed.soaRefresh ?? DEFAULT_SOA.soaRefresh,
+        soaRetry: soaParsed.soaRetry ?? DEFAULT_SOA.soaRetry,
+        soaExpiry: soaParsed.soaExpiry ?? DEFAULT_SOA.soaExpiry,
+        soaMinimum: soaParsed.soaMinimum ?? DEFAULT_SOA.soaMinimum,
+        records: nonSoaRecords.map((record) => ({...record}))
+    };
 }
 
 function normalizeZoneForApi(zone: EditableZone): Zone {
-  const soaRecord = buildSoaRecord(zone);
+    const soaRecord = buildSoaRecord(zone);
 
-  return {
-    id: zone.id,
-    suffix: zone.suffix.trim(),
-    serial: zone.serial,
-    enabled: zone.enabled,
-    masterZoneId: zone.masterZoneId ?? null,
-    records: [
-      soaRecord,
-      ...zone.records
-      .map((record) => ({
-        id: record.id,
-        host: record.host?.trim() ?? "",
-        type: record.type?.trim() ?? "",
-        class: record.class?.trim() ?? "",
-        data: record.data?.trim() ?? ""
-      }))
-      // Keep apex records (empty host) such as NS/MX/TXT at the zone root.
-      .filter((record) => record.type && record.class && record.data)
-    ]
-  };
+    return {
+        id: zone.id,
+        suffix: zone.suffix.trim(),
+        serial: zone.serial,
+        enabled: zone.enabled,
+        masterZoneId: zone.masterZoneId ?? null,
+        records: [
+            soaRecord,
+            ...zone.records
+                .map((record) => ({
+                    id: record.id,
+                    host: record.host?.trim() ?? "",
+                    type: record.type?.trim() ?? "",
+                    class: record.class?.trim() ?? "",
+                    data: record.data?.trim() ?? ""
+                }))
+                // Keep apex records (empty host) such as NS/MX/TXT at the zone root.
+                .filter((record) => record.type && record.class && record.data)
+        ]
+    };
 }
 
 function inferZoneSuffixFromFileName(fileName: string): string {
-  const strippedPath = fileName.split(/[\\/]/).pop() ?? fileName;
-  return strippedPath.replace(/\.[^.]+$/, "");
+    const strippedPath = fileName.split(/[\\/]/).pop() ?? fileName;
+    return strippedPath.replace(/\.[^.]+$/, "");
 }
 
 export function ZoneList(): JSX.Element {
-  const dispatch = useAppDispatch();
-  const zones = useAppSelector((state) => state.zones);
-
-  const [selectedZoneIds, setSelectedZoneIds] = useState<number[]>([]);
-
-  const [editing, setEditing] = useState(false);
-  const [zoneDraft, setZoneDraft] = useState<EditableZone>(emptyZone());
-
-  const [recordDialogOpen, setRecordDialogOpen] = useState(false);
-  const [recordDraft, setRecordDraft] = useState<ZoneRecord>({ host: "", type: "A", class: "IN", data: "" });
-  const [recordEditIndex, setRecordEditIndex] = useState<number | null>(null);
-
-  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
-  const [bulkEnabledMode, setBulkEnabledMode] = useState<EnabledBulkMode>("keep");
-  const [bindImportDialogOpen, setBindImportDialogOpen] = useState(false);
-  const [bindImportFile, setBindImportFile] = useState<File | null>(null);
-  const [bindImportZoneSuffix, setBindImportZoneSuffix] = useState("");
-  const [bindImportEnabled, setBindImportEnabled] = useState(true);
-  const [bindImportReplaceExisting, setBindImportReplaceExisting] = useState(true);
-  const [hideSlaves, setHideSlaves] = useState(false);
-  const [zoneBindImportDialogOpen, setZoneBindImportDialogOpen] = useState(false);
-  const [zoneBindImportFile, setZoneBindImportFile] = useState<File | null>(null);
-  const [zoneBindImportMode, setZoneBindImportMode] = useState<BindImportMode>("replace");
-  const [zoneSortKey, setZoneSortKey] = useState<ZoneSortKey>("suffix");
-  const [zoneSortDirection, setZoneSortDirection] = useState<SortDirection>("asc");
-  const [recordSortKey, setRecordSortKey] = useState<RecordSortKey>("host");
-  const [recordSortDirection, setRecordSortDirection] = useState<SortDirection>("asc");
-
-  useEffect(() => {
-    void dispatch(fetchZones());
-  }, [dispatch]);
-
-  const sortedZones = useMemo(() => {
-    const directionFactor = zoneSortDirection === "asc" ? 1 : -1;
-
-    return [...zones.items].sort((a, b) => {
-      let compare = 0;
-      if (zoneSortKey === "suffix") {
-        compare = (a.suffix ?? "").localeCompare(b.suffix ?? "");
-      } else if (zoneSortKey === "serial") {
-        compare = (a.serial ?? 0) - (b.serial ?? 0);
-      } else if (zoneSortKey === "enabled") {
-        compare = Number(a.enabled ?? false) - Number(b.enabled ?? false);
-      } else if (zoneSortKey === "records") {
-        compare = (a.records?.length ?? 0) - (b.records?.length ?? 0);
-      } else if (zoneSortKey === "relationship") {
-        const relationshipA = a.masterZoneId != null ? `slave-${a.masterZoneSuffix ?? ""}` : `master-${a.slaveZoneCount ?? 0}`;
-        const relationshipB = b.masterZoneId != null ? `slave-${b.masterZoneSuffix ?? ""}` : `master-${b.slaveZoneCount ?? 0}`;
-        compare = relationshipA.localeCompare(relationshipB);
-      }
-
-      return compare * directionFactor;
-    });
-  }, [zones.items, zoneSortDirection, zoneSortKey]);
-
-  const displayedZones = useMemo(() => {
-    if (!hideSlaves) {
-      return sortedZones;
-    }
-
-    return sortedZones.filter((zone) => zone.masterZoneId == null);
-  }, [hideSlaves, sortedZones]);
-
-  const sortedDraftRecords = useMemo(() => {
-    const directionFactor = recordSortDirection === "asc" ? 1 : -1;
-    const withIndex = zoneDraft.records.map((record, originalIndex) => ({ record, originalIndex }));
-
-    return withIndex.sort((a, b) => {
-      let compare = 0;
-      if (recordSortKey === "host") {
-        compare = (a.record.host ?? "").localeCompare(b.record.host ?? "");
-      } else if (recordSortKey === "type") {
-        compare = (a.record.type ?? "").localeCompare(b.record.type ?? "");
-      } else if (recordSortKey === "class") {
-        compare = (a.record.class ?? "").localeCompare(b.record.class ?? "");
-      } else if (recordSortKey === "data") {
-        compare = (a.record.data ?? "").localeCompare(b.record.data ?? "");
-      }
-
-      return compare * directionFactor;
-    });
-  }, [recordSortDirection, recordSortKey, zoneDraft.records]);
-
-  const selectableIds = useMemo(
-    () => displayedZones.map((zone) => zone.id).filter((id): id is number => id != null),
-    [displayedZones]
-  );
-
-  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedZoneIds.includes(id));
-  const selectedCount = selectedZoneIds.length;
-  const isDraftSlave = zoneDraft.masterZoneId != null;
-
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedZoneIds([]);
-      return;
-    }
-
-    setSelectedZoneIds(selectableIds);
-  };
-
-  const toggleSelectZone = (zoneId: number) => {
-    setSelectedZoneIds((current) =>
-      current.includes(zoneId) ? current.filter((id) => id !== zoneId) : [...current, zoneId]
-    );
-  };
-
-  const requestZoneSort = (key: ZoneSortKey) => {
-    if (zoneSortKey === key) {
-      setZoneSortDirection((current) => (current === "asc" ? "desc" : "asc"));
-      return;
-    }
-
-    setZoneSortKey(key);
-    setZoneSortDirection("asc");
-  };
-
-  const requestRecordSort = (key: RecordSortKey) => {
-    if (recordSortKey === key) {
-      setRecordSortDirection((current) => (current === "asc" ? "desc" : "asc"));
-      return;
-    }
-
-    setRecordSortKey(key);
-    setRecordSortDirection("asc");
-  };
-
-  const startCreateZone = () => {
-    setZoneDraft(emptyZone());
-    setEditing(true);
-  };
-
-  const startEditZone = (zone: Zone) => {
-    setZoneDraft(mapZoneToEditable(zone));
-    setEditing(true);
-  };
-
-  const cancelEditZone = () => {
-    setZoneDraft(emptyZone());
-    setEditing(false);
-  };
-
-  const submitZone = async () => {
-    if (zoneDraft.suffix.trim().length === 0) {
-      return;
-    }
-
-    await dispatch(saveZone(normalizeZoneForApi(zoneDraft))).unwrap();
-    cancelEditZone();
-  };
-
-  const removeZone = async (zone: Zone) => {
-    if (zone.id == null) {
-      return;
-    }
-
-    if (!window.confirm(`Delete zone '${zone.suffix}'?`)) {
-      return;
-    }
-
-    await dispatch(deleteZone(zone.id)).unwrap();
-    setSelectedZoneIds((current) => current.filter((id) => id !== zone.id));
-  };
-
-  const removeSelectedZones = async () => {
-    if (selectedZoneIds.length === 0) {
-      return;
-    }
-
-    if (!window.confirm(`Delete ${selectedZoneIds.length} selected zone(s)?`)) {
-      return;
-    }
-
-    for (const zoneId of selectedZoneIds) {
-      await dispatch(deleteZone(zoneId)).unwrap();
-    }
-
-    setSelectedZoneIds([]);
-  };
-
-  const applyBulkEdit = async () => {
-    if (selectedZoneIds.length === 0) {
-      return;
-    }
-
-    const selectedZones = displayedZones.filter((zone): zone is Zone & { id: number } =>
-      zone.id != null ? selectedZoneIds.includes(zone.id) : false
-    );
-
-    const editableZones = selectedZones.filter((zone) => zone.masterZoneId == null);
-    for (const zone of editableZones) {
-      const draft = mapZoneToEditable(zone);
-
-      if (bulkEnabledMode === "enable") {
-        draft.enabled = true;
-      } else if (bulkEnabledMode === "disable") {
-        draft.enabled = false;
-      }
-
-      await dispatch(saveZone(normalizeZoneForApi(draft))).unwrap();
-    }
-
-    setBulkDialogOpen(false);
-    setBulkEnabledMode("keep");
-  };
-
-  const openBindImportDialog = () => {
-    setBindImportDialogOpen(true);
-  };
-
-  const closeBindImportDialog = () => {
-    setBindImportDialogOpen(false);
-    setBindImportFile(null);
-    setBindImportZoneSuffix("");
-    setBindImportEnabled(true);
-    setBindImportReplaceExisting(true);
-  };
-
-  const submitBindImport = async () => {
-    if (!bindImportFile) {
-      return;
-    }
-
-    if (bindImportZoneSuffix.trim().length === 0) {
-      return;
-    }
-
-    await dispatch(
-      importBindZone({
-        file: bindImportFile,
-        zoneSuffix: bindImportZoneSuffix.trim(),
-        enabled: bindImportEnabled,
-        replaceExistingRecords: bindImportReplaceExisting
-      })
-    ).unwrap();
-
-    closeBindImportDialog();
-  };
-
-  const openZoneBindImportDialog = () => {
-    if (zoneDraft.id == null || isDraftSlave) {
-      return;
-    }
-
-    setZoneBindImportDialogOpen(true);
-  };
-
-  const closeZoneBindImportDialog = () => {
-    setZoneBindImportDialogOpen(false);
-    setZoneBindImportFile(null);
-    setZoneBindImportMode("replace");
-  };
-
-  const submitZoneBindImport = async () => {
-    if (zoneDraft.id == null || !zoneBindImportFile) {
-      return;
-    }
-
-    await dispatch(
-      importBindZoneIntoZone({
-        zoneId: zoneDraft.id,
-        file: zoneBindImportFile,
-        replaceExistingRecords: zoneBindImportMode === "replace"
-      })
-    ).unwrap();
-
-    closeZoneBindImportDialog();
-    cancelEditZone();
-  };
-
-  const openCreateRecord = () => {
-    if (isDraftSlave) {
-      return;
-    }
-
-    setRecordEditIndex(null);
-    setRecordDraft({ host: "", type: "A", class: "IN", data: "" });
-    setRecordDialogOpen(true);
-  };
-
-  const openEditRecord = (index: number) => {
-    if (isDraftSlave) {
-      return;
-    }
-
-    setRecordEditIndex(index);
-    setRecordDraft({ ...zoneDraft.records[index] });
-    setRecordDialogOpen(true);
-  };
-
-  const saveRecord = () => {
-    const next = { ...recordDraft };
-    setZoneDraft((current) => {
-      const records = [...current.records];
-      if (recordEditIndex == null) {
-        records.push(next);
-      } else {
-        records[recordEditIndex] = next;
-      }
-
-      return {
-        ...current,
-        records
-      };
-    });
-
-    setRecordDialogOpen(false);
-    setRecordEditIndex(null);
-  };
-
-  const deleteRecord = (index: number) => {
-    if (isDraftSlave) {
-      return;
-    }
-
-    setZoneDraft((current) => ({
-      ...current,
-      records: current.records.filter((_, i) => i !== index)
-    }));
-  };
-
-  const availableMasterZones = useMemo(() => {
-    return zones.items.filter((zone) => {
-      if (zone.id == null) return false;
-      if (zone.id === zoneDraft.id) return false;
-      return zone.masterZoneId == null;
-    });
-  }, [zones.items, zoneDraft.id]);
-
-  const getRelationshipLabel = (zone: Zone): string => {
-    if (zone.masterZoneId != null) {
-      return `Slave of ${zone.masterZoneSuffix ?? `#${zone.masterZoneId}`}`;
-    }
-
-    if ((zone.slaveZoneCount ?? 0) > 0) {
-      return `Master (${zone.slaveZoneCount} slave${(zone.slaveZoneCount ?? 0) === 1 ? "" : "s"})`;
-    }
-
-    return "Standalone";
-  };
-
-  return (
-    <Stack spacing={2}>
-      <Card elevation={2}>
-        <CardContent>
-          <Stack spacing={2}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
-              <Box>
-                <Typography variant="h6" fontWeight={600} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <DnsIcon fontSize="small" /> Zones Overview
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Select zones with checkboxes for bulk actions, or edit one zone at a time.
-                </Typography>
-              </Box>
-
-              <Stack
-                direction={{ xs: "column", md: "row" }}
-                spacing={1.5}
-                useFlexGap
-                sx={{ width: { xs: "100%", md: "auto" }, alignItems: { xs: "stretch", md: "center" } }}
-              >
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={() => void dispatch(fetchZones())}
-                  disabled={zones.loading || zones.saving}
-                  sx={{ minWidth: { md: 132 } }}
-                >
-                  Refresh
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={startCreateZone}
-                  disabled={zones.saving}
-                  sx={{ minWidth: { md: 132 } }}
-                >
-                  Add zone
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<UploadFileIcon />}
-                  onClick={openBindImportDialog}
-                  disabled={zones.saving}
-                  sx={{ minWidth: { md: 152 } }}
-                >
-                  Import BIND
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  disabled={zones.saving || selectedCount === 0}
-                  onClick={() => setBulkDialogOpen(true)}
-                  sx={{ minWidth: { md: 164 } }}
-                >
-                  Bulk edit ({selectedCount})
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<DeleteIcon />}
-                  disabled={zones.saving || selectedCount === 0}
-                  onClick={() => void removeSelectedZones()}
-                  sx={{ minWidth: { md: 174 } }}
-                >
-                  Bulk delete ({selectedCount})
-                </Button>
-              </Stack>
-            </Stack>
-            <FormControlLabel
-              control={<Checkbox checked={hideSlaves} onChange={(event) => setHideSlaves(event.target.checked)} />}
-              label="Hide slave zones"
-            />
-
-            {zones.loading ? (
-              <Stack direction="row" spacing={1} alignItems="center">
-                <CircularProgress size={18} />
-                <Typography variant="body2">Loading zones...</Typography>
-              </Stack>
-            ) : null}
-
-            {zones.error ? <Alert severity="error">{zones.error}</Alert> : null}
-
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={allSelected}
-                        indeterminate={!allSelected && selectedCount > 0}
-                        onChange={toggleSelectAll}
-                        inputProps={{ "aria-label": "select all zones" }}
-                      />
-                    </TableCell>
-                    <TableCell sortDirection={zoneSortKey === "suffix" ? zoneSortDirection : false}>
-                      <TableSortLabel
-                        active={zoneSortKey === "suffix"}
-                        direction={zoneSortKey === "suffix" ? zoneSortDirection : "asc"}
-                        onClick={() => requestZoneSort("suffix")}
-                      >
-                        Suffix
-                      </TableSortLabel>
-                    </TableCell>
-                    <TableCell sortDirection={zoneSortKey === "serial" ? zoneSortDirection : false}>
-                      <TableSortLabel
-                        active={zoneSortKey === "serial"}
-                        direction={zoneSortKey === "serial" ? zoneSortDirection : "asc"}
-                        onClick={() => requestZoneSort("serial")}
-                      >
-                        Serial
-                      </TableSortLabel>
-                    </TableCell>
-                    <TableCell sortDirection={zoneSortKey === "enabled" ? zoneSortDirection : false}>
-                      <TableSortLabel
-                        active={zoneSortKey === "enabled"}
-                        direction={zoneSortKey === "enabled" ? zoneSortDirection : "asc"}
-                        onClick={() => requestZoneSort("enabled")}
-                      >
-                        Enabled
-                      </TableSortLabel>
-                    </TableCell>
-                    <TableCell sortDirection={zoneSortKey === "records" ? zoneSortDirection : false}>
-                      <TableSortLabel
-                        active={zoneSortKey === "records"}
-                        direction={zoneSortKey === "records" ? zoneSortDirection : "asc"}
-                        onClick={() => requestZoneSort("records")}
-                      >
-                        Records
-                      </TableSortLabel>
-                    </TableCell>
-                    <TableCell sortDirection={zoneSortKey === "relationship" ? zoneSortDirection : false}>
-                      <TableSortLabel
-                        active={zoneSortKey === "relationship"}
-                        direction={zoneSortKey === "relationship" ? zoneSortDirection : "asc"}
-                        onClick={() => requestZoneSort("relationship")}
-                      >
-                        Relationship
-                      </TableSortLabel>
-                    </TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {displayedZones.map((zone) => {
-                    const zoneId = zone.id;
-                    const isChecked = zoneId != null && selectedZoneIds.includes(zoneId);
-
-                    return (
-                      <TableRow key={zone.id ?? zone.suffix} hover>
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            checked={isChecked}
-                            disabled={zoneId == null}
-                            onChange={() => {
-                              if (zoneId != null) {
-                                toggleSelectZone(zoneId);
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>{zone.suffix}</TableCell>
-                        <TableCell>{zone.serial}</TableCell>
-                        <TableCell>
-                          <Chip
-                            size="small"
-                            color={zone.enabled ? "success" : "default"}
-                            label={zone.enabled ? "enabled" : "disabled"}
-                          />
-                        </TableCell>
-                        <TableCell>{zone.records?.length ?? 0}</TableCell>
-                        <TableCell>
-                          <Typography variant="body2">{getRelationshipLabel(zone)}</Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Stack direction="row" spacing={1} justifyContent="flex-end">
-                            <Tooltip title={zone.masterZoneId != null ? "Slave zones are synchronized from their master and cannot be edited directly." : "Edit zone"}>
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() => startEditZone(zone)}
-                                  disabled={zone.masterZoneId != null}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                            <Tooltip title="Delete zone">
-                              <IconButton size="small" color="error" onClick={() => void removeZone(zone)}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {displayedZones.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7}>
-                        <Typography variant="body2" color="text.secondary">
-                          No zones found.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Stack>
-        </CardContent>
-      </Card>
-
-      <Dialog open={editing} onClose={cancelEditZone} maxWidth="md" fullWidth>
-        <DialogTitle>{zoneDraft.id == null ? "Create zone" : `Edit zone: ${zoneDraft.suffix}`}</DialogTitle>
-        <DialogContent
-          dividers
-          sx={{
-            maxHeight: "70vh",
-            overflowY: "auto",
-            scrollbarWidth: "thin",
-            scrollbarColor: "#4fc3f7 #1a2438",
-            "&::-webkit-scrollbar": {
-              width: "10px"
-            },
-            "&::-webkit-scrollbar-track": {
-              backgroundColor: "#1a2438",
-              borderRadius: "999px"
-            },
-            "&::-webkit-scrollbar-thumb": {
-              background: "linear-gradient(180deg, #4fc3f7, #80cbc4)",
-              borderRadius: "999px",
-              border: "2px solid #1a2438"
-            },
-            "&::-webkit-scrollbar-thumb:hover": {
-              background: "linear-gradient(180deg, #81d4fa, #a5d6d1)"
+    const dispatch = useAppDispatch();
+    const zones = useAppSelector((state) => state.zones);
+
+    const [selectedZoneIds, setSelectedZoneIds] = useState<number[]>([]);
+
+    const [zoneDialogMode, setZoneDialogMode] = useState<ZoneDialogMode>("closed");
+    const [zoneReadOnlySource, setZoneReadOnlySource] = useState<string | null>(null);
+    const [zoneDraft, setZoneDraft] = useState<EditableZone>(emptyZone());
+
+    const [recordDialogOpen, setRecordDialogOpen] = useState(false);
+    const [recordDraft, setRecordDraft] = useState<ZoneRecord>({host: "", type: "A", class: "IN", data: ""});
+    const [recordEditIndex, setRecordEditIndex] = useState<number | null>(null);
+
+    const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+    const [bulkEnabledMode, setBulkEnabledMode] = useState<EnabledBulkMode>("keep");
+    const [bindImportDialogOpen, setBindImportDialogOpen] = useState(false);
+    const [bindImportFile, setBindImportFile] = useState<File | null>(null);
+    const [bindImportZoneSuffix, setBindImportZoneSuffix] = useState("");
+    const [bindImportEnabled, setBindImportEnabled] = useState(true);
+    const [bindImportReplaceExisting, setBindImportReplaceExisting] = useState(true);
+    const [hideSlaves, setHideSlaves] = useState(false);
+    const [zoneBindImportDialogOpen, setZoneBindImportDialogOpen] = useState(false);
+    const [zoneBindImportFile, setZoneBindImportFile] = useState<File | null>(null);
+    const [zoneBindImportMode, setZoneBindImportMode] = useState<BindImportMode>("replace");
+    const [zoneSortKey, setZoneSortKey] = useState<ZoneSortKey>("suffix");
+    const [zoneSortDirection, setZoneSortDirection] = useState<SortDirection>("asc");
+    const [recordSortKey, setRecordSortKey] = useState<RecordSortKey>("host");
+    const [recordSortDirection, setRecordSortDirection] = useState<SortDirection>("asc");
+
+    useEffect(() => {
+        void dispatch(fetchZones());
+
+        const refreshTimer = window.setInterval(() => {
+            void dispatch(fetchZones());
+        }, 5000);
+
+        return () => window.clearInterval(refreshTimer);
+    }, [dispatch]);
+
+    const sortedZones = useMemo(() => {
+        const directionFactor = zoneSortDirection === "asc" ? 1 : -1;
+
+        return [...zones.items].sort((a, b) => {
+            let compare = 0;
+            if (zoneSortKey === "suffix") {
+                compare = (a.suffix ?? "").localeCompare(b.suffix ?? "");
+            } else if (zoneSortKey === "serial") {
+                compare = (a.serial ?? 0) - (b.serial ?? 0);
+            } else if (zoneSortKey === "enabled") {
+                compare = Number(a.enabled ?? false) - Number(b.enabled ?? false);
+            } else if (zoneSortKey === "records") {
+                compare = (a.records?.length ?? 0) - (b.records?.length ?? 0);
+            } else if (zoneSortKey === "source") {
+                compare = (a.source ?? "").localeCompare(b.source ?? "");
+            } else if (zoneSortKey === "relationship") {
+                const relationshipA = getZoneRelationshipLabel(a);
+                const relationshipB = getZoneRelationshipLabel(b);
+                compare = relationshipA.localeCompare(relationshipB);
             }
-          }}
-        >
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Suffix"
-              value={zoneDraft.suffix}
-              onChange={(event) => setZoneDraft((current) => ({ ...current, suffix: event.target.value }))}
-              fullWidth
-            />
 
-            <Typography variant="subtitle1" fontWeight={600}>
-              SOA
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                label="Primary NS"
-                value={zoneDraft.soaPrimaryNs}
-                onChange={(event) => setZoneDraft((current) => ({ ...current, soaPrimaryNs: event.target.value }))}
-                fullWidth
-                disabled={isDraftSlave}
-              />
-              <TextField
-                label="Hostmaster"
-                value={zoneDraft.soaHostmaster}
-                onChange={(event) => setZoneDraft((current) => ({ ...current, soaHostmaster: event.target.value }))}
-                fullWidth
-                disabled={isDraftSlave}
-              />
-            </Stack>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                label="Refresh"
-                value={zoneDraft.soaRefresh}
-                onChange={(event) => setZoneDraft((current) => ({ ...current, soaRefresh: event.target.value }))}
-                fullWidth
-                disabled={isDraftSlave}
-              />
-              <TextField
-                label="Retry"
-                value={zoneDraft.soaRetry}
-                onChange={(event) => setZoneDraft((current) => ({ ...current, soaRetry: event.target.value }))}
-                fullWidth
-                disabled={isDraftSlave}
-              />
-              <TextField
-                label="Expiry"
-                value={zoneDraft.soaExpiry}
-                onChange={(event) => setZoneDraft((current) => ({ ...current, soaExpiry: event.target.value }))}
-                fullWidth
-                disabled={isDraftSlave}
-              />
-              <TextField
-                label="Minimum"
-                value={zoneDraft.soaMinimum}
-                onChange={(event) => setZoneDraft((current) => ({ ...current, soaMinimum: event.target.value }))}
-                fullWidth
-                disabled={isDraftSlave}
-              />
-            </Stack>
+            return compare * directionFactor;
+        });
+    }, [zones.items, zoneSortDirection, zoneSortKey]);
 
-            <FormControl fullWidth>
-              <InputLabel id="master-zone-label">Master zone</InputLabel>
-              <Select
-                labelId="master-zone-label"
-                label="Master zone"
-                value={zoneDraft.masterZoneId ?? ""}
-                onChange={(event) => {
-                  const raw = event.target.value;
-                  const nextMasterId = raw === "" ? null : Number(raw);
-                  setZoneDraft((current) => ({ ...current, masterZoneId: nextMasterId }));
-                }}
-              >
-                <MenuItem value="">None (standalone/master)</MenuItem>
-                {availableMasterZones.map((zone) => (
-                  <MenuItem key={zone.id} value={zone.id}>
-                    {zone.suffix}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+    const displayedZones = useMemo(() => {
+        if (!hideSlaves) {
+            return sortedZones;
+        }
 
-            {isDraftSlave ? (
-              <Alert severity="info">
-                This zone is configured as a slave. Serial, enabled state, and records are synchronized from its master.
-              </Alert>
-            ) : null}
+        return sortedZones.filter((zone) => !isSlaveZone(zone));
+    }, [hideSlaves, sortedZones]);
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                label="Serial"
-                value={zoneDraft.serial}
-                fullWidth
-                disabled
-                helperText="Managed automatically by server (YYYYMMDDXX)."
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={zoneDraft.enabled}
-                    onChange={(event) => setZoneDraft((current) => ({ ...current, enabled: event.target.checked }))}
-                    disabled={isDraftSlave}
-                  />
-                }
-                label="Enabled"
-              />
-            </Stack>
+    const sortedDraftRecords = useMemo(() => {
+        const directionFactor = recordSortDirection === "asc" ? 1 : -1;
+        const withIndex = zoneDraft.records.map((record, originalIndex) => ({record, originalIndex}));
 
-            <Stack spacing={1}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="subtitle1" fontWeight={600}>
-                  Records
-                </Typography>
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    size="small"
-                    startIcon={<UploadFileIcon />}
-                    onClick={openZoneBindImportDialog}
-                    disabled={isDraftSlave || zoneDraft.id == null}
-                  >
-                    Import BIND
-                  </Button>
-                  <Button size="small" startIcon={<AddIcon />} onClick={openCreateRecord} disabled={isDraftSlave}>
-                    Add record
-                  </Button>
-                </Stack>
-              </Stack>
+        return withIndex.sort((a, b) => {
+            let compare = 0;
+            if (recordSortKey === "host") {
+                compare = (a.record.host ?? "").localeCompare(b.record.host ?? "");
+            } else if (recordSortKey === "type") {
+                compare = (a.record.type ?? "").localeCompare(b.record.type ?? "");
+            } else if (recordSortKey === "class") {
+                compare = (a.record.class ?? "").localeCompare(b.record.class ?? "");
+            } else if (recordSortKey === "data") {
+                compare = (a.record.data ?? "").localeCompare(b.record.data ?? "");
+            }
 
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sortDirection={recordSortKey === "host" ? recordSortDirection : false}>
-                        <TableSortLabel
-                          active={recordSortKey === "host"}
-                          direction={recordSortKey === "host" ? recordSortDirection : "asc"}
-                          onClick={() => requestRecordSort("host")}
-                        >
-                          Host
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell sortDirection={recordSortKey === "type" ? recordSortDirection : false}>
-                        <TableSortLabel
-                          active={recordSortKey === "type"}
-                          direction={recordSortKey === "type" ? recordSortDirection : "asc"}
-                          onClick={() => requestRecordSort("type")}
-                        >
-                          Type
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell sortDirection={recordSortKey === "class" ? recordSortDirection : false}>
-                        <TableSortLabel
-                          active={recordSortKey === "class"}
-                          direction={recordSortKey === "class" ? recordSortDirection : "asc"}
-                          onClick={() => requestRecordSort("class")}
-                        >
-                          Class
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell sortDirection={recordSortKey === "data" ? recordSortDirection : false}>
-                        <TableSortLabel
-                          active={recordSortKey === "data"}
-                          direction={recordSortKey === "data" ? recordSortDirection : "asc"}
-                          onClick={() => requestRecordSort("data")}
-                        >
-                          Data
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {sortedDraftRecords.map(({ record, originalIndex }) => (
-                      <TableRow key={`${record.id ?? "edit"}-${originalIndex}`}>
-                        <TableCell>{record.host}</TableCell>
-                        <TableCell>{record.type}</TableCell>
-                        <TableCell>{record.class}</TableCell>
-                        <TableCell>{record.data}</TableCell>
-                        <TableCell align="right">
-                          <Stack direction="row" spacing={1} justifyContent="flex-end">
-                            <Tooltip title="Edit record">
+            return compare * directionFactor;
+        });
+    }, [recordSortDirection, recordSortKey, zoneDraft.records]);
+
+    const selectableIds = useMemo(
+        () => displayedZones.map((zone) => zone.id).filter((id): id is number => id != null),
+        [displayedZones]
+    );
+
+    const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedZoneIds.includes(id));
+    const selectedCount = selectedZoneIds.length;
+    const isDraftSlave = zoneDraft.masterZoneId != null;
+    const isViewingReadOnlyZone = zoneDialogMode === "view";
+    const areDraftRecordsReadOnly = isViewingReadOnlyZone || isDraftSlave;
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setSelectedZoneIds([]);
+            return;
+        }
+
+        setSelectedZoneIds(selectableIds);
+    };
+
+    const toggleSelectZone = (zoneId: number) => {
+        setSelectedZoneIds((current) =>
+            current.includes(zoneId) ? current.filter((id) => id !== zoneId) : [...current, zoneId]
+        );
+    };
+
+    const requestZoneSort = (key: ZoneSortKey) => {
+        if (zoneSortKey === key) {
+            setZoneSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+            return;
+        }
+
+        setZoneSortKey(key);
+        setZoneSortDirection("asc");
+    };
+
+    const requestRecordSort = (key: RecordSortKey) => {
+        if (recordSortKey === key) {
+            setRecordSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+            return;
+        }
+
+        setRecordSortKey(key);
+        setRecordSortDirection("asc");
+    };
+
+    const startCreateZone = () => {
+        setZoneDraft(emptyZone());
+        setZoneReadOnlySource(null);
+        setZoneDialogMode("create");
+    };
+
+    const openZone = (zone: Zone) => {
+        setZoneDraft(mapZoneToEditable(zone));
+        setZoneReadOnlySource(zone.source ?? null);
+        setZoneDialogMode(getZoneAccessMode(zone));
+    };
+
+    const cancelEditZone = () => {
+        setZoneDraft(emptyZone());
+        setZoneReadOnlySource(null);
+        setZoneDialogMode("closed");
+    };
+
+    const submitZone = async () => {
+        if (isViewingReadOnlyZone || zoneDraft.suffix.trim().length === 0) {
+            return;
+        }
+
+        await dispatch(saveZone(normalizeZoneForApi(zoneDraft))).unwrap();
+        cancelEditZone();
+    };
+
+    const removeZone = async (zone: Zone) => {
+        if (zone.id == null) {
+            return;
+        }
+
+        if (!window.confirm(`Delete zone '${zone.suffix}'?`)) {
+            return;
+        }
+
+        await dispatch(deleteZone(zone.id)).unwrap();
+        setSelectedZoneIds((current) => current.filter((id) => id !== zone.id));
+    };
+
+    const removeSelectedZones = async () => {
+        if (selectedZoneIds.length === 0) {
+            return;
+        }
+
+        if (!window.confirm(`Delete ${selectedZoneIds.length} selected zone(s)?`)) {
+            return;
+        }
+
+        for (const zoneId of selectedZoneIds) {
+            await dispatch(deleteZone(zoneId)).unwrap();
+        }
+
+        setSelectedZoneIds([]);
+    };
+
+    const applyBulkEdit = async () => {
+        if (selectedZoneIds.length === 0) {
+            return;
+        }
+
+        const selectedZones = displayedZones.filter((zone): zone is Zone & { id: number } =>
+            zone.id != null ? selectedZoneIds.includes(zone.id) : false
+        );
+
+        const editableZones = selectedZones.filter((zone) => !isReadOnlyZone(zone));
+        for (const zone of editableZones) {
+            const draft = mapZoneToEditable(zone);
+
+            if (bulkEnabledMode === "enable") {
+                draft.enabled = true;
+            } else if (bulkEnabledMode === "disable") {
+                draft.enabled = false;
+            }
+
+            await dispatch(saveZone(normalizeZoneForApi(draft))).unwrap();
+        }
+
+        setBulkDialogOpen(false);
+        setBulkEnabledMode("keep");
+    };
+
+    const openBindImportDialog = () => {
+        setBindImportDialogOpen(true);
+    };
+
+    const closeBindImportDialog = () => {
+        setBindImportDialogOpen(false);
+        setBindImportFile(null);
+        setBindImportZoneSuffix("");
+        setBindImportEnabled(true);
+        setBindImportReplaceExisting(true);
+    };
+
+    const submitBindImport = async () => {
+        if (!bindImportFile) {
+            return;
+        }
+
+        if (bindImportZoneSuffix.trim().length === 0) {
+            return;
+        }
+
+        await dispatch(
+            importBindZone({
+                file: bindImportFile,
+                zoneSuffix: bindImportZoneSuffix.trim(),
+                enabled: bindImportEnabled,
+                replaceExistingRecords: bindImportReplaceExisting
+            })
+        ).unwrap();
+
+        closeBindImportDialog();
+    };
+
+    const openZoneBindImportDialog = () => {
+        if (zoneDraft.id == null || areDraftRecordsReadOnly) {
+            return;
+        }
+
+        setZoneBindImportDialogOpen(true);
+    };
+
+    const closeZoneBindImportDialog = () => {
+        setZoneBindImportDialogOpen(false);
+        setZoneBindImportFile(null);
+        setZoneBindImportMode("replace");
+    };
+
+    const submitZoneBindImport = async () => {
+        if (zoneDraft.id == null || !zoneBindImportFile) {
+            return;
+        }
+
+        await dispatch(
+            importBindZoneIntoZone({
+                zoneId: zoneDraft.id,
+                file: zoneBindImportFile,
+                replaceExistingRecords: zoneBindImportMode === "replace"
+            })
+        ).unwrap();
+
+        closeZoneBindImportDialog();
+        cancelEditZone();
+    };
+
+    const openCreateRecord = () => {
+        if (areDraftRecordsReadOnly) {
+            return;
+        }
+
+        setRecordEditIndex(null);
+        setRecordDraft({host: "", type: "A", class: "IN", data: ""});
+        setRecordDialogOpen(true);
+    };
+
+    const openEditRecord = (index: number) => {
+        if (areDraftRecordsReadOnly) {
+            return;
+        }
+
+        setRecordEditIndex(index);
+        setRecordDraft({...zoneDraft.records[index]});
+        setRecordDialogOpen(true);
+    };
+
+    const saveRecord = () => {
+        const next = {...recordDraft};
+        setZoneDraft((current) => {
+            const records = [...current.records];
+            if (recordEditIndex == null) {
+                records.push(next);
+            } else {
+                records[recordEditIndex] = next;
+            }
+
+            return {
+                ...current,
+                records
+            };
+        });
+
+        setRecordDialogOpen(false);
+        setRecordEditIndex(null);
+    };
+
+    const deleteRecord = (index: number) => {
+        if (areDraftRecordsReadOnly) {
+            return;
+        }
+
+        setZoneDraft((current) => ({
+            ...current,
+            records: current.records.filter((_, i) => i !== index)
+        }));
+    };
+
+    const availableMasterZones = useMemo(() => {
+        return zones.items.filter((zone) => {
+            if (zone.id == null) return false;
+            if (zone.id === zoneDraft.id) return false;
+            return zone.masterZoneId == null;
+        });
+    }, [zones.items, zoneDraft.id]);
+
+    return (
+        <Stack spacing={2}>
+            <Card elevation={2}>
+                <CardContent>
+                    <Stack spacing={2}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
+                            <Box>
+                                <Typography variant="h6" fontWeight={600}
+                                            sx={{display: "flex", alignItems: "center", gap: 1}}>
+                                    <DnsIcon fontSize="small"/> Zones Overview
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Select zones with checkboxes for bulk actions, or edit one zone at a time.
+                                </Typography>
+                            </Box>
+
+                            <Stack
+                                direction={{xs: "column", md: "row"}}
+                                spacing={1.5}
+                                useFlexGap
+                                sx={{width: {xs: "100%", md: "auto"}, alignItems: {xs: "stretch", md: "center"}}}
+                            >
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<RefreshIcon/>}
+                                    onClick={() => void dispatch(fetchZones())}
+                                    disabled={zones.loading || zones.saving}
+                                    sx={{minWidth: {md: 132}}}
+                                >
+                                    Refresh
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<AddIcon/>}
+                                    onClick={startCreateZone}
+                                    disabled={zones.saving}
+                                    sx={{minWidth: {md: 132}}}
+                                >
+                                    Add zone
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<UploadFileIcon/>}
+                                    onClick={openBindImportDialog}
+                                    disabled={zones.saving}
+                                    sx={{minWidth: {md: 152}}}
+                                >
+                                    Import BIND
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<EditIcon/>}
+                                    disabled={zones.saving || selectedCount === 0}
+                                    onClick={() => setBulkDialogOpen(true)}
+                                    sx={{minWidth: {md: 164}}}
+                                >
+                                    Bulk edit ({selectedCount})
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<DeleteIcon/>}
+                                    disabled={zones.saving || selectedCount === 0}
+                                    onClick={() => void removeSelectedZones()}
+                                    sx={{minWidth: {md: 174}}}
+                                >
+                                    Bulk delete ({selectedCount})
+                                </Button>
+                            </Stack>
+                        </Stack>
+                        <FormControlLabel
+                            control={<Checkbox checked={hideSlaves}
+                                               onChange={(event) => setHideSlaves(event.target.checked)}/>}
+                            label="Hide slave zones"
+                        />
+
+                        {zones.loading ? (
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <CircularProgress size={18}/>
+                                <Typography variant="body2">Loading zones...</Typography>
+                            </Stack>
+                        ) : null}
+
+                        {zones.error ? <Alert severity="error">{zones.error}</Alert> : null}
+
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell padding="checkbox">
+                                            <Checkbox
+                                                checked={allSelected}
+                                                indeterminate={!allSelected && selectedCount > 0}
+                                                onChange={toggleSelectAll}
+                                                inputProps={{"aria-label": "select all zones"}}
+                                            />
+                                        </TableCell>
+                                        <TableCell sortDirection={zoneSortKey === "suffix" ? zoneSortDirection : false}>
+                                            <TableSortLabel
+                                                active={zoneSortKey === "suffix"}
+                                                direction={zoneSortKey === "suffix" ? zoneSortDirection : "asc"}
+                                                onClick={() => requestZoneSort("suffix")}
+                                            >
+                                                Suffix
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell sortDirection={zoneSortKey === "serial" ? zoneSortDirection : false}>
+                                            <TableSortLabel
+                                                active={zoneSortKey === "serial"}
+                                                direction={zoneSortKey === "serial" ? zoneSortDirection : "asc"}
+                                                onClick={() => requestZoneSort("serial")}
+                                            >
+                                                Serial
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell
+                                            sortDirection={zoneSortKey === "enabled" ? zoneSortDirection : false}>
+                                            <TableSortLabel
+                                                active={zoneSortKey === "enabled"}
+                                                direction={zoneSortKey === "enabled" ? zoneSortDirection : "asc"}
+                                                onClick={() => requestZoneSort("enabled")}
+                                            >
+                                                Enabled
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell
+                                            sortDirection={zoneSortKey === "records" ? zoneSortDirection : false}>
+                                            <TableSortLabel
+                                                active={zoneSortKey === "records"}
+                                                direction={zoneSortKey === "records" ? zoneSortDirection : "asc"}
+                                                onClick={() => requestZoneSort("records")}
+                                            >
+                                                Records
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell sortDirection={zoneSortKey === "source" ? zoneSortDirection : false}>
+                                            <TableSortLabel
+                                                active={zoneSortKey === "source"}
+                                                direction={zoneSortKey === "source" ? zoneSortDirection : "asc"}
+                                                onClick={() => requestZoneSort("source")}
+                                            >
+                                                Source
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell
+                                            sortDirection={zoneSortKey === "relationship" ? zoneSortDirection : false}>
+                                            <TableSortLabel
+                                                active={zoneSortKey === "relationship"}
+                                                direction={zoneSortKey === "relationship" ? zoneSortDirection : "asc"}
+                                                onClick={() => requestZoneSort("relationship")}
+                                            >
+                                                Relationship
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell align="right">Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {displayedZones.map((zone) => {
+                                        const zoneId = zone.id;
+                                        const isChecked = zoneId != null && selectedZoneIds.includes(zoneId);
+                                        const isReadOnly = isReadOnlyZone(zone);
+
+                                        return (
+                                            <TableRow
+                                                key={zone.id != null ? `database-${zone.id}` : `${zone.source}-${zone.suffix}`}
+                                                hover
+                                                tabIndex={0}
+                                                onClick={() => openZone(zone)}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === "Enter" && event.target === event.currentTarget) {
+                                                        openZone(zone);
+                                                    }
+                                                }}
+                                                sx={{cursor: "pointer"}}
+                                            >
+                                                <TableCell padding="checkbox">
+                                                    <Checkbox
+                                                        checked={isChecked}
+                                                        disabled={zoneId == null}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        onChange={() => {
+                                                            if (zoneId != null) {
+                                                                toggleSelectZone(zoneId);
+                                                            }
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{zone.suffix}</TableCell>
+                                                <TableCell>{zone.serial}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        size="small"
+                                                        color={zone.enabled ? "success" : "default"}
+                                                        label={zone.enabled ? "enabled" : "disabled"}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{zone.records?.length ?? 0}</TableCell>
+                                                <TableCell>
+                                                    <Chip size="small" variant="outlined"
+                                                          label={zone.source ?? "Unknown"}/>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography
+                                                        variant="body2">{getZoneRelationshipLabel(zone)}</Typography>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                        <Tooltip
+                                                            title={isReadOnly ? "View read-only zone" : "Edit zone"}>
                               <span>
                                 <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() => openEditRecord(originalIndex)}
-                                  disabled={isDraftSlave}
+                                    size="small"
+                                    color="primary"
+                                    aria-label={isReadOnly ? "View zone" : "Edit zone"}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        openZone(zone);
+                                    }}
                                 >
-                                  <EditIcon fontSize="small" />
+                                  {isReadOnly ? <VisibilityIcon fontSize="small"/> : <EditIcon fontSize="small"/>}
                                 </IconButton>
                               </span>
-                            </Tooltip>
-                            <Tooltip title="Delete record">
+                                                        </Tooltip>
+                                                        <Tooltip
+                                                            title={zoneId == null ? "Provider-managed zones cannot be deleted here." : "Delete zone"}>
+                              <span>
+                              <IconButton size="small" color="error" disabled={zoneId == null}
+                                          onClick={(event) => {
+                                              event.stopPropagation();
+                                              void removeZone(zone);
+                                          }}>
+                                <DeleteIcon fontSize="small"/>
+                              </IconButton>
+                              </span>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                    {displayedZones.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={8}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    No zones found.
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : null}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Stack>
+                </CardContent>
+            </Card>
+
+            <Dialog open={zoneDialogMode !== "closed"} onClose={cancelEditZone} maxWidth="md" fullWidth>
+                <DialogTitle>
+                    {zoneDialogMode === "create"
+                        ? "Create zone"
+                        : `${isViewingReadOnlyZone ? "View" : "Edit"} zone: ${zoneDraft.suffix}`}
+                </DialogTitle>
+                <DialogContent
+                    dividers
+                    sx={{
+                        maxHeight: "70vh",
+                        overflowY: "auto",
+                        scrollbarWidth: "thin",
+                        scrollbarColor: "#4fc3f7 #1a2438",
+                        "&::-webkit-scrollbar": {
+                            width: "10px"
+                        },
+                        "&::-webkit-scrollbar-track": {
+                            backgroundColor: "#1a2438",
+                            borderRadius: "999px"
+                        },
+                        "&::-webkit-scrollbar-thumb": {
+                            background: "linear-gradient(180deg, #4fc3f7, #80cbc4)",
+                            borderRadius: "999px",
+                            border: "2px solid #1a2438"
+                        },
+                        "&::-webkit-scrollbar-thumb:hover": {
+                            background: "linear-gradient(180deg, #81d4fa, #a5d6d1)"
+                        }
+                    }}
+                >
+                    <Stack spacing={2} sx={{mt: 1}}>
+                        <TextField
+                            label="Suffix"
+                            value={zoneDraft.suffix}
+                            onChange={(event) => setZoneDraft((current) => ({...current, suffix: event.target.value}))}
+                            fullWidth
+                            disabled={isViewingReadOnlyZone}
+                        />
+
+                        <Typography variant="subtitle1" fontWeight={600}>
+                            SOA
+                        </Typography>
+                        <Stack direction={{xs: "column", sm: "row"}} spacing={2}>
+                            <TextField
+                                label="Primary NS"
+                                value={zoneDraft.soaPrimaryNs}
+                                onChange={(event) => setZoneDraft((current) => ({
+                                    ...current,
+                                    soaPrimaryNs: event.target.value
+                                }))}
+                                fullWidth
+                                disabled={areDraftRecordsReadOnly}
+                            />
+                            <TextField
+                                label="Hostmaster"
+                                value={zoneDraft.soaHostmaster}
+                                onChange={(event) => setZoneDraft((current) => ({
+                                    ...current,
+                                    soaHostmaster: event.target.value
+                                }))}
+                                fullWidth
+                                disabled={areDraftRecordsReadOnly}
+                            />
+                        </Stack>
+                        <Stack direction={{xs: "column", sm: "row"}} spacing={2}>
+                            <TextField
+                                label="Refresh"
+                                value={zoneDraft.soaRefresh}
+                                onChange={(event) => setZoneDraft((current) => ({
+                                    ...current,
+                                    soaRefresh: event.target.value
+                                }))}
+                                fullWidth
+                                disabled={areDraftRecordsReadOnly}
+                            />
+                            <TextField
+                                label="Retry"
+                                value={zoneDraft.soaRetry}
+                                onChange={(event) => setZoneDraft((current) => ({
+                                    ...current,
+                                    soaRetry: event.target.value
+                                }))}
+                                fullWidth
+                                disabled={areDraftRecordsReadOnly}
+                            />
+                            <TextField
+                                label="Expiry"
+                                value={zoneDraft.soaExpiry}
+                                onChange={(event) => setZoneDraft((current) => ({
+                                    ...current,
+                                    soaExpiry: event.target.value
+                                }))}
+                                fullWidth
+                                disabled={areDraftRecordsReadOnly}
+                            />
+                            <TextField
+                                label="Minimum"
+                                value={zoneDraft.soaMinimum}
+                                onChange={(event) => setZoneDraft((current) => ({
+                                    ...current,
+                                    soaMinimum: event.target.value
+                                }))}
+                                fullWidth
+                                disabled={areDraftRecordsReadOnly}
+                            />
+                        </Stack>
+
+                        <FormControl fullWidth>
+                            <InputLabel id="master-zone-label">Master zone</InputLabel>
+                            <Select
+                                labelId="master-zone-label"
+                                label="Master zone"
+                                value={zoneDraft.masterZoneId ?? ""}
+                                disabled={isViewingReadOnlyZone}
+                                onChange={(event) => {
+                                    const raw = event.target.value;
+                                    const nextMasterId = raw === "" ? null : Number(raw);
+                                    setZoneDraft((current) => ({...current, masterZoneId: nextMasterId}));
+                                }}
+                            >
+                                <MenuItem value="">None (standalone/master)</MenuItem>
+                                {availableMasterZones.map((zone) => (
+                                    <MenuItem key={zone.id} value={zone.id}>
+                                        {zone.suffix}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        {isViewingReadOnlyZone ? (
+                            <Alert severity="info">
+                                {zoneReadOnlySource ?? "The active provider"} manages this zone. All fields and records
+                                are read-only.
+                            </Alert>
+                        ) : isDraftSlave ? (
+                            <Alert severity="info">
+                                This zone is configured as a slave. Serial, enabled state, and records are synchronized
+                                from its master.
+                            </Alert>
+                        ) : null}
+
+                        <Stack direction={{xs: "column", sm: "row"}} spacing={2}>
+                            <TextField
+                                label="Serial"
+                                value={zoneDraft.serial}
+                                fullWidth
+                                disabled
+                                helperText="Managed automatically by server (YYYYMMDDXX)."
+                            />
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={zoneDraft.enabled}
+                                        onChange={(event) => setZoneDraft((current) => ({
+                                            ...current,
+                                            enabled: event.target.checked
+                                        }))}
+                                        disabled={areDraftRecordsReadOnly}
+                                    />
+                                }
+                                label="Enabled"
+                            />
+                        </Stack>
+
+                        <Stack spacing={1}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Typography variant="subtitle1" fontWeight={600}>
+                                    Records
+                                </Typography>
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        size="small"
+                                        startIcon={<UploadFileIcon/>}
+                                        onClick={openZoneBindImportDialog}
+                                        disabled={areDraftRecordsReadOnly || zoneDraft.id == null}
+                                    >
+                                        Import BIND
+                                    </Button>
+                                    <Button size="small" startIcon={<AddIcon/>} onClick={openCreateRecord}
+                                            disabled={areDraftRecordsReadOnly}>
+                                        Add record
+                                    </Button>
+                                </Stack>
+                            </Stack>
+
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell
+                                                sortDirection={recordSortKey === "host" ? recordSortDirection : false}>
+                                                <TableSortLabel
+                                                    active={recordSortKey === "host"}
+                                                    direction={recordSortKey === "host" ? recordSortDirection : "asc"}
+                                                    onClick={() => requestRecordSort("host")}
+                                                >
+                                                    Host
+                                                </TableSortLabel>
+                                            </TableCell>
+                                            <TableCell
+                                                sortDirection={recordSortKey === "type" ? recordSortDirection : false}>
+                                                <TableSortLabel
+                                                    active={recordSortKey === "type"}
+                                                    direction={recordSortKey === "type" ? recordSortDirection : "asc"}
+                                                    onClick={() => requestRecordSort("type")}
+                                                >
+                                                    Type
+                                                </TableSortLabel>
+                                            </TableCell>
+                                            <TableCell
+                                                sortDirection={recordSortKey === "class" ? recordSortDirection : false}>
+                                                <TableSortLabel
+                                                    active={recordSortKey === "class"}
+                                                    direction={recordSortKey === "class" ? recordSortDirection : "asc"}
+                                                    onClick={() => requestRecordSort("class")}
+                                                >
+                                                    Class
+                                                </TableSortLabel>
+                                            </TableCell>
+                                            <TableCell
+                                                sortDirection={recordSortKey === "data" ? recordSortDirection : false}>
+                                                <TableSortLabel
+                                                    active={recordSortKey === "data"}
+                                                    direction={recordSortKey === "data" ? recordSortDirection : "asc"}
+                                                    onClick={() => requestRecordSort("data")}
+                                                >
+                                                    Data
+                                                </TableSortLabel>
+                                            </TableCell>
+                                            <TableCell align="right">Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {sortedDraftRecords.map(({record, originalIndex}) => (
+                                            <TableRow key={`${record.id ?? "edit"}-${originalIndex}`}>
+                                                <TableCell>{record.host}</TableCell>
+                                                <TableCell>{record.type}</TableCell>
+                                                <TableCell>{record.class}</TableCell>
+                                                <TableCell>{record.data}</TableCell>
+                                                <TableCell align="right">
+                                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                        <Tooltip
+                                                            title={areDraftRecordsReadOnly ? "Read-only record" : "Edit record"}>
                               <span>
                                 <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => deleteRecord(originalIndex)}
-                                  disabled={isDraftSlave}
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => openEditRecord(originalIndex)}
+                                    disabled={areDraftRecordsReadOnly}
                                 >
-                                  <DeleteIcon fontSize="small" />
+                                  <EditIcon fontSize="small"/>
                                 </IconButton>
                               </span>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {sortedDraftRecords.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5}>
-                          <Typography variant="body2" color="text.secondary">
-                            No records configured.
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
+                                                        </Tooltip>
+                                                        <Tooltip
+                                                            title={areDraftRecordsReadOnly ? "Read-only record" : "Delete record"}>
+                              <span>
+                                <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => deleteRecord(originalIndex)}
+                                    disabled={areDraftRecordsReadOnly}
+                                >
+                                  <DeleteIcon fontSize="small"/>
+                                </IconButton>
+                              </span>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {sortedDraftRecords.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5}>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        No records configured.
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : null}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Stack>
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cancelEditZone}>{isViewingReadOnlyZone ? "Close" : "Cancel"}</Button>
+                    {!isViewingReadOnlyZone ? (
+                        <Button onClick={() => void submitZone()} variant="contained" disabled={zones.saving}>
+                            Save zone
+                        </Button>
                     ) : null}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={cancelEditZone}>Cancel</Button>
-          <Button onClick={() => void submitZone()} variant="contained" disabled={zones.saving}>
-            Save zone
-          </Button>
-        </DialogActions>
-      </Dialog>
+                </DialogActions>
+            </Dialog>
 
-      <Dialog open={recordDialogOpen} onClose={() => setRecordDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{recordEditIndex == null ? "Add record" : "Edit record"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Host"
-              value={recordDraft.host ?? ""}
-              onChange={(event) => setRecordDraft((current) => ({ ...current, host: event.target.value }))}
-              fullWidth
-            />
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <FormControl fullWidth>
-                <InputLabel id="record-type-label">Type</InputLabel>
-                <Select
-                  labelId="record-type-label"
-                  label="Type"
-                  value={recordDraft.type ?? "A"}
-                  onChange={(event) => setRecordDraft((current) => ({ ...current, type: event.target.value }))}
-                >
-                  {RESOURCE_TYPES.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel id="record-class-label">Class</InputLabel>
-                <Select
-                  labelId="record-class-label"
-                  label="Class"
-                  value={recordDraft.class ?? "IN"}
-                  onChange={(event) => setRecordDraft((current) => ({ ...current, class: event.target.value }))}
-                >
-                  {RESOURCE_CLASSES.map((resourceClass) => (
-                    <MenuItem key={resourceClass} value={resourceClass}>
-                      {resourceClass}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-            <TextField
-              label="Data"
-              value={recordDraft.data ?? ""}
-              onChange={(event) => setRecordDraft((current) => ({ ...current, data: event.target.value }))}
-              fullWidth
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRecordDialogOpen(false)}>Cancel</Button>
-          <Button onClick={saveRecord} variant="contained">
-            Save record
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <Dialog open={recordDialogOpen} onClose={() => setRecordDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>{recordEditIndex == null ? "Add record" : "Edit record"}</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{mt: 1}}>
+                        <TextField
+                            label="Host"
+                            value={recordDraft.host ?? ""}
+                            onChange={(event) => setRecordDraft((current) => ({...current, host: event.target.value}))}
+                            fullWidth
+                        />
+                        <Stack direction={{xs: "column", sm: "row"}} spacing={2}>
+                            <FormControl fullWidth>
+                                <InputLabel id="record-type-label">Type</InputLabel>
+                                <Select
+                                    labelId="record-type-label"
+                                    label="Type"
+                                    value={recordDraft.type ?? "A"}
+                                    onChange={(event) => setRecordDraft((current) => ({
+                                        ...current,
+                                        type: event.target.value
+                                    }))}
+                                >
+                                    {RESOURCE_TYPES.map((type) => (
+                                        <MenuItem key={type} value={type}>
+                                            {type}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <FormControl fullWidth>
+                                <InputLabel id="record-class-label">Class</InputLabel>
+                                <Select
+                                    labelId="record-class-label"
+                                    label="Class"
+                                    value={recordDraft.class ?? "IN"}
+                                    onChange={(event) => setRecordDraft((current) => ({
+                                        ...current,
+                                        class: event.target.value
+                                    }))}
+                                >
+                                    {RESOURCE_CLASSES.map((resourceClass) => (
+                                        <MenuItem key={resourceClass} value={resourceClass}>
+                                            {resourceClass}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Stack>
+                        <TextField
+                            label="Data"
+                            value={recordDraft.data ?? ""}
+                            onChange={(event) => setRecordDraft((current) => ({...current, data: event.target.value}))}
+                            fullWidth
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRecordDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={saveRecord} variant="contained">
+                        Save record
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
-      <Dialog open={bulkDialogOpen} onClose={() => setBulkDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Bulk edit selected zones</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Applying changes to {selectedCount} selected zone(s).
-            </Typography>
-            <FormControl fullWidth>
-              <InputLabel id="bulk-enabled-mode-label">Enabled</InputLabel>
-              <Select
-                labelId="bulk-enabled-mode-label"
-                label="Enabled"
-                value={bulkEnabledMode}
-                onChange={(event) => setBulkEnabledMode(event.target.value as EnabledBulkMode)}
-              >
-                <MenuItem value="keep">Keep current value</MenuItem>
-                <MenuItem value="enable">Enable all selected</MenuItem>
-                <MenuItem value="disable">Disable all selected</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBulkDialogOpen(false)}>Cancel</Button>
-          <Button onClick={() => void applyBulkEdit()} variant="contained" disabled={zones.saving || selectedCount === 0}>
-            Apply bulk edit
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <Dialog open={bulkDialogOpen} onClose={() => setBulkDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>Bulk edit selected zones</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{mt: 1}}>
+                        <Typography variant="body2" color="text.secondary">
+                            Applying changes to {selectedCount} selected zone(s).
+                        </Typography>
+                        <FormControl fullWidth>
+                            <InputLabel id="bulk-enabled-mode-label">Enabled</InputLabel>
+                            <Select
+                                labelId="bulk-enabled-mode-label"
+                                label="Enabled"
+                                value={bulkEnabledMode}
+                                onChange={(event) => setBulkEnabledMode(event.target.value as EnabledBulkMode)}
+                            >
+                                <MenuItem value="keep">Keep current value</MenuItem>
+                                <MenuItem value="enable">Enable all selected</MenuItem>
+                                <MenuItem value="disable">Disable all selected</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setBulkDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={() => void applyBulkEdit()} variant="contained"
+                            disabled={zones.saving || selectedCount === 0}>
+                        Apply bulk edit
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
-      <Dialog open={bindImportDialogOpen} onClose={closeBindImportDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Import BIND Zone File</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
-              <Button variant="outlined" component="label">
-                Select file
-                <input
-                  hidden
-                  type="file"
-                  accept=".zone,.txt"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] ?? null;
-                    setBindImportFile(file);
-                    if (file && bindImportZoneSuffix.trim().length === 0) {
-                      setBindImportZoneSuffix(inferZoneSuffixFromFileName(file.name));
-                    }
-                  }}
-                />
-              </Button>
-              <Typography variant="body2" color="text.secondary">
-                {bindImportFile?.name ?? "No file selected"}
-              </Typography>
-            </Stack>
-            <TextField
-              label="Zone suffix"
-              value={bindImportZoneSuffix}
-              onChange={(event) => setBindImportZoneSuffix(event.target.value)}
-              helperText="Example: example.com"
-              fullWidth
-            />
-            <FormControlLabel
-              control={
-                <Switch checked={bindImportEnabled} onChange={(event) => setBindImportEnabled(event.target.checked)} />
-              }
-              label="Enable imported zone"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={bindImportReplaceExisting}
-                  onChange={(event) => setBindImportReplaceExisting(event.target.checked)}
-                />
-              }
-              label="Replace existing records if zone already exists"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeBindImportDialog}>Cancel</Button>
-          <Button
-            onClick={() => void submitBindImport()}
-            variant="contained"
-            disabled={zones.saving || !bindImportFile || bindImportZoneSuffix.trim().length === 0}
-          >
-            Import
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <Dialog open={bindImportDialogOpen} onClose={closeBindImportDialog} maxWidth="sm" fullWidth>
+                <DialogTitle>Import BIND Zone File</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{mt: 1}}>
+                        <Stack direction={{xs: "column", sm: "row"}} spacing={2}
+                               alignItems={{xs: "stretch", sm: "center"}}>
+                            <Button variant="outlined" component="label">
+                                Select file
+                                <input
+                                    hidden
+                                    type="file"
+                                    accept=".zone,.txt"
+                                    onChange={(event) => {
+                                        const file = event.target.files?.[0] ?? null;
+                                        setBindImportFile(file);
+                                        if (file && bindImportZoneSuffix.trim().length === 0) {
+                                            setBindImportZoneSuffix(inferZoneSuffixFromFileName(file.name));
+                                        }
+                                    }}
+                                />
+                            </Button>
+                            <Typography variant="body2" color="text.secondary">
+                                {bindImportFile?.name ?? "No file selected"}
+                            </Typography>
+                        </Stack>
+                        <TextField
+                            label="Zone suffix"
+                            value={bindImportZoneSuffix}
+                            onChange={(event) => setBindImportZoneSuffix(event.target.value)}
+                            helperText="Example: example.com"
+                            fullWidth
+                        />
+                        <FormControlLabel
+                            control={
+                                <Switch checked={bindImportEnabled}
+                                        onChange={(event) => setBindImportEnabled(event.target.checked)}/>
+                            }
+                            label="Enable imported zone"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={bindImportReplaceExisting}
+                                    onChange={(event) => setBindImportReplaceExisting(event.target.checked)}
+                                />
+                            }
+                            label="Replace existing records if zone already exists"
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeBindImportDialog}>Cancel</Button>
+                    <Button
+                        onClick={() => void submitBindImport()}
+                        variant="contained"
+                        disabled={zones.saving || !bindImportFile || bindImportZoneSuffix.trim().length === 0}
+                    >
+                        Import
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
-      <Dialog open={zoneBindImportDialogOpen} onClose={closeZoneBindImportDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Import BIND Into Existing Zone</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Target zone: {zoneDraft.suffix}
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
-              <Button variant="outlined" component="label">
-                Select file
-                <input
-                  hidden
-                  type="file"
-                  accept=".zone,.txt"
-                  onChange={(event) => setZoneBindImportFile(event.target.files?.[0] ?? null)}
-                />
-              </Button>
-              <Typography variant="body2" color="text.secondary">
-                {zoneBindImportFile?.name ?? "No file selected"}
-              </Typography>
-            </Stack>
-            <FormControl fullWidth>
-              <InputLabel id="zone-bind-import-mode-label">Import mode</InputLabel>
-              <Select
-                labelId="zone-bind-import-mode-label"
-                label="Import mode"
-                value={zoneBindImportMode}
-                onChange={(event) => setZoneBindImportMode(event.target.value as BindImportMode)}
-              >
-                <MenuItem value="add">Add new records only</MenuItem>
-                <MenuItem value="replace">Replace all records with file contents</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeZoneBindImportDialog}>Cancel</Button>
-          <Button onClick={() => void submitZoneBindImport()} variant="contained" disabled={!zoneBindImportFile || zones.saving}>
-            Import
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Stack>
-  );
+            <Dialog open={zoneBindImportDialogOpen} onClose={closeZoneBindImportDialog} maxWidth="sm" fullWidth>
+                <DialogTitle>Import BIND Into Existing Zone</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{mt: 1}}>
+                        <Typography variant="body2" color="text.secondary">
+                            Target zone: {zoneDraft.suffix}
+                        </Typography>
+                        <Stack direction={{xs: "column", sm: "row"}} spacing={2}
+                               alignItems={{xs: "stretch", sm: "center"}}>
+                            <Button variant="outlined" component="label">
+                                Select file
+                                <input
+                                    hidden
+                                    type="file"
+                                    accept=".zone,.txt"
+                                    onChange={(event) => setZoneBindImportFile(event.target.files?.[0] ?? null)}
+                                />
+                            </Button>
+                            <Typography variant="body2" color="text.secondary">
+                                {zoneBindImportFile?.name ?? "No file selected"}
+                            </Typography>
+                        </Stack>
+                        <FormControl fullWidth>
+                            <InputLabel id="zone-bind-import-mode-label">Import mode</InputLabel>
+                            <Select
+                                labelId="zone-bind-import-mode-label"
+                                label="Import mode"
+                                value={zoneBindImportMode}
+                                onChange={(event) => setZoneBindImportMode(event.target.value as BindImportMode)}
+                            >
+                                <MenuItem value="add">Add new records only</MenuItem>
+                                <MenuItem value="replace">Replace all records with file contents</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeZoneBindImportDialog}>Cancel</Button>
+                    <Button onClick={() => void submitZoneBindImport()} variant="contained"
+                            disabled={!zoneBindImportFile || zones.saving}>
+                        Import
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Stack>
+    );
 }

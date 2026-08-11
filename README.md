@@ -146,7 +146,7 @@ The provider reads the file whenever it changes (a 10-second settlement window a
     "zoneTransfer": {
       "enabled": true,
       "allowTransfersFrom": [
-        "192.0.2.10",
+        "ns2.afraid.org",
         "198.51.100.0/24"
       ],
       "notifySecondaries": [
@@ -159,10 +159,66 @@ The provider reads the file whenever it changes (a 10-second settlement window a
 }
 ```
 
-- `allowTransfersFrom`: required ACL for incoming AXFR/IXFR requests.
-- `notifySecondaries`: optional list of `ip[:port]` targets that receive outbound DNS NOTIFY whenever a zone serial changes.
+- `allowTransfersFrom`: required ACL for incoming AXFR/IXFR requests. Entries may be `*`, an exact IPv4/IPv6 address, an IPv4/IPv6 CIDR, or a DNS hostname. Hostnames authorize every resolved A and AAAA address and are refreshed from the system resolver every five minutes.
+- `notifySecondaries`: optional list of `host[:port]` targets that receive outbound DNS NOTIFY whenever a zone serial changes. Hostnames expand to every resolved A and AAAA address and refresh every five minutes. Use `[IPv6]:port` when overriding the port for IPv6.
 - `injectedNsAddress`: optional fallback address/target used only when the server auto-injects an apex NS for AXFR validity; IPv4 -> `A`, IPv6 -> `AAAA`, hostname -> `CNAME`.
 - UDP AXFR/IXFR requests are refused by design; use TCP transport.
+
+### Automatic Primary/Secondary Replication
+
+This server can act as a secondary for another instance while continuing to serve locally configured zones. The secondary maintains a persistent, project-specific catalog subscription over the primary's DNS TCP port. A complete catalog is sent when the connection is established, again after every reconnect, and whenever any primary resolver publishes a zone change. New and changed zones are then transferred with standard TCP AXFR.
+
+On the primary, enable transfers and allow every secondary source address. Hostname ACL entries authorize all of their resolved IPv4 and IPv6 addresses:
+
+```json
+{
+  "server": {
+    "zoneTransfer": {
+      "enabled": true,
+      "allowTransfersFrom": [
+        "secondary-1.example.net",
+        "secondary-2.example.net"
+      ]
+    }
+  }
+}
+```
+
+On each secondary, point `secondarySync.master` at the primary DNS TCP endpoint:
+
+```json
+{
+  "server": {
+    "secondarySync": {
+      "enabled": true,
+      "master": "primary.example.net:53",
+      "reconnectDelaySeconds": 5,
+      "transferTimeoutSeconds": 30,
+      "transferRetryDelaySeconds": 5,
+      "maxConcurrentTransfers": 4,
+      "cacheFile": "/app/data/secondary-zones.json"
+    }
+  }
+}
+```
+
+- The primary accepts multiple simultaneous secondary catalog connections.
+- Every connection and reconnect receives the full current zone list, so missed changes do not require manual recovery.
+- After primary startup, catalog streams wait until every configured resolver has published its initial snapshot. This prevents reconnecting secondaries from treating a partially loaded primary as an authoritative deletion.
+- Replicated zones take precedence over same-named local zones. Local zones not present on the primary continue to be served.
+- When a zone disappears from a valid primary catalog, its replicated copy is removed and any same-named local zone becomes visible again.
+- `cacheFile` is optional. When configured on persistent storage, its last-known-good zones are loaded before reconnecting so a restarted secondary can keep answering during a primary outage.
+- Cached zones restore their complete record sets. Cache entries without records or an SOA are treated as incomplete and transferred again even when their serial matches the primary catalog.
+- Losing the catalog connection never removes replicated zones. The in-memory resolver and `cacheFile` retain their last-known-good snapshots until a complete, valid primary catalog explicitly removes a zone.
+- Once the primary is ready, its complete catalog is authoritative: zones omitted from that snapshot are removed from the secondary as the synchronization delta.
+- Zone transfers run independently, up to `maxConcurrentTransfers` at a time, so a stalled AXFR does not block catalog processing or other zones. Failed and timed-out transfers retry after `transferRetryDelaySeconds` until they succeed or disappear from the primary catalog.
+- Each successfully transferred zone is published to DNS and persisted immediately.
+- The web admin zone overview lists zones from every active provider. Database zones are editable; synchronized, Traefik, BIND, probe, and other provider-managed zones are labeled by source and open in a read-only record view.
+- The catalog connection carries 30-second heartbeat snapshots. A broken connection is retried after `reconnectDelaySeconds`.
+- Both the catalog subscription and each AXFR are checked against the primary's `allowTransfersFrom` ACL.
+- Publish the configured DNS port over TCP on both hosts. UDP alone is insufficient for replication.
+
+The catalog and AXFR streams are not encrypted. Use a private network or VPN when zone contents must not traverse an untrusted network. See [Secondary replication](docs/secondary_replication.md) for protocol and operational details.
 
 ## React SPA (NSwag + Redux)
 A React SPA is available under `Dns.Spa/` and is designed to interface with the API in `Dns.Cli`.

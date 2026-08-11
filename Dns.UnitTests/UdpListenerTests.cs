@@ -18,6 +18,45 @@ namespace Dns.UnitTests;
 public class UdpListenerTests
 {
 	[Fact]
+	public async Task SendsToIpv6TargetWhenSupported()
+	{
+		if (!Socket.OSSupportsIPv6) return;
+
+		var listener = new UdpListener();
+		listener.Initialize(0);
+		listener.Start();
+
+		try
+		{
+			using var receiver = new UdpClient(AddressFamily.InterNetworkV6);
+			receiver.Client.Bind(new IPEndPoint(IPAddress.IPv6Loopback, 0));
+			using var args = new SocketAsyncEventArgs();
+			args.RemoteEndPoint = receiver.Client.LocalEndPoint;
+			args.SetBuffer(new byte[] { 0x53 }, 0, 1);
+
+			await listener.SendToAsync(args);
+			var result = await receiver.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+			Assert.Equal(new byte[] { 0x53 }, result.Buffer);
+		}
+		finally
+		{
+			listener.Stop();
+		}
+	}
+
+	[Fact]
+	public async Task SendToAsync_ReportsFailureThroughReturnedTask()
+	{
+		var       listener = new UdpListener();
+		using var args     = new SocketAsyncEventArgs();
+		args.RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 53);
+		args.SetBuffer(new byte[] { 0x53 }, 0, 1);
+
+		await Assert.ThrowsAsync<InvalidOperationException>(() => listener.SendToAsync(args));
+	}
+
+	[Fact]
 	public async Task Stop_ReleasesPortAndHaltsProcessing()
 	{
 		var listener = new UdpListener();
@@ -67,8 +106,8 @@ public class UdpListenerTests
 
 		try
 		{
-			var captured = new List<IPEndPoint>();
-			var gate = new object();
+			var captured   = new List<IPEndPoint>();
+			var gate       = new object();
 			var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 			listener.OnRequest += (buffer, length, remote) =>

@@ -37,7 +37,7 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	public IActionResult? GetDnsResolverData() => Ok(dnsService.Resolvers.Select(s => s.GetObject()));
 
 	/// <summary>
-	///     Get database zones
+	///     Get editable database zones and read-only zones from every active provider.
 	/// </summary>
 	/// <returns>html</returns>
 	[ProducesResponseType(StatusCodes.Status200OK)]
@@ -47,8 +47,17 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	[Authorize]
 	public async Task<IActionResult?> GetZones()
 	{
-		var zones = await zoneRepository.GetZones().ConfigureAwait(false);
-		return Ok(zones.Select(z => z.ToDto()).ToList());
+		var zones  = await zoneRepository.GetZones().ConfigureAwait(false);
+		var result = zones.Select(z => z.ToDto()).ToList();
+		result.AddRange(
+			(dnsService.ActiveZones ?? []).Where(snapshot => snapshot.Zone != null)
+			                              .Select(snapshot => snapshot.Zone.ToDto(
+				                                      snapshot.Source,
+				                                      snapshot.IsReplicated
+			                                      )
+			                              )
+		);
+		return Ok(result);
 	}
 
 	/// <summary>
@@ -141,7 +150,12 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 			return BadRequest($"Unable to parse BIND zone file: {ex.Message}");
 		}
 
-		return await UpsertImportedZoneAsync(parsedZone, request.ZoneSuffix, request.Enabled, request.ReplaceExistingRecords)
+		return await UpsertImportedZoneAsync(
+				parsedZone,
+				request.ZoneSuffix,
+				request.Enabled,
+				request.ReplaceExistingRecords
+			)
 			.ConfigureAwait(false);
 	}
 
@@ -158,18 +172,19 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	public async Task<IActionResult?> ImportBindZoneUpload([FromForm] BindZoneUploadImportRequest request)
 	{
 		if (!ModelState.IsValid) return ValidationProblem(ModelState);
-		if (request.File == null || request.File.Length <= 0) return BadRequest("A non-empty BIND zone file is required.");
+		if (request.File == null || request.File.Length <= 0)
+			return BadRequest("A non-empty BIND zone file is required.");
 
 		var parseResult = await ParseUploadedZoneAsync(request.File, request.ZoneSuffix).ConfigureAwait(false);
 		if (parseResult.Error != null) return parseResult.Error;
 
 		return await UpsertImportedZoneAsync(
-				   parseResult.ParsedZone!,
-				   request.ZoneSuffix,
-				   request.Enabled,
-				   request.ReplaceExistingRecords
-			   )
-			   .ConfigureAwait(false);
+				parseResult.ParsedZone!,
+				request.ZoneSuffix,
+				request.Enabled,
+				request.ReplaceExistingRecords
+			)
+			.ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -189,7 +204,8 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	)
 	{
 		if (!ModelState.IsValid) return ValidationProblem(ModelState);
-		if (request.File == null || request.File.Length <= 0) return BadRequest("A non-empty BIND zone file is required.");
+		if (request.File == null || request.File.Length <= 0)
+			return BadRequest("A non-empty BIND zone file is required.");
 
 		var existingZone = await zoneRepository.GetZone(id).ConfigureAwait(false);
 		if (existingZone == null) return NotFound($"Zone '{id}' was not found.");
@@ -202,12 +218,12 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 		if (parseResult.Error != null) return parseResult.Error;
 
 		return await UpsertImportedZoneAsync(
-				   parseResult.ParsedZone!,
-				   zoneSuffix,
-				   existingZone.Enabled,
-				   request.ReplaceExistingRecords
-			   )
-			   .ConfigureAwait(false);
+				parseResult.ParsedZone!,
+				zoneSuffix,
+				existingZone.Enabled,
+				request.ReplaceExistingRecords
+			)
+			.ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -223,10 +239,10 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 	{
 		var options = request ?? new();
 		var result = await dnsService.ImportActiveBindZonesToDatabaseAndDisableAsync(
-								   options.ReplaceExistingRecords,
-								   options.EnableImportedZones
-							   )
-							   .ConfigureAwait(false);
+			                             options.ReplaceExistingRecords,
+			                             options.EnableImportedZones
+		                             )
+		                             .ConfigureAwait(false);
 
 		return Ok(result);
 	}
@@ -238,16 +254,16 @@ public class DnsController(IDnsService dnsService, IDnsServer dnsServer, IZoneRe
 		bool replaceExistingRecords
 	)
 	{
-		var dbZone = BindZoneImportMapper.ToDbZone(parsedZone, zoneSuffix, enabled);
+		var dbZone   = BindZoneImportMapper.ToDbZone(parsedZone, zoneSuffix, enabled);
 		var existing = await zoneRepository.GetZone(dbZone.Suffix!).ConfigureAwait(false);
 		var upserted = await zoneRepository.UpsertZone(dbZone, replaceExistingRecords).ConfigureAwait(false);
 
 		var payload = new
 		{
-			id = upserted.Id,
-			suffix = upserted.Suffix,
-			serial = upserted.Serial,
-			enabled = upserted.Enabled,
+			id          = upserted.Id,
+			suffix      = upserted.Suffix,
+			serial      = upserted.Serial,
+			enabled     = upserted.Enabled,
 			recordCount = upserted.Records?.Count ?? dbZone.Records?.Count ?? 0,
 		};
 

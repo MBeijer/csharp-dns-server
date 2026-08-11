@@ -6,7 +6,8 @@
 
 using System;
 using System.Collections.Generic;
-using Dns.Db.Models.EntityFramework.Enums;
+using System.Threading;
+using System.Threading.Tasks;
 using Dns.Models;
 
 namespace Dns.Contracts;
@@ -14,7 +15,20 @@ namespace Dns.Contracts;
 /// <summary>Provides domain name resolver capabilities</summary>
 public interface IDnsResolver : IObserver<List<Zone>>, IHtmlDump
 {
-	public void SubscribeTo(IObservable<List<Zone>> zoneProvider);
+	event EventHandler ZonesChanged;
+
+	bool IsReady => true;
+
+	void DeferReadiness()
+	{
+	}
+
+	void MarkReady()
+	{
+	}
+
+	public void       SubscribeTo(IObservable<List<Zone>> zoneProvider);
 	IEnumerable<Zone> GetZones();
-	bool TryGetZone(string hostname, out Zone zone);
+	bool              TryGetZone(string hostname, out Zone zone);
+	Task              WaitUntilReadyAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

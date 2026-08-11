@@ -15,6 +15,7 @@ using Dns.Contracts;
 using Dns.Db.Repositories;
 using Dns.ZoneProvider;
 using Dns.ZoneProvider.Bind;
+using Dns.ZoneProvider.Secondary;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -25,17 +26,48 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 {
 	private sealed class ProviderRuntime(ZoneOptions zoneOptions, IZoneProvider provider)
 	{
-		public ZoneOptions ZoneOptions { get; } = zoneOptions;
-		public IZoneProvider Provider { get; } = provider;
+		public ZoneOptions   ZoneOptions { get; } = zoneOptions;
+		public IZoneProvider Provider    { get; } = provider;
 	}
 
-	private static readonly Lock RuntimeSyncRoot = new();
-	private static readonly List<IDnsResolver> ZoneResolvers = [];
-	private static readonly List<ProviderRuntime> ActiveProviders = [];
-	public bool Running { get; set; } = true;
-	private CancellationTokenSource Cts { get; set; }
+	private static readonly Lock                    RuntimeSyncRoot = new();
+	private static readonly List<IDnsResolver>      ZoneResolvers   = [];
+	private static readonly List<ProviderRuntime>   ActiveProviders = [];
+	public                  bool                    Running { get; set; } = true;
+	private                 CancellationTokenSource Cts     { get; set; }
 
 	public List<IDnsResolver> Resolvers => ZoneResolvers;
+
+	public IReadOnlyList<ActiveZoneSnapshot> ActiveZones
+	{
+		get
+		{
+			lock (RuntimeSyncRoot)
+			{
+				var snapshots = new List<ActiveZoneSnapshot>();
+				foreach (var resolver in ZoneResolvers)
+				{
+					var runtime = ActiveProviders.FirstOrDefault(candidate =>
+						                                             ReferenceEquals(
+							                                             candidate.Provider.Resolver,
+							                                             resolver
+						                                             )
+					);
+					if (runtime?.Provider is DatabaseZoneProvider) continue;
+
+					var source       = runtime == null ? "Runtime" : GetProviderSource(runtime.Provider);
+					var isReplicated = runtime?.Provider is SecondaryZoneProvider;
+					snapshots.AddRange(
+						resolver.GetZones()
+						        .Where(zone => zone != null)
+						        .Select(zone => new ActiveZoneSnapshot(zone, source, isReplicated))
+					);
+				}
+
+				return snapshots;
+			}
+		}
+	}
 
 	public async Task StartAsync(CancellationToken ct)
 	{
@@ -47,6 +79,21 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 			ActiveProviders.Clear();
 		}
 
+		if (serverOptions.Value.SecondarySync.Enabled)
+		{
+			var secondaryProvider = services.GetRequiredService<SecondaryZoneProvider>();
+			var secondaryOptions = new ZoneOptions
+			{
+				Name = DnsServer.CatalogZoneName, Provider = typeof(SecondaryZoneProvider).FullName,
+			};
+			secondaryProvider.Initialize(secondaryOptions);
+			secondaryProvider.Start(Cts.Token);
+			lock (RuntimeSyncRoot)
+			{
+				ActiveProviders.Add(new(secondaryOptions, secondaryProvider));
+			}
+		}
+
 		foreach (var zone in serverOptions.Value.Zones)
 		{
 			var zoneProvider = (IZoneProvider)services.GetRequiredService(ByName(zone.Provider));
@@ -54,13 +101,35 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 			zoneProvider.Start(Cts.Token);
 			lock (RuntimeSyncRoot)
 			{
-				ZoneResolvers.Add(zoneProvider.Resolver);
 				ActiveProviders.Add(new(zone, zoneProvider));
 			}
 		}
 
+		lock (RuntimeSyncRoot)
+		{
+			ZoneResolvers.AddRange(
+				ActiveProviders.OrderByDescending(runtime => runtime.Provider.ResolverPriority)
+				               .Select(runtime => runtime.Provider.Resolver)
+			);
+		}
+
 		dnsServer.Initialize(ZoneResolvers);
 		await dnsServer.Start(Cts.Token).ConfigureAwait(false);
+	}
+
+	private string GetProviderSource(IZoneProvider provider)
+	{
+		if (provider is SecondaryZoneProvider)
+		{
+			var master = serverOptions.Value.SecondarySync.Master;
+			return string.IsNullOrWhiteSpace(master) ? "Secondary" : $"Secondary ({master})";
+		}
+
+		if (provider is BindZoneProvider) return "BIND";
+
+		var          name   = provider.GetType().Name;
+		const string suffix = "ZoneProvider";
+		return name.EndsWith(suffix, StringComparison.Ordinal) ? name[..^suffix.Length] : name;
 	}
 
 	public async Task StopAsync(CancellationToken cancellationToken)
@@ -80,28 +149,27 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 		List<ProviderRuntime> activeBindProviders;
 		lock (RuntimeSyncRoot)
 		{
-			activeBindProviders = ActiveProviders
-								  .Where(runtime => runtime.Provider is BindZoneProvider)
-								  .ToList();
+			activeBindProviders = ActiveProviders.Where(runtime => runtime.Provider is BindZoneProvider).ToList();
 		}
 
 		var result = new BindZoneImportBatchResult();
 
-		using var scope = services.CreateScope();
-		var zoneRepository = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
+		using var scope          = services.CreateScope();
+		var       zoneRepository = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
 
 		foreach (var runtime in activeBindProviders)
 		{
 			var item = new BindZoneImportBatchItem
 			{
 				ZoneSuffix = runtime.ZoneOptions.Name ?? string.Empty,
-				FileName = (runtime.ZoneOptions.ProviderSettings as FileWatcherZoneProviderSettings)?.FileName ?? string.Empty,
+				FileName = (runtime.ZoneOptions.ProviderSettings as FileWatcherZoneProviderSettings)?.FileName ??
+				           string.Empty,
 			};
 
 			try
 			{
 				if (runtime.ZoneOptions.ProviderSettings is not FileWatcherZoneProviderSettings fileSettings ||
-					string.IsNullOrWhiteSpace(fileSettings.FileName))
+				    string.IsNullOrWhiteSpace(fileSettings.FileName))
 					throw new InvalidOperationException("BIND provider is missing file watcher settings.");
 
 				var bindFilePath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(fileSettings.FileName));
@@ -109,13 +177,13 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 				var dbZone = BindZoneImportMapper.ToDbZone(parsedZone, runtime.ZoneOptions.Name, enableImportedZones);
 				var upserted = await zoneRepository.UpsertZone(dbZone, replaceExistingRecords).ConfigureAwait(false);
 
-				item.Imported = true;
-				item.ZoneId = upserted.Id;
-				item.Serial = upserted.Serial;
+				item.Imported    = true;
+				item.ZoneId      = upserted.Id;
+				item.Serial      = upserted.Serial;
 				item.RecordCount = upserted.Records?.Count ?? dbZone.Records?.Count ?? 0;
 				result.ImportedCount++;
 
-				((IObserver<List<Dns.Models.Zone>>)runtime.Provider.Resolver).OnNext([]);
+				runtime.Provider.Resolver.OnNext([]);
 				if (runtime.Provider is IDisposable disposableProvider)
 					disposableProvider.Dispose();
 				item.Disabled = true;
@@ -140,7 +208,7 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 
 	private static Type ByName(string name) =>
 		AppDomain.CurrentDomain.GetAssemblies()
-				 .Reverse()
-				 .Select(assembly => assembly.GetType(name))
-				 .FirstOrDefault(tt => tt != null);
+		         .Reverse()
+		         .Select(assembly => assembly.GetType(name))
+		         .FirstOrDefault(tt => tt != null);
 }

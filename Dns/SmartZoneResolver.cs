@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Dns.Contracts;
 using Dns.Db.Models.EntityFramework.Enums;
 using Dns.Models;
@@ -21,11 +22,16 @@ namespace Dns;
 public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 {
 	private long _hits;
-	private long _misses;
+
+	private readonly TaskCompletionSource _initialLoadCompletion =
+		new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	private long          _misses;
 	private IZoneProvider _provider;
-	private long _queries;
-	private IDisposable _subscription;
-	private List<Zone> _zones = [];
+	private long          _queries;
+	private int           _readinessDeferred;
+	private IDisposable   _subscription;
+	private List<Zone>    _zones = [];
 
 	private static JsonSerializerOptions SerializerOptions { get; } = new() { WriteIndented = true };
 
@@ -34,11 +40,17 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 		get => _zones;
 		set
 		{
-			_zones = value ?? throw new ArgumentNullException(nameof(value));
+			_zones         = value ?? throw new ArgumentNullException(nameof(value));
 			LastZoneReload = DateTime.Now;
+			if (Volatile.Read(ref _readinessDeferred) == 0) _initialLoadCompletion.TrySetResult();
 			logger.LogInformation("Zone reloaded: {Zones}", string.Join(',', _zones.Select(z => z.Suffix)));
+			ZonesChanged?.Invoke(this, EventArgs.Empty);
 		}
 	}
+
+	public event EventHandler ZonesChanged;
+
+	public bool IsReady => _initialLoadCompletion.Task.IsCompletedSuccessfully;
 
 	public DateTime LastZoneReload { get; private set; } = DateTime.MinValue;
 
@@ -103,4 +115,11 @@ public class SmartZoneResolver(ILogger<SmartZoneResolver> logger) : IDnsResolver
 	}
 
 	public bool AreZonesLoaded() => _zones.Count > 0;
+
+	public void DeferReadiness() => Interlocked.Exchange(ref _readinessDeferred, 1);
+
+	public void MarkReady() => _initialLoadCompletion.TrySetResult();
+
+	public Task WaitUntilReadyAsync(CancellationToken cancellationToken) =>
+		_initialLoadCompletion.Task.WaitAsync(cancellationToken);
 }

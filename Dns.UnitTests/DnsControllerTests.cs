@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Dns.Contracts;
 using Dns.Cli.Controllers;
 using Dns.Cli.Models;
+using Dns.Cli.Models.Dto;
 using Dns.Db.Models.EntityFramework;
+using Dns.Db.Models.EntityFramework.Enums;
 using Dns.Db.Repositories;
 using Dns.Services;
 using Microsoft.AspNetCore.Http;
@@ -28,29 +31,49 @@ public sealed class DnsControllerTests
 		dnsService.Resolvers.Returns([resolver]);
 
 		var result = controller.GetDnsResolverData();
-		var ok = Assert.IsType<OkObjectResult>(result);
+		var ok     = Assert.IsType<OkObjectResult>(result);
 		Assert.NotNull(ok.Value);
 	}
 
 	[Fact]
 	public async Task GetZones_ReturnsMappedDtos()
 	{
-		var controller = CreateController(out var zoneRepository, out _);
-		zoneRepository.GetZones().Returns(
+		var controller = CreateController(out var zoneRepository, out var dnsService);
+		zoneRepository.GetZones()
+		              .Returns(
+			              [
+				              new Zone
+				              {
+					              Id      = 1,
+					              Suffix  = "example.com",
+					              Enabled = true,
+					              Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.10" } },
+				              },
+			              ]
+		              );
+		var runtimeZone = new Dns.Models.Zone { Suffix = "runtime.example", Serial = 42 };
+		runtimeZone.Initialize(
 			[
-				new Zone
+				new()
 				{
-					Id = 1,
-					Suffix = "example.com",
-					Enabled = true,
-					Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.10" } },
+					Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.42"],
 				},
 			]
 		);
+		dnsService.ActiveZones.Returns([new(runtimeZone, "Traefik", false)]);
 
 		var result = await controller.GetZones();
-		var ok = Assert.IsType<OkObjectResult>(result);
-		Assert.NotNull(ok.Value);
+		var ok     = Assert.IsType<OkObjectResult>(result);
+		var zones  = Assert.IsAssignableFrom<IEnumerable<ZoneDto>>(ok.Value).ToList();
+		Assert.Equal(2, zones.Count);
+		Assert.Equal("Database", zones.Single(zone => zone.Id == 1).Source);
+
+		var runtime = zones.Single(zone => zone.Suffix == "runtime.example");
+		Assert.Null(runtime.Id);
+		Assert.True(runtime.IsReadOnly);
+		Assert.False(runtime.IsReplicated);
+		Assert.Equal("Traefik", runtime.Source);
+		Assert.Equal("192.0.2.42", Assert.Single(runtime.Records!).Data);
 	}
 
 	[Fact]
@@ -59,14 +82,7 @@ public sealed class DnsControllerTests
 		var controller = CreateController(out var zoneRepository, out _);
 		zoneRepository.AddZone(Arg.Any<Zone>()).Returns(Task.CompletedTask);
 
-		var result = await controller.AddZone(
-						 new Dns.Cli.Models.Dto.ZoneDto
-						 {
-							 Suffix = "example.com",
-							 Enabled = true,
-							 Records = [],
-						 }
-					 );
+		var result = await controller.AddZone(new ZoneDto { Suffix = "example.com", Enabled = true, Records = [], });
 
 		Assert.IsType<CreatedResult>(result);
 	}
@@ -75,10 +91,9 @@ public sealed class DnsControllerTests
 	public async Task AddZone_ReturnsBadRequest_OnInvalidOperation()
 	{
 		var controller = CreateController(out var zoneRepository, out _);
-		zoneRepository.AddZone(Arg.Any<Zone>())
-					  .Returns(_ => throw new InvalidOperationException("broken"));
+		zoneRepository.AddZone(Arg.Any<Zone>()).Returns(_ => throw new InvalidOperationException("broken"));
 
-		var result = await controller.AddZone(new Dns.Cli.Models.Dto.ZoneDto { Suffix = "x", Enabled = true, Records = [] });
+		var result = await controller.AddZone(new ZoneDto { Suffix = "x", Enabled = true, Records = [] });
 		Assert.IsType<BadRequestObjectResult>(result);
 	}
 
@@ -89,14 +104,11 @@ public sealed class DnsControllerTests
 		zoneRepository.UpdateZone(Arg.Any<Zone>()).Returns(Task.CompletedTask);
 
 		var result = await controller.UpdateZone(
-						 new Dns.Cli.Models.Dto.ZoneDto
-						 {
-							 Id = 1,
-							 Suffix = "example.com",
-							 Enabled = true,
-							 Records = [],
-						 }
-					 );
+			new ZoneDto
+			{
+				Id = 1, Suffix = "example.com", Enabled = true, Records = [],
+			}
+		);
 
 		Assert.IsType<OkResult>(result);
 	}
@@ -105,18 +117,14 @@ public sealed class DnsControllerTests
 	public async Task UpdateZone_ReturnsBadRequest_OnInvalidOperation()
 	{
 		var controller = CreateController(out var zoneRepository, out _);
-		zoneRepository.UpdateZone(Arg.Any<Zone>())
-					  .Returns(_ => throw new InvalidOperationException("broken"));
+		zoneRepository.UpdateZone(Arg.Any<Zone>()).Returns(_ => throw new InvalidOperationException("broken"));
 
 		var result = await controller.UpdateZone(
-						 new Dns.Cli.Models.Dto.ZoneDto
-						 {
-							 Id = 1,
-							 Suffix = "example.com",
-							 Enabled = true,
-							 Records = [],
-						 }
-					 );
+			new ZoneDto
+			{
+				Id = 1, Suffix = "example.com", Enabled = true, Records = [],
+			}
+		);
 
 		Assert.IsType<BadRequestObjectResult>(result);
 	}
@@ -147,12 +155,12 @@ public sealed class DnsControllerTests
 		var controller = CreateController(out _, out _);
 
 		var result = await controller.ImportBindZone(
-						 new BindZoneImportRequest
-						 {
-							 FileName = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
-							 ZoneSuffix = "example.com",
-						 }
-					 );
+			new BindZoneImportRequest
+			{
+				FileName   = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+				ZoneSuffix = "example.com",
+			}
+		);
 
 		var badRequest = Assert.IsType<BadRequestObjectResult>(result);
 		Assert.Contains("Zone file was not found", badRequest.Value?.ToString(), StringComparison.Ordinal);
@@ -165,12 +173,8 @@ public sealed class DnsControllerTests
 		controller.ModelState.AddModelError("ZoneSuffix", "required");
 
 		var result = await controller.ImportBindZone(
-						 new BindZoneImportRequest
-						 {
-							 FileName = "ignored.zone",
-							 ZoneSuffix = "example.com",
-						 }
-					 );
+			new BindZoneImportRequest { FileName = "ignored.zone", ZoneSuffix = "example.com", }
+		);
 
 		Assert.IsType<ObjectResult>(result);
 	}
@@ -198,26 +202,23 @@ public sealed class DnsControllerTests
 		{
 			zoneRepository.GetZone("example.com").Returns((Zone)null);
 			zoneRepository.UpsertZone(Arg.Any<Zone>(), Arg.Any<bool>())
-						  .Returns(
-							  new Zone
-							  {
-								  Id = 100,
-								  Suffix = "example.com",
-								  Serial = 2024010101,
-								  Enabled = true,
-								  Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.10" } },
-							  }
-						  );
+			              .Returns(
+				              new Zone
+				              {
+					              Id      = 100,
+					              Suffix  = "example.com",
+					              Serial  = 2024010101,
+					              Enabled = true,
+					              Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.10" } },
+				              }
+			              );
 
 			var result = await controller.ImportBindZone(
-							 new BindZoneImportRequest
-							 {
-								 FileName = zoneFile,
-								 ZoneSuffix = "example.com",
-								 Enabled = true,
-								 ReplaceExistingRecords = true,
-							 }
-						 );
+				new BindZoneImportRequest
+				{
+					FileName = zoneFile, ZoneSuffix = "example.com", Enabled = true, ReplaceExistingRecords = true,
+				}
+			);
 
 			var created = Assert.IsType<CreatedResult>(result);
 			Assert.Equal("/dns/zones/100", created.Location);
@@ -232,17 +233,13 @@ public sealed class DnsControllerTests
 	public async Task ImportBindZone_ReturnsBadRequest_WhenParseFails()
 	{
 		var controller = CreateController(out _, out _);
-		var zoneFile = WriteTempZoneFile(["not-a-zone"]);
+		var zoneFile   = WriteTempZoneFile(["not-a-zone"]);
 
 		try
 		{
 			var result = await controller.ImportBindZone(
-							 new BindZoneImportRequest
-							 {
-								 FileName = zoneFile,
-								 ZoneSuffix = "example.com",
-							 }
-						 );
+				new BindZoneImportRequest { FileName = zoneFile, ZoneSuffix = "example.com", }
+			);
 
 			Assert.IsType<BadRequestObjectResult>(result);
 		}
@@ -276,25 +273,23 @@ public sealed class DnsControllerTests
 			var existing = new Zone { Id = 5, Suffix = "example.com", Enabled = true };
 			zoneRepository.GetZone("example.com").Returns(existing);
 			zoneRepository.UpsertZone(Arg.Any<Zone>(), true)
-						  .Returns(
-							  new Zone
-							  {
-								  Id = 5,
-								  Suffix = "example.com",
-								  Serial = 2024010102,
-								  Enabled = true,
-								  Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.10" } },
-							  }
-						  );
+			              .Returns(
+				              new Zone
+				              {
+					              Id      = 5,
+					              Suffix  = "example.com",
+					              Serial  = 2024010102,
+					              Enabled = true,
+					              Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.10" } },
+				              }
+			              );
 
 			var result = await controller.ImportBindZone(
-							 new BindZoneImportRequest
-							 {
-								 FileName = zoneFile,
-								 ZoneSuffix = "example.com",
-								 ReplaceExistingRecords = true,
-							 }
-						 );
+				new BindZoneImportRequest
+				{
+					FileName = zoneFile, ZoneSuffix = "example.com", ReplaceExistingRecords = true,
+				}
+			);
 
 			Assert.IsType<OkObjectResult>(result);
 		}
@@ -311,12 +306,8 @@ public sealed class DnsControllerTests
 
 		controller.ModelState.AddModelError("File", "required");
 		var result = await controller.ImportBindZoneUpload(
-						 new BindZoneUploadImportRequest
-						 {
-							 File = CreateFormFile("x", "x.zone"),
-							 ZoneSuffix = "example.com",
-						 }
-					 );
+			new BindZoneUploadImportRequest { File = CreateFormFile("x", "x.zone"), ZoneSuffix = "example.com", }
+		);
 
 		Assert.IsType<ObjectResult>(result);
 	}
@@ -327,12 +318,8 @@ public sealed class DnsControllerTests
 		var controller = CreateController(out _, out _);
 
 		var result = await controller.ImportBindZoneUpload(
-						 new BindZoneUploadImportRequest
-						 {
-							 File = null,
-							 ZoneSuffix = "example.com",
-						 }
-					 );
+			new BindZoneUploadImportRequest { File = null, ZoneSuffix = "example.com", }
+		);
 
 		Assert.IsType<BadRequestObjectResult>(result);
 	}
@@ -365,13 +352,8 @@ public sealed class DnsControllerTests
 		zoneRepository.UpsertZone(Arg.Any<Zone>(), true).Returns(existing);
 
 		var result = await controller.ImportBindZoneUpload(
-						 new BindZoneUploadImportRequest
-						 {
-							 File = file,
-							 ZoneSuffix = "example.com",
-							 ReplaceExistingRecords = true,
-						 }
-					 );
+			new BindZoneUploadImportRequest { File = file, ZoneSuffix = "example.com", ReplaceExistingRecords = true, }
+		);
 
 		Assert.IsType<OkObjectResult>(result);
 	}
@@ -380,15 +362,11 @@ public sealed class DnsControllerTests
 	public async Task ImportBindZoneUpload_ReturnsBadRequest_WhenFileIsInvalidBind()
 	{
 		var controller = CreateController(out _, out _);
-		var file = CreateFormFile("not-a-bind-zone", "broken.zone");
+		var file       = CreateFormFile("not-a-bind-zone", "broken.zone");
 
 		var result = await controller.ImportBindZoneUpload(
-						 new BindZoneUploadImportRequest
-						 {
-							 File = file,
-							 ZoneSuffix = "example.com",
-						 }
-					 );
+			new BindZoneUploadImportRequest { File = file, ZoneSuffix = "example.com", }
+		);
 
 		var badRequest = Assert.IsType<BadRequestObjectResult>(result);
 		Assert.Contains("Unable to parse BIND zone file", badRequest.Value?.ToString(), StringComparison.Ordinal);
@@ -401,12 +379,9 @@ public sealed class DnsControllerTests
 		zoneRepository.GetZone(42).Returns((Zone)null);
 
 		var result = await controller.ImportBindZoneIntoExistingZone(
-						 42,
-						 new BindZoneExistingUploadImportRequest
-						 {
-							 File = CreateFormFile("x", "x.zone"),
-						 }
-					 );
+			42,
+			new BindZoneExistingUploadImportRequest { File = CreateFormFile("x", "x.zone"), }
+		);
 
 		Assert.IsType<NotFoundObjectResult>(result);
 	}
@@ -418,12 +393,9 @@ public sealed class DnsControllerTests
 		zoneRepository.GetZone(7).Returns(new Zone { Id = 7, Suffix = " " });
 
 		var result = await controller.ImportBindZoneIntoExistingZone(
-						 7,
-						 new BindZoneExistingUploadImportRequest
-						 {
-							 File = CreateFormFile("x", "x.zone"),
-						 }
-					 );
+			7,
+			new BindZoneExistingUploadImportRequest { File = CreateFormFile("x", "x.zone"), }
+		);
 
 		Assert.IsType<BadRequestObjectResult>(result);
 	}
@@ -455,25 +427,21 @@ public sealed class DnsControllerTests
 		zoneRepository.GetZone(8).Returns(existingZone);
 		zoneRepository.GetZone("existing.com").Returns(existingZone);
 		zoneRepository.UpsertZone(Arg.Any<Zone>(), false)
-					  .Returns(
-						  new Zone
-						  {
-							  Id = 8,
-							  Suffix = "existing.com",
-							  Enabled = false,
-							  Serial = 2024010102,
-							  Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.44" } },
-						  }
-					  );
+		              .Returns(
+			              new Zone
+			              {
+				              Id      = 8,
+				              Suffix  = "existing.com",
+				              Enabled = false,
+				              Serial  = 2024010102,
+				              Records = new List<ZoneRecord> { new() { Host = "www", Data = "192.0.2.44" } },
+			              }
+		              );
 
 		var result = await controller.ImportBindZoneIntoExistingZone(
-						 8,
-						 new BindZoneExistingUploadImportRequest
-						 {
-							 File = file,
-							 ReplaceExistingRecords = false,
-						 }
-					 );
+			8,
+			new BindZoneExistingUploadImportRequest { File = file, ReplaceExistingRecords = false, }
+		);
 
 		Assert.IsType<OkObjectResult>(result);
 		await zoneRepository.Received(1).UpsertZone(Arg.Any<Zone>(), false);
@@ -485,13 +453,9 @@ public sealed class DnsControllerTests
 		var controller = CreateController(out _, out _);
 
 		var result = await controller.ImportBindZoneIntoExistingZone(
-						 8,
-						 new BindZoneExistingUploadImportRequest
-						 {
-							 File = null,
-							 ReplaceExistingRecords = true,
-						 }
-					 );
+			8,
+			new BindZoneExistingUploadImportRequest { File = null, ReplaceExistingRecords = true, }
+		);
 
 		Assert.IsType<BadRequestObjectResult>(result);
 	}
@@ -503,13 +467,12 @@ public sealed class DnsControllerTests
 		controller.ModelState.AddModelError("File", "required");
 
 		var result = await controller.ImportBindZoneIntoExistingZone(
-						 8,
-						 new BindZoneExistingUploadImportRequest
-						 {
-							 File = CreateFormFile("x", "x.zone"),
-							 ReplaceExistingRecords = true,
-						 }
-					 );
+			8,
+			new BindZoneExistingUploadImportRequest
+			{
+				File = CreateFormFile("x", "x.zone"), ReplaceExistingRecords = true,
+			}
+		);
 
 		Assert.IsType<ObjectResult>(result);
 	}
@@ -521,13 +484,12 @@ public sealed class DnsControllerTests
 		zoneRepository.GetZone(8).Returns(new Zone { Id = 8, Suffix = "existing.com", Enabled = true });
 
 		var result = await controller.ImportBindZoneIntoExistingZone(
-						 8,
-						 new BindZoneExistingUploadImportRequest
-						 {
-							 File = CreateFormFile("broken", "broken.zone"),
-							 ReplaceExistingRecords = true,
-						 }
-					 );
+			8,
+			new BindZoneExistingUploadImportRequest
+			{
+				File = CreateFormFile("broken", "broken.zone"), ReplaceExistingRecords = true,
+			}
+		);
 
 		Assert.IsType<BadRequestObjectResult>(result);
 	}
@@ -536,8 +498,7 @@ public sealed class DnsControllerTests
 	public async Task ImportActiveBindZones_UsesDefaults_WhenRequestIsNull()
 	{
 		var controller = CreateController(out _, out var dnsService);
-		dnsService.ImportActiveBindZonesToDatabaseAndDisableAsync(true, true)
-				  .Returns(new BindZoneImportBatchResult());
+		dnsService.ImportActiveBindZonesToDatabaseAndDisableAsync(true, true).Returns(new BindZoneImportBatchResult());
 
 		var result = await controller.ImportActiveBindZones(null);
 
@@ -550,15 +511,11 @@ public sealed class DnsControllerTests
 	{
 		var controller = CreateController(out _, out var dnsService);
 		dnsService.ImportActiveBindZonesToDatabaseAndDisableAsync(false, false)
-				  .Returns(new BindZoneImportBatchResult());
+		          .Returns(new BindZoneImportBatchResult());
 
 		var result = await controller.ImportActiveBindZones(
-						 new ActiveBindImportRequest
-						 {
-							 ReplaceExistingRecords = false,
-							 EnableImportedZones = false,
-						 }
-					 );
+			new ActiveBindImportRequest { ReplaceExistingRecords = false, EnableImportedZones = false, }
+		);
 
 		Assert.IsType<OkObjectResult>(result);
 		await dnsService.Received(1).ImportActiveBindZonesToDatabaseAndDisableAsync(false, false);
@@ -594,12 +551,11 @@ public sealed class DnsControllerTests
 
 	private static IFormFile CreateFormFile(string content, string fileName)
 	{
-		var bytes = Encoding.UTF8.GetBytes(content);
+		var bytes  = Encoding.UTF8.GetBytes(content);
 		var stream = new MemoryStream(bytes);
 		return new FormFile(stream, 0, bytes.Length, "file", fileName)
 		{
-			Headers = new HeaderDictionary(),
-			ContentType = "text/plain",
+			Headers = new HeaderDictionary(), ContentType = "text/plain",
 		};
 	}
 

@@ -24,11 +24,11 @@ public delegate void OnRequestHandler(byte[] buffer, int length, EndPoint remote
 
 public class UdpListener
 {
-	private readonly Lock _syncRoot = new();
-	private CancellationTokenSource _cts;
-	private Socket _listener;
-	private Task _receiveLoopTask;
-	public OnRequestHandler OnRequest;
+	private readonly Lock                    _syncRoot = new();
+	private          CancellationTokenSource _cts;
+	private          Socket                  _listener;
+	private          Task                    _receiveLoopTask;
+	public           OnRequestHandler        OnRequest;
 
 	public EndPoint LocalEndPoint => _listener?.LocalEndPoint;
 
@@ -36,8 +36,20 @@ public class UdpListener
 	{
 		if (_listener != null) throw new InvalidOperationException("Listener already initialized.");
 
-		_listener = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-		var ep = new IPEndPoint(IPAddress.Any, port);
+		if (Socket.OSSupportsIPv6)
+		{
+			_listener          = new(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
+			_listener.DualMode = true;
+		}
+		else
+		{
+			_listener = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+		}
+
+		var ep = new IPEndPoint(
+			_listener.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any,
+			port
+		);
 		_listener.Bind(ep);
 	}
 
@@ -49,7 +61,7 @@ public class UdpListener
 		{
 			if (_cts != null) throw new InvalidOperationException("UDP listener already started.");
 
-			_cts = new();
+			_cts             = new();
 			_receiveLoopTask = ReceiveLoopAsync(_cts.Token);
 		}
 	}
@@ -57,15 +69,15 @@ public class UdpListener
 	public void Stop()
 	{
 		CancellationTokenSource cts;
-		Task receiveLoop;
+		Task                    receiveLoop;
 
 		lock (_syncRoot)
 		{
 			if (_cts == null) return;
 
-			cts = _cts;
-			receiveLoop = _receiveLoopTask;
-			_cts = null;
+			cts              = _cts;
+			receiveLoop      = _receiveLoopTask;
+			_cts             = null;
 			_receiveLoopTask = null;
 		}
 
@@ -86,12 +98,21 @@ public class UdpListener
 		cts.Dispose();
 	}
 
-	public async void SendToAsync(SocketAsyncEventArgs args)
+	public async Task SendToAsync(SocketAsyncEventArgs args)
 	{
-		if (_listener == null) throw new InvalidOperationException("Listener is not initialized.");
+		var listener = _listener ?? throw new InvalidOperationException("Listener is not initialized.");
+		if (listener.AddressFamily == AddressFamily.InterNetworkV6 &&
+		    args.RemoteEndPoint is IPEndPoint { AddressFamily: AddressFamily.InterNetwork } ipv4Endpoint)
+			args.RemoteEndPoint = new IPEndPoint(ipv4Endpoint.Address.MapToIPv6(), ipv4Endpoint.Port);
 
-		var awaitable = new SocketAwaitable(args);
-		await _listener.SendToAsync(awaitable);
+		if (args.Buffer == null) throw new InvalidOperationException("A send buffer is required.");
+
+		await listener.SendToAsync(
+			              new ReadOnlyMemory<byte>(args.Buffer, args.Offset, args.Count),
+			              SocketFlags.None,
+			              args.RemoteEndPoint
+		              )
+		              .ConfigureAwait(false);
 	}
 
 	private async Task ReceiveLoopAsync(CancellationToken ct)
@@ -107,7 +128,10 @@ public class UdpListener
 		{
 			while (!ct.IsCancellationRequested)
 			{
-				args.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+				args.RemoteEndPoint = new IPEndPoint(
+					listener.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any,
+					0
+				);
 
 				try
 				{
@@ -134,8 +158,8 @@ public class UdpListener
 				catch (SocketException ex)
 				{
 					if (ct.IsCancellationRequested &&
-						(ex.SocketErrorCode == SocketError.OperationAborted ||
-						 ex.SocketErrorCode == SocketError.Interrupted))
+					    (ex.SocketErrorCode == SocketError.OperationAborted ||
+					     ex.SocketErrorCode == SocketError.Interrupted))
 						break;
 
 					Console.WriteLine(ex.ToString());
@@ -174,9 +198,9 @@ public sealed class SocketAwaitable : INotifyCompletion
 {
 	private static readonly Action SENTINEL = () => { };
 
-	internal Action m_continuation;
+	internal Action               m_continuation;
 	internal SocketAsyncEventArgs m_eventArgs;
-	internal bool m_wasCompleted;
+	internal bool                 m_wasCompleted;
 
 	public SocketAwaitable(SocketAsyncEventArgs eventArgs)
 	{
@@ -193,7 +217,7 @@ public sealed class SocketAwaitable : INotifyCompletion
 	public void OnCompleted(Action continuation)
 	{
 		if (m_continuation == SENTINEL ||
-			Interlocked.CompareExchange(ref m_continuation, continuation, null) == SENTINEL)
+		    Interlocked.CompareExchange(ref m_continuation, continuation, null) == SENTINEL)
 			Task.Run(continuation);
 	}
 

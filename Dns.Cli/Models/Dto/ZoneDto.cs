@@ -43,6 +43,21 @@ public sealed class ZoneDto
 	public int SlaveZoneCount { get; set; }
 
 	/// <summary>
+	/// Provider or backing store that supplies this zone.
+	/// </summary>
+	public string? Source { get; set; }
+
+	/// <summary>
+	/// Indicates that the zone cannot be edited through the database administration API.
+	/// </summary>
+	public bool IsReadOnly { get; set; }
+
+	/// <summary>
+	/// Indicates that the zone is synchronized from the configured replication primary.
+	/// </summary>
+	public bool IsReplicated { get; set; }
+
+	/// <summary>
 	/// Zone records.
 	/// </summary>
 	public ICollection<ZoneRecordDto>? Records { get; set; }
