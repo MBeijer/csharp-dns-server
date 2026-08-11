@@ -44,17 +44,27 @@ public class DnsService(IServiceProvider services, IOptions<ServerOptions> serve
 		{
 			lock (RuntimeSyncRoot)
 			{
-				return ActiveProviders.Where(runtime => runtime.Provider is not DatabaseZoneProvider)
-				                      .SelectMany(runtime => runtime.Provider.Resolver.GetZones()
-				                                                    .Select(zone => new ActiveZoneSnapshot(
-					                                                            zone,
-					                                                            GetProviderSource(runtime.Provider),
-					                                                            runtime.Provider is
-						                                                            SecondaryZoneProvider
-				                                                            )
-				                                                    )
-				                      )
-				                      .ToList();
+				var snapshots = new List<ActiveZoneSnapshot>();
+				foreach (var resolver in ZoneResolvers)
+				{
+					var runtime = ActiveProviders.FirstOrDefault(candidate =>
+						                                             ReferenceEquals(
+							                                             candidate.Provider.Resolver,
+							                                             resolver
+						                                             )
+					);
+					if (runtime?.Provider is DatabaseZoneProvider) continue;
+
+					var source       = runtime == null ? "Runtime" : GetProviderSource(runtime.Provider);
+					var isReplicated = runtime?.Provider is SecondaryZoneProvider;
+					snapshots.AddRange(
+						resolver.GetZones()
+						        .Where(zone => zone != null)
+						        .Select(zone => new ActiveZoneSnapshot(zone, source, isReplicated))
+					);
+				}
+
+				return snapshots;
 			}
 		}
 	}

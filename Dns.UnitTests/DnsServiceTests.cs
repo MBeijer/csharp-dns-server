@@ -31,8 +31,7 @@ public sealed class DnsServiceTests
 	[Fact]
 	public async Task StartAsync_InitializesProvidersAndStartsServer()
 	{
-		var resolver = Substitute.For<IDnsResolver>();
-		resolver.GetZones().Returns([new DnsZone { Suffix = "runtime.example", Serial = 7 }]);
+		var resolver = new SmartZoneResolver(Substitute.For<ILogger<SmartZoneResolver>>());
 		var provider = new DnsServiceTestZoneProvider(resolver);
 		var services = new ServiceCollection().AddSingleton(provider).BuildServiceProvider();
 		var options = Options.Create(
@@ -51,6 +50,9 @@ public sealed class DnsServiceTests
 		Assert.True(provider.Initialized);
 		Assert.True(provider.Started);
 		Assert.Single(target.Resolvers);
+		Assert.Empty(target.ActiveZones);
+
+		provider.Publish([new DnsZone { Suffix = "runtime.example", Serial = 7 }]);
 		var activeZone = Assert.Single(target.ActiveZones);
 		Assert.Equal("runtime.example", activeZone.Zone.Suffix);
 		Assert.Equal("DnsServiceTest", activeZone.Source);
@@ -169,13 +171,27 @@ public sealed class DnsServiceTests
 
 	private sealed class DnsServiceTestZoneProvider(IDnsResolver resolver) : IZoneProvider
 	{
+		private IObserver<List<DnsZone>> _observer;
+
 		public bool         Initialized { get; private set; }
 		public bool         Started     { get; private set; }
 		public IDnsResolver Resolver    { get; } = resolver;
 
-		public void        Initialize(ZoneOptions zoneOptions)          => Initialized = true;
-		public void        Start(CancellationToken ct)                  => Started = true;
-		public IDisposable Subscribe(IObserver<List<DnsZone>> observer) => Substitute.For<IDisposable>();
+		public void Initialize(ZoneOptions zoneOptions)
+		{
+			Initialized = true;
+			Resolver.SubscribeTo(this);
+		}
+
+		public void Start(CancellationToken ct) => Started = true;
+
+		public IDisposable Subscribe(IObserver<List<DnsZone>> observer)
+		{
+			_observer = observer;
+			return Substitute.For<IDisposable>();
+		}
+
+		public void Publish(List<DnsZone> zones) => _observer.OnNext(zones);
 	}
 
 	private sealed class DnsServiceTestBindZoneProvider(IDnsResolver resolver) : BindZoneProvider(

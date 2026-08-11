@@ -1,4 +1,4 @@
-// // //-------------------------------------------------------------------------------------------------
+﻿// // //-------------------------------------------------------------------------------------------------
 // // // <copyright file="SecondaryZoneProvider.cs" company="stephbu">
 // // // Copyright (c) Steve Butler. All rights reserved.
 // // // </copyright>
@@ -32,10 +32,15 @@ public sealed class SecondaryZoneProvider(
 {
 	private static readonly JsonSerializerOptions CacheSerializerOptions = new() { WriteIndented = true, };
 
-	private readonly Dictionary<string, Zone> _zones = new(StringComparer.OrdinalIgnoreCase);
-	private          CancellationTokenSource  _cancellationTokenSource;
-	private          SecondarySyncOptions     _settings;
-	private          Task                     _runningTask;
+	private readonly Dictionary<string, uint>              _catalogSerials = new(StringComparer.OrdinalIgnoreCase);
+	private readonly SemaphoreSlim                         _publishLock    = new(1, 1);
+	private readonly Lock                                  _syncRoot       = new();
+	private readonly Dictionary<string, ZoneTransferState> _transfers      = new(StringComparer.OrdinalIgnoreCase);
+	private readonly Dictionary<string, Zone>              _zones          = new(StringComparer.OrdinalIgnoreCase);
+	private          CancellationTokenSource               _cancellationTokenSource;
+	private          SecondarySyncOptions                  _settings;
+	private          Task                                  _runningTask;
+	private          SemaphoreSlim                         _transferSlots;
 
 	public int ResolverPriority => 100;
 
@@ -46,6 +51,8 @@ public sealed class SecondaryZoneProvider(
 			throw new InvalidOperationException("Secondary synchronization is not enabled.");
 		if (string.IsNullOrWhiteSpace(_settings.Master))
 			throw new InvalidOperationException("Secondary synchronization requires a master endpoint.");
+
+		_transferSlots = new(Math.Max(1, _settings.MaxConcurrentTransfers));
 
 		base.Initialize(zoneOptions);
 	}
@@ -77,29 +84,36 @@ public sealed class SecondaryZoneProvider(
 		await LoadCacheAsync(cancellationToken).ConfigureAwait(false);
 
 		var reconnectDelay = TimeSpan.FromSeconds(Math.Max(1, _settings.ReconnectDelaySeconds));
-		while (!cancellationToken.IsCancellationRequested)
+		try
 		{
-			try
+			while (!cancellationToken.IsCancellationRequested)
 			{
-				await SubscribeToCatalogAsync(cancellationToken).ConfigureAwait(false);
-			}
-			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-			{
-				break;
-			}
-			catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException)
-			{
-				logger.LogWarning(ex, "Secondary catalog connection to {Master} was lost", _settings.Master);
-			}
+				try
+				{
+					await SubscribeToCatalogAsync(cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+				{
+					break;
+				}
+				catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException)
+				{
+					logger.LogWarning(ex, "Secondary catalog connection to {Master} was lost", _settings.Master);
+				}
 
-			try
-			{
-				await Task.Delay(reconnectDelay, cancellationToken).ConfigureAwait(false);
+				try
+				{
+					await Task.Delay(reconnectDelay, cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+					break;
+				}
 			}
-			catch (OperationCanceledException)
-			{
-				break;
-			}
+		}
+		finally
+		{
+			await StopTransfersAsync().ConfigureAwait(false);
 		}
 	}
 
@@ -149,55 +163,239 @@ public sealed class SecondaryZoneProvider(
 			                        StringComparer.OrdinalIgnoreCase
 		                        );
 
-		var changed = false;
-		foreach (var entry in entries)
+		var transfersToCancel = new List<ZoneTransferState>();
+		var transfersToStart  = new List<ZoneTransferState>();
+		var removedZones      = new List<string>();
+		lock (_syncRoot)
 		{
-			if (_zones.TryGetValue(entry.Key, out var current) && current.Serial == entry.Value) continue;
+			_catalogSerials.Clear();
+			foreach (var entry in entries) _catalogSerials[entry.Key] = entry.Value;
 
-			try
+			foreach (var transfer in _transfers.ToList())
 			{
-				var transferred = await TransferZoneAsync(endpoint, entry.Key, cancellationToken).ConfigureAwait(false);
-				_zones[entry.Key] = transferred;
-				changed           = true;
-				logger.LogInformation(
-					"Transferred secondary zone {Zone} at serial {Serial} from {Master}",
-					entry.Key,
-					transferred.Serial,
-					_settings.Master
-				);
+				if (entries.TryGetValue(transfer.Key, out var serial) &&
+				    (!_zones.TryGetValue(transfer.Key, out var current) || current.Serial != serial))
+					continue;
+
+				_transfers.Remove(transfer.Key);
+				transfersToCancel.Add(transfer.Value);
 			}
-			catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException)
+
+			foreach (var removedZone in _zones.Keys.Where(zoneName => !entries.ContainsKey(zoneName)).ToList())
 			{
-				logger.LogWarning(
-					ex,
-					"Unable to transfer secondary zone {Zone} from {Master}",
-					entry.Key,
-					_settings.Master
-				);
+				_zones.Remove(removedZone);
+				removedZones.Add(removedZone);
+			}
+
+			foreach (var entry in entries)
+			{
+				if (_zones.TryGetValue(entry.Key, out var current) && current.Serial == entry.Value) continue;
+				if (_transfers.ContainsKey(entry.Key)) continue;
+
+				var transfer = CreateTransferState(entry.Key, endpoint, cancellationToken);
+				_transfers[entry.Key] = transfer;
+				transfersToStart.Add(transfer);
 			}
 		}
 
-		foreach (var removedZone in _zones.Keys.Where(zoneName => !entries.ContainsKey(zoneName)).ToList())
+		foreach (var transfer in transfersToCancel) transfer.CancellationTokenSource.Cancel();
+		foreach (var transfer in transfersToStart) StartTransfer(transfer);
+
+		foreach (var removedZone in removedZones)
 		{
-			_zones.Remove(removedZone);
-			changed = true;
 			logger.LogInformation(
 				"Removed secondary zone {Zone} because it is no longer in the primary catalog",
 				removedZone
 			);
 		}
 
-		if (!changed) return;
+		if (removedZones.Count > 0) await PublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
-		var snapshot = _zones.Values.OrderBy(zone => zone.Suffix, StringComparer.OrdinalIgnoreCase).ToList();
-		Notify(snapshot);
+		logger.LogInformation(
+			"Processed secondary catalog from {Master}: {AdvertisedCount} advertised, {AvailableCount} available, {QueuedCount} queued, {RemovedCount} removed",
+			_settings.Master,
+			entries.Count,
+			GetZoneCount(),
+			transfersToStart.Count,
+			removedZones.Count
+		);
+	}
+
+	private ZoneTransferState CreateTransferState(
+		string zoneName,
+		MasterEndpoint endpoint,
+		CancellationToken cancellationToken
+	) =>
+		new(zoneName, endpoint, CancellationTokenSource.CreateLinkedTokenSource(cancellationToken));
+
+	private void StartTransfer(ZoneTransferState state)
+	{
+		state.Task = Task.Run(() => RunTransferAsync(state), CancellationToken.None);
+	}
+
+	private async Task RunTransferAsync(ZoneTransferState state)
+	{
+		var transferTimeout = TimeSpan.FromSeconds(Math.Max(1, _settings.TransferTimeoutSeconds));
+		var retryDelay      = TimeSpan.FromSeconds(Math.Max(1, _settings.TransferRetryDelaySeconds));
 		try
 		{
-			await SaveCacheAsync(snapshot, cancellationToken).ConfigureAwait(false);
+			while (!state.CancellationTokenSource.IsCancellationRequested)
+			{
+				uint expectedSerial;
+				lock (_syncRoot)
+				{
+					if (!_catalogSerials.TryGetValue(state.ZoneName, out expectedSerial)) return;
+					if (_zones.TryGetValue(state.ZoneName, out var current) && current.Serial == expectedSerial)
+						return;
+				}
+
+				var transferSucceeded = false;
+				try
+				{
+					await _transferSlots.WaitAsync(state.CancellationTokenSource.Token).ConfigureAwait(false);
+					try
+					{
+						using var transferCts = CancellationTokenSource.CreateLinkedTokenSource(
+							state.CancellationTokenSource.Token
+						);
+						transferCts.CancelAfter(transferTimeout);
+						var transferred = await TransferZoneAsync(state.Endpoint, state.ZoneName, transferCts.Token)
+							.ConfigureAwait(false);
+
+						lock (_syncRoot)
+						{
+							if (!_catalogSerials.ContainsKey(state.ZoneName)) return;
+							_zones[state.ZoneName] = transferred;
+						}
+
+						transferSucceeded = true;
+						logger.LogInformation(
+							"Transferred secondary zone {Zone} at serial {Serial} from {Master}",
+							state.ZoneName,
+							transferred.Serial,
+							_settings.Master
+						);
+						await PublishSnapshotAsync(
+								_cancellationTokenSource?.Token ?? state.CancellationTokenSource.Token
+							)
+							.ConfigureAwait(false);
+					}
+					finally
+					{
+						_transferSlots.Release();
+					}
+				}
+				catch (OperationCanceledException) when (!state.CancellationTokenSource.IsCancellationRequested)
+				{
+					logger.LogWarning(
+						"Timed out transferring secondary zone {Zone} from {Master} after {TimeoutSeconds} seconds; retrying in {RetryDelaySeconds} seconds",
+						state.ZoneName,
+						_settings.Master,
+						transferTimeout.TotalSeconds,
+						retryDelay.TotalSeconds
+					);
+				}
+				catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException)
+				{
+					logger.LogWarning(
+						ex,
+						"Unable to transfer secondary zone {Zone} from {Master}; retrying in {RetryDelaySeconds} seconds",
+						state.ZoneName,
+						_settings.Master,
+						retryDelay.TotalSeconds
+					);
+				}
+
+				if (state.CancellationTokenSource.IsCancellationRequested) break;
+
+				lock (_syncRoot)
+				{
+					if (transferSucceeded &&
+					    _catalogSerials.TryGetValue(state.ZoneName, out expectedSerial) &&
+					    _zones.TryGetValue(state.ZoneName, out var current) &&
+					    current.Serial == expectedSerial)
+						return;
+				}
+
+				await Task.Delay(retryDelay, state.CancellationTokenSource.Token).ConfigureAwait(false);
+			}
 		}
-		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+		catch (OperationCanceledException) when (state.CancellationTokenSource.IsCancellationRequested)
 		{
-			logger.LogWarning(ex, "Unable to save secondary zone cache {CacheFile}", _settings.CacheFile);
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "Secondary zone transfer worker for {Zone} stopped unexpectedly", state.ZoneName);
+		}
+		finally
+		{
+			ZoneTransferState replacement = null;
+			lock (_syncRoot)
+			{
+				if (_transfers.TryGetValue(state.ZoneName, out var currentState) &&
+				    ReferenceEquals(currentState, state))
+				{
+					_transfers.Remove(state.ZoneName);
+					if (!state.CancellationTokenSource.IsCancellationRequested &&
+					    _catalogSerials.TryGetValue(state.ZoneName, out var expectedSerial) &&
+					    (!_zones.TryGetValue(state.ZoneName, out var currentZone) ||
+					     currentZone.Serial != expectedSerial))
+					{
+						replacement = CreateTransferState(
+							state.ZoneName,
+							state.Endpoint,
+							_cancellationTokenSource?.Token ?? CancellationToken.None
+						);
+						_transfers[state.ZoneName] = replacement;
+					}
+				}
+			}
+
+			state.CancellationTokenSource.Dispose();
+			if (replacement != null) StartTransfer(replacement);
+		}
+	}
+
+	private async Task StopTransfersAsync()
+	{
+		ZoneTransferState[] transfers;
+		lock (_syncRoot)
+		{
+			transfers = _transfers.Values.ToArray();
+			_transfers.Clear();
+		}
+
+		foreach (var transfer in transfers) transfer.CancellationTokenSource.Cancel();
+		await Task.WhenAll(transfers.Select(transfer => transfer.Task)).ConfigureAwait(false);
+	}
+
+	private int GetZoneCount()
+	{
+		lock (_syncRoot) return _zones.Count;
+	}
+
+	private async Task PublishSnapshotAsync(CancellationToken cancellationToken)
+	{
+		await _publishLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+		try
+		{
+			List<Zone> snapshot;
+			lock (_syncRoot)
+				snapshot = _zones.Values.OrderBy(zone => zone.Suffix, StringComparer.OrdinalIgnoreCase).ToList();
+
+			Notify(snapshot);
+			try
+			{
+				await SaveCacheAsync(snapshot, cancellationToken).ConfigureAwait(false);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				logger.LogWarning(ex, "Unable to save secondary zone cache {CacheFile}", _settings.CacheFile);
+			}
+		}
+		finally
+		{
+			_publishLock.Release();
 		}
 	}
 
@@ -326,11 +524,17 @@ public sealed class SecondaryZoneProvider(
 					                                  cancellationToken: cancellationToken
 				                                  )
 				                                  .ConfigureAwait(false);
-			foreach (var zone in cachedZones ?? [])
-				if (!string.IsNullOrWhiteSpace(zone.Suffix))
-					_zones[CanonicalName(zone.Suffix)] = zone;
+			List<Zone> snapshot;
+			lock (_syncRoot)
+			{
+				foreach (var zone in cachedZones ?? [])
+					if (!string.IsNullOrWhiteSpace(zone.Suffix))
+						_zones[CanonicalName(zone.Suffix)] = zone;
 
-			if (_zones.Count > 0) Notify(_zones.Values.ToList());
+				snapshot = _zones.Values.ToList();
+			}
+
+			if (snapshot.Count > 0) Notify(snapshot);
 		}
 		catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
 		{
@@ -443,4 +647,13 @@ public sealed class SecondaryZoneProvider(
 	private static string CanonicalName(string name) => name?.Trim().Trim('.') ?? string.Empty;
 
 	private sealed record MasterEndpoint(string Host, ushort Port);
+
+	private sealed record ZoneTransferState(
+		string ZoneName,
+		MasterEndpoint Endpoint,
+		CancellationTokenSource CancellationTokenSource
+	)
+	{
+		public Task Task { get; set; } = Task.CompletedTask;
+	}
 }

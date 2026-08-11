@@ -193,6 +193,9 @@ On each secondary, point `secondarySync.master` at the primary DNS TCP endpoint:
       "enabled": true,
       "master": "primary.example.net:53",
       "reconnectDelaySeconds": 5,
+      "transferTimeoutSeconds": 30,
+      "transferRetryDelaySeconds": 5,
+      "maxConcurrentTransfers": 4,
       "cacheFile": "/app/data/secondary-zones.json"
     }
   }
@@ -204,6 +207,8 @@ On each secondary, point `secondarySync.master` at the primary DNS TCP endpoint:
 - Replicated zones take precedence over same-named local zones. Local zones not present on the primary continue to be served.
 - When a zone disappears from a valid primary catalog, its replicated copy is removed and any same-named local zone becomes visible again.
 - `cacheFile` is optional. When configured on persistent storage, its last-known-good zones are loaded before reconnecting so a restarted secondary can keep answering during a primary outage.
+- Zone transfers run independently, up to `maxConcurrentTransfers` at a time, so a stalled AXFR does not block catalog processing or other zones. Failed and timed-out transfers retry after `transferRetryDelaySeconds` until they succeed or disappear from the primary catalog.
+- Each successfully transferred zone is published to DNS and persisted immediately.
 - The web admin zone overview lists zones from every active provider. Database zones are editable; synchronized, Traefik, BIND, probe, and other provider-managed zones are labeled by source and shown read-only.
 - The catalog connection carries 30-second heartbeat snapshots. A broken connection is retried after `reconnectDelaySeconds`.
 - Both the catalog subscription and each AXFR are checked against the primary's `allowTransfersFrom` ACL.

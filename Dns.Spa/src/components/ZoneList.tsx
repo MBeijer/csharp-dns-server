@@ -216,6 +216,12 @@ export function ZoneList(): JSX.Element {
 
     useEffect(() => {
         void dispatch(fetchZones());
+
+        const refreshTimer = window.setInterval(() => {
+            void dispatch(fetchZones());
+        }, 5000);
+
+        return () => window.clearInterval(refreshTimer);
     }, [dispatch]);
 
     const sortedZones = useMemo(() => {

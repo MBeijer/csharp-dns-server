@@ -694,7 +694,6 @@ public class DnsServerTests
 			"192.0.2.20",
 			secondUpdated.Records.Single(record => record.Type == ResourceType.A).Addresses.Single()
 		);
-
 		await primaryCts.CancelAsync();
 
 		var restartedResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
@@ -719,20 +718,154 @@ public class DnsServerTests
 		await restartedCts.CancelAsync();
 	}
 
-	private static SecondaryZoneProvider CreateSecondaryProvider(IDnsResolver resolver, ushort port)
+	[Fact]
+	public async Task SecondarySync_StalledZoneDoesNotBlockOtherTransfers()
+	{
+		var port = GetAvailableTcpPort();
+		using var transferControl = new StallingResolver(
+			[
+				CreateReplicationZone(1, "192.0.2.10", "stalled.example"),
+				CreateReplicationZone(1, "192.0.2.20", "working.example"),
+			]
+		);
+		var       primary    = CreateReplicationPrimary(port, transferControl);
+		using var primaryCts = new CancellationTokenSource();
+		await primary.Start(primaryCts.Token);
+
+		var secondaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		using var secondary = CreateSecondaryProvider(
+			secondaryResolver,
+			port,
+			settings =>
+			{
+				settings.MaxConcurrentTransfers    = 2;
+				settings.TransferTimeoutSeconds    = 3;
+				settings.TransferRetryDelaySeconds = 1;
+			}
+		);
+		secondary.Start(CancellationToken.None);
+
+		try
+		{
+			await transferControl.StalledTransferStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+			var workingZone = await WaitForNamedZoneAsync(
+				secondaryResolver,
+				"working.example",
+				TimeSpan.FromSeconds(2)
+			);
+			Assert.Equal((uint)1, workingZone.Serial);
+			Assert.DoesNotContain(secondaryResolver.GetZones(), zone => zone.Suffix == "stalled.example");
+
+			var retriedZone = await WaitForNamedZoneAsync(
+				secondaryResolver,
+				"stalled.example",
+				TimeSpan.FromSeconds(8)
+			);
+			Assert.Equal((uint)1, retriedZone.Serial);
+			Assert.True(transferControl.StalledAttemptCount >= 2);
+		}
+		finally
+		{
+			transferControl.ReleaseStalledTransfer();
+			await primaryCts.CancelAsync();
+		}
+	}
+
+	[Fact]
+	public async Task SecondarySync_FailedZoneRetriesUntilItSucceeds()
+	{
+		var       port             = GetAvailableTcpPort();
+		var       retryingResolver = new RetryOnceResolver(CreateReplicationZone(7, "192.0.2.70", "retry.example"));
+		var       primary          = CreateReplicationPrimary(port, retryingResolver);
+		using var primaryCts       = new CancellationTokenSource();
+		await primary.Start(primaryCts.Token);
+
+		var secondaryResolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+		using var secondary = CreateSecondaryProvider(
+			secondaryResolver,
+			port,
+			settings => settings.TransferRetryDelaySeconds = 1
+		);
+		secondary.Start(CancellationToken.None);
+
+		try
+		{
+			var zone = await WaitForNamedZoneAsync(secondaryResolver, "retry.example", TimeSpan.FromSeconds(10));
+			Assert.Equal((uint)7, zone.Serial);
+			Assert.True(retryingResolver.AttemptCount >= 2);
+		}
+		finally
+		{
+			await primaryCts.CancelAsync();
+		}
+	}
+
+	private static DnsServer CreateReplicationPrimary(ushort port, IDnsResolver resolver)
 	{
 		var options = Options.Create(
 			new ServerOptions
 			{
-				SecondarySync = new SecondarySyncOptions
-				{
-					Enabled = true, Master = $"127.0.0.1:{port}", ReconnectDelaySeconds = 1,
-				},
+				DnsListener  = new DnsListenerOptions { Port     = port, TcpPort            = port },
+				ZoneTransfer = new ZoneTransferOptions { Enabled = true, AllowTransfersFrom = ["127.0.0.1/32"], },
+				WebServer    = new WebServerOptions(),
 			}
 		);
+		var primary = new DnsServer(new FakeLogger<DnsServer>(), options);
+		primary.Initialize([resolver]);
+		return primary;
+	}
+
+	private static SecondaryZoneProvider CreateSecondaryProvider(
+		IDnsResolver resolver,
+		ushort port,
+		Action<SecondarySyncOptions> configure = null
+	)
+	{
+		var settings = new SecondarySyncOptions
+		{
+			Enabled = true, Master = $"127.0.0.1:{port}", ReconnectDelaySeconds = 1,
+		};
+		configure?.Invoke(settings);
+		var options  = Options.Create(new ServerOptions { SecondarySync = settings, });
 		var provider = new SecondaryZoneProvider(new FakeLogger<SecondaryZoneProvider>(), resolver, options);
 		provider.Initialize(new ZoneOptions());
 		return provider;
+	}
+
+	[Fact]
+	public async Task SecondarySync_PublishesAndPersistsCurrentSnapshotImmediately()
+	{
+		var cacheFile = Path.Combine(Path.GetTempPath(), $"secondary-zones-{Guid.NewGuid():N}.json");
+		try
+		{
+			var resolver = new SmartZoneResolver(new FakeLogger<SmartZoneResolver>());
+			var options = Options.Create(
+				new ServerOptions
+				{
+					SecondarySync = new SecondarySyncOptions
+					{
+						Enabled = true, Master = "127.0.0.1:53", CacheFile = cacheFile,
+					},
+				}
+			);
+			using var provider = new SecondaryZoneProvider(new FakeLogger<SecondaryZoneProvider>(), resolver, options);
+			provider.Initialize(new ZoneOptions());
+			var zones = Assert.IsType<Dictionary<string, Zone>>(
+				typeof(SecondaryZoneProvider).GetField("_zones", BindingFlags.Instance | BindingFlags.NonPublic)!
+				                             .GetValue(provider)
+			);
+			zones["cached.example"] = CreateReplicationZone(9, "192.0.2.9", "cached.example");
+
+			await InvokePrivate<Task>(provider, "PublishSnapshotAsync", CancellationToken.None);
+
+			Assert.Contains(resolver.GetZones(), zone => zone.Suffix == "cached.example");
+			Assert.Contains("cached.example", await File.ReadAllTextAsync(cacheFile));
+		}
+		finally
+		{
+			File.Delete(cacheFile);
+			File.Delete($"{cacheFile}.tmp");
+		}
 	}
 
 	private static Zone CreateReplicationZone(uint serial, string address, string suffix = "replicated.example")
@@ -790,6 +923,25 @@ public class DnsServerTests
 		}
 
 		throw new TimeoutException($"Secondary did not load {count} zones.");
+	}
+
+	private static async Task<Zone> WaitForNamedZoneAsync(IDnsResolver resolver, string suffix, TimeSpan timeout)
+	{
+		using var timeoutCts = new CancellationTokenSource(timeout);
+		while (!timeoutCts.IsCancellationRequested)
+		{
+			var zone = resolver.GetZones()
+			                   .SingleOrDefault(item => string.Equals(
+				                                    item.Suffix,
+				                                    suffix,
+				                                    StringComparison.OrdinalIgnoreCase
+			                                    )
+			                   );
+			if (zone != null) return zone;
+			await Task.Delay(25, timeoutCts.Token);
+		}
+
+		throw new TimeoutException($"Secondary did not load {suffix}.");
 	}
 
 	private static ushort GetAvailableTcpPort()
@@ -1145,6 +1297,113 @@ public class DnsServerTests
 		}
 
 		public object GetObject() => _zones;
+
+		public void OnCompleted()
+		{
+		}
+
+		public void OnError(Exception error)
+		{
+		}
+
+		public void OnNext(List<Zone> value)
+		{
+		}
+	}
+
+	private sealed class StallingResolver(List<Zone> zones) : IDnsResolver, IDisposable
+	{
+		private readonly ManualResetEventSlim _releaseStalledTransfer = new(false);
+		private          int                  _stalledAttemptCount;
+
+		public int StalledAttemptCount => Volatile.Read(ref _stalledAttemptCount);
+
+		public TaskCompletionSource<bool> StalledTransferStarted { get; } =
+			new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		event EventHandler IDnsResolver.ZonesChanged
+		{
+			add { }
+			remove { }
+		}
+
+		public bool TryGetZone(string hostname, out Zone zone)
+		{
+			if (hostname.EndsWith("stalled.example", StringComparison.OrdinalIgnoreCase) &&
+			    Interlocked.Increment(ref _stalledAttemptCount) == 1)
+			{
+				StalledTransferStarted.TrySetResult(true);
+				_releaseStalledTransfer.Wait(TimeSpan.FromSeconds(15));
+			}
+
+			zone = zones.FirstOrDefault(item => hostname.EndsWith(item.Suffix, StringComparison.OrdinalIgnoreCase));
+			return zone != null;
+		}
+
+		public IEnumerable<Zone> GetZones() => zones;
+
+		public void ReleaseStalledTransfer() => _releaseStalledTransfer.Set();
+
+		public void Dispose() => _releaseStalledTransfer.Dispose();
+
+		public void SubscribeTo(IObservable<List<Zone>> zoneProvider)
+		{
+		}
+
+		public void DumpHtml(TextWriter writer)
+		{
+		}
+
+		public object GetObject() => zones;
+
+		public void OnCompleted()
+		{
+		}
+
+		public void OnError(Exception error)
+		{
+		}
+
+		public void OnNext(List<Zone> value)
+		{
+		}
+	}
+
+	private sealed class RetryOnceResolver(Zone zone) : IDnsResolver
+	{
+		private int _attemptCount;
+
+		public int AttemptCount => Volatile.Read(ref _attemptCount);
+
+		event EventHandler IDnsResolver.ZonesChanged
+		{
+			add { }
+			remove { }
+		}
+
+		public bool TryGetZone(string hostname, out Zone result)
+		{
+			if (Interlocked.Increment(ref _attemptCount) == 1)
+			{
+				result = null;
+				return false;
+			}
+
+			result = zone;
+			return true;
+		}
+
+		public IEnumerable<Zone> GetZones() => [zone];
+
+		public void SubscribeTo(IObservable<List<Zone>> zoneProvider)
+		{
+		}
+
+		public void DumpHtml(TextWriter writer)
+		{
+		}
+
+		public object GetObject() => zone;
 
 		public void OnCompleted()
 		{

@@ -28,6 +28,9 @@ public sealed class AppConfigTests
 		Assert.Equal("secret", app.Server.WebServer.JwtSecretKey);
 		Assert.True(app.Server.SecondarySync.Enabled);
 		Assert.Equal("primary.example.com:53", app.Server.SecondarySync.Master);
+		Assert.Equal(4, app.Server.SecondarySync.MaxConcurrentTransfers);
+		Assert.Equal(5, app.Server.SecondarySync.TransferRetryDelaySeconds);
+		Assert.Equal(30, app.Server.SecondarySync.TransferTimeoutSeconds);
 		Assert.True(app.Server.ZoneTransfer.Enabled);
 	}
 }
