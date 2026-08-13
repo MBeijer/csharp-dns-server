@@ -494,11 +494,19 @@ public sealed class SecondaryZoneProvider(
 
 		groupedRecords[(string.Empty, ResourceType.SOA, ResourceClass.IN)] = new()
 		{
-			Host      = string.Empty,
-			Type      = ResourceType.SOA,
-			Class     = ResourceClass.IN,
-			Addresses = [openingSoa.PrimaryNameServer, openingSoa.ResponsibleAuthoritativeMailbox],
-			Count     = 2,
+			Host  = string.Empty,
+			Type  = ResourceType.SOA,
+			Class = ResourceClass.IN,
+			Addresses =
+			[
+				openingSoa.PrimaryNameServer,
+				openingSoa.ResponsibleAuthoritativeMailbox,
+				openingSoa.RefreshInterval.ToString(),
+				openingSoa.RetryInterval.ToString(),
+				openingSoa.ExpirationLimit.ToString(),
+				openingSoa.MinimumTTL.ToString(),
+			],
+			Count = 6,
 		};
 
 		var zone = new Zone { Suffix = zoneName, Serial = openingSoa.Serial };

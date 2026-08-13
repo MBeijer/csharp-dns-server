@@ -314,6 +314,109 @@ public class DnsServerTests
 	}
 
 	[Fact]
+	public void CreateSoaRecord_UsesConfiguredNamesAndIntervals()
+	{
+		var server = CreateServer();
+		var zone   = new Zone { Suffix = "example.com", Serial = 2026081301 };
+		var soa = new ZoneRecord
+		{
+			Host      = "@",
+			Type      = ResourceType.SOA,
+			Class     = ResourceClass.IN,
+			Addresses = ["ns1.example.com. hostmaster.example.com. 1 4H 15M 2W 1H"],
+		};
+		zone.Initialize(
+			[
+				soa,
+				new()
+				{
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"],
+				},
+			]
+		);
+
+		var record = InvokePrivate<ResourceRecord>(server, "CreateSoaRecord", "example.com", zone, soa);
+		var data   = Assert.IsType<SOARData>(record.RData);
+
+		Assert.Equal("ns1.example.com", data.PrimaryNameServer);
+		Assert.Equal("hostmaster.example.com", data.ResponsibleAuthoritativeMailbox);
+		Assert.Equal(2026081301u, data.Serial);
+		Assert.Equal(14400u, data.RefreshInterval);
+		Assert.Equal(900u, data.RetryInterval);
+		Assert.Equal(1209600u, data.ExpirationLimit);
+		Assert.Equal(3600u, data.MinimumTTL);
+		Assert.Equal(3600u, record.TTL);
+	}
+
+	[Fact]
+	public void HandleRecords_AddsInZoneIpv4AndIpv6GlueForNsAnswers()
+	{
+		var server = CreateServer();
+		var zone   = new Zone { Suffix = "example.com", Serial = 1 };
+		var ns = new ZoneRecord
+		{
+			Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"],
+		};
+		zone.Initialize(
+			[
+				ns,
+				new()
+				{
+					Host = "ns1", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.53"],
+				},
+				new()
+				{
+					Host = "ns1", Type = ResourceType.AAAA, Class = ResourceClass.IN, Addresses = ["2001:db8::53"],
+				},
+			]
+		);
+		var message = new DnsMessage();
+
+		InvokePrivateVoid(
+			server,
+			"HandleRecords",
+			new List<ZoneRecord> { ns },
+			new Question("example.com", ResourceType.NS, ResourceClass.IN),
+			message,
+			zone,
+			new IPEndPoint(IPAddress.Parse("198.51.100.1"), 5300)
+		);
+
+		Assert.Single(message.Answers);
+		Assert.Equal(2, message.AdditionalCount);
+		Assert.Contains(message.Additionals, record => record.Type == ResourceType.A);
+		Assert.Contains(message.Additionals, record => record.Type == ResourceType.AAAA);
+	}
+
+	[Fact]
+	public void IsRecursionAllowed_UsesGlobalSwitchOrClientAcl()
+	{
+		var restricted = CreateServer(allowRecursionFrom: ["10.0.0.0/8", "2001:db8::/32", "192.0.2.53"]);
+
+		Assert.True(
+			InvokePrivate<bool>(restricted, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("10.20.30.40"), 5300))
+		);
+		Assert.True(
+			InvokePrivate<bool>(restricted, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("2001:db8::42"), 5300))
+		);
+		Assert.True(
+			InvokePrivate<bool>(
+				restricted,
+				"IsRecursionAllowed",
+				new IPEndPoint(IPAddress.Parse("::ffff:192.0.2.53"), 5300)
+			)
+		);
+		Assert.False(
+			InvokePrivate<bool>(restricted, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("198.51.100.2"), 5300))
+		);
+
+		var global = CreateServer(recursionEnabled: true);
+		Assert.True(
+			InvokePrivate<bool>(global, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("198.51.100.2"), 5300))
+		);
+	}
+
+	[Fact]
 	public void BuildResourceRecords_CnameAtShorthandTargetsResolveToZoneApex()
 	{
 		var server = CreateServer();
@@ -1463,12 +1566,21 @@ public class DnsServerTests
 		bool zoneTransferEnabled = true,
 		List<string> allowTransfersFrom = null,
 		List<IDnsResolver> resolvers = null,
-		string injectedNsAddress = null
+		string injectedNsAddress = null,
+		bool recursionEnabled = false,
+		List<string> allowRecursionFrom = null
 	)
 	{
 		var options = new ServerOptions
 		{
-			DnsListener = new DnsListenerOptions { Port = 5301, TcpPort = 5301 },
+			DnsListener =
+				new DnsListenerOptions
+				{
+					Port               = 5301,
+					TcpPort            = 5301,
+					RecursionEnabled   = recursionEnabled,
+					AllowRecursionFrom = allowRecursionFrom ?? [],
+				},
 			ZoneTransfer = new ZoneTransferOptions
 			{
 				Enabled            = zoneTransferEnabled,

@@ -84,7 +84,7 @@ const DEFAULT_SOA: SoaFields = {
     soaHostmaster: "hostmaster.eevul.net.",
     soaRefresh: "1H",
     soaRetry: "15M",
-    soaExpiry: "1W",
+    soaExpiry: "2W",
     soaMinimum: "1D"
 };
 

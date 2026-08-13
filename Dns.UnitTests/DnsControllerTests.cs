@@ -58,6 +58,13 @@ public sealed class DnsControllerTests
 				{
 					Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.42"],
 				},
+				new()
+				{
+					Host      = "",
+					Type      = ResourceType.SOA,
+					Class     = ResourceClass.IN,
+					Addresses = ["ns1.runtime.example", "hostmaster.runtime.example", "7200", "900", "1209600", "3600"],
+				},
 			]
 		);
 		dnsService.ActiveZones.Returns([new(runtimeZone, "Traefik", false)]);
@@ -73,7 +80,11 @@ public sealed class DnsControllerTests
 		Assert.True(runtime.IsReadOnly);
 		Assert.False(runtime.IsReplicated);
 		Assert.Equal("Traefik", runtime.Source);
-		Assert.Equal("192.0.2.42", Assert.Single(runtime.Records!).Data);
+		Assert.Equal("192.0.2.42", runtime.Records!.Single(record => record.Type == ResourceType.A).Data);
+		Assert.Equal(
+			"ns1.runtime.example hostmaster.runtime.example 42 7200 900 1209600 3600",
+			runtime.Records.Single(record => record.Type == ResourceType.SOA).Data
+		);
 	}
 
 	[Fact]

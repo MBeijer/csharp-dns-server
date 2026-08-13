@@ -28,13 +28,9 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 {
 	public static Zone ParseZoneFile(string filename, string zoneSuffix)
 	{
-		var parser = new ZoneFileParser(filename, zoneSuffix);
+		var parser  = new ZoneFileParser(filename, zoneSuffix);
 		var records = parser.Parse();
-		var zone = new Zone
-		{
-			Suffix = zoneSuffix,
-			Serial = parser.Serial ?? 0,
-		};
+		var zone    = new Zone { Suffix = zoneSuffix, Serial = parser.Serial ?? 0, };
 		zone.Initialize(records);
 		return zone;
 	}
@@ -86,29 +82,29 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 
 	private sealed class ZoneFileParser
 	{
-		private readonly string _defaultOrigin;
-		private readonly string _filename;
+		private readonly string           _defaultOrigin;
+		private readonly string           _filename;
 		private readonly List<ZoneRecord> _records = [];
-		private readonly string _zoneRoot;
-		private readonly string _zoneRootSuffix;
-		private int _apexNsCount;
+		private readonly string           _zoneRoot;
+		private readonly string           _zoneRootSuffix;
+		private          int              _apexNsCount;
 
 		private string _currentOrigin;
-		private uint? _defaultTtl = 3600;
-		private int _lastLineNumber;
+		private uint?  _defaultTtl = 3600;
+		private int    _lastLineNumber;
 		private string _lastOwner;
-		private bool _sawSoa;
-		public uint? Serial { get; private set; }
+		private bool   _sawSoa;
+		public  uint?  Serial { get; private set; }
 
 		public ZoneFileParser(string filename, string zoneSuffix)
 		{
 			ArgumentException.ThrowIfNullOrWhiteSpace(filename);
 
-			_filename = filename;
-			_zoneRoot = NormalizeZoneSuffix(zoneSuffix);
+			_filename       = filename;
+			_zoneRoot       = NormalizeZoneSuffix(zoneSuffix);
 			_zoneRootSuffix = $".{_zoneRoot}";
-			_defaultOrigin = $"{_zoneRoot}.";
-			_currentOrigin = _defaultOrigin;
+			_defaultOrigin  = $"{_zoneRoot}.";
+			_currentOrigin  = _defaultOrigin;
 		}
 
 		public IReadOnlyList<ZoneRecord> Parse()
@@ -137,12 +133,14 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 					"Zone file must declare at least one NS record for the zone apex."
 				);
 
-			return _records.Count != 0 ? _records : throw new BindZoneFileException(_lastLineNumber, "Zone file did not produce any address records.");
+			return _records.Count != 0
+				? _records
+				: throw new BindZoneFileException(_lastLineNumber, "Zone file did not produce any address records.");
 		}
 
 		private void ProcessDirective(LogicalLine line)
 		{
-			var tokens = Tokenize(line.Text, line.LineNumber);
+			var tokens    = Tokenize(line.Text, line.LineNumber);
 			var directive = tokens[0].ToUpperInvariant();
 
 			switch (directive)
@@ -175,22 +173,22 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 			var tokens = Tokenize(line.Text, line.LineNumber);
 			if (tokens.Count == 0) return;
 
-			var index = 0;
+			var    index = 0;
 			string owner;
 
 			if (line.OwnerImplicit)
 			{
-				owner = string.IsNullOrEmpty(_lastOwner) ? TrimTrailingDot(_currentOrigin) : _lastOwner;
+				owner      = string.IsNullOrEmpty(_lastOwner) ? TrimTrailingDot(_currentOrigin) : _lastOwner;
 				_lastOwner = owner;
 			}
 			else
 			{
-				owner = CanonicalizeOwner(tokens[index++], line.LineNumber);
+				owner      = CanonicalizeOwner(tokens[index++], line.LineNumber);
 				_lastOwner = owner;
 			}
 
-			var recordClass = "IN";
-			uint? recordTtl = null;
+			var   recordClass = "IN";
+			uint? recordTtl   = null;
 
 			while (index < tokens.Count)
 			{
@@ -222,7 +220,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 				throw new BindZoneFileException(line.LineNumber, "Record is missing a type token.");
 
 			var typeToken = tokens[index++].ToUpperInvariant();
-			var rdata = tokens.Skip(index).ToList();
+			var rdata     = tokens.Skip(index).ToList();
 
 			var typeTokenEnum = Enum.Parse<ResourceType>(typeToken);
 
@@ -304,14 +302,19 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 					'H' => value * 3600, // hours
 					'D' => value * 86400, // days
 					'W' => value * 604800, // weeks
-					_ => value,
+					_   => value,
 				}).ToString();
 			}
 
 			if (!uint.TryParse(rdata[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var serial))
 				throw new BindZoneFileException(lineNumber, $"Invalid SOA serial field '{rdata[2]}'.");
 
-			Serial = serial;
+			record.Addresses.Add(rdata[3]);
+			record.Addresses.Add(rdata[4]);
+			record.Addresses.Add(rdata[5]);
+			record.Addresses.Add(rdata[6]);
+
+			Serial  = serial;
 			_sawSoa = true;
 		}
 
@@ -333,7 +336,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 			if (!ushort.TryParse(rdata[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
 				throw new BindZoneFileException(lineNumber, "MX preference must be between 0 and 65535.");
 
-			record.Addresses.Add($"{rdata[0]} {CanonicalizeName(rdata[1], lineNumber)}"); ;
+			record.Addresses.Add($"{rdata[0]} {CanonicalizeName(rdata[1], lineNumber)}");
 		}
 
 		private static void ParseTxt(ZoneRecord record, List<string> rdata, int lineNumber)
@@ -411,16 +414,12 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 		private ZoneRecord GetOrCreateRecord(string owner, ResourceType resourceType, ResourceClass resourceClass)
 		{
 			var host = owner.Replace(_zoneRootSuffix, "").Replace(_zoneRoot, "");
-			var record = _records.SingleOrDefault(r => r.Host == host && r.Type == resourceType && r.Class == resourceClass);
+			var record =
+				_records.SingleOrDefault(r => r.Host == host && r.Type == resourceType && r.Class == resourceClass);
 
 			if (record != null) return record;
 
-			record = new()
-			{
-				Host = host,
-				Type = resourceType,
-				Class = resourceClass,
-			};
+			record = new() { Host = host, Type = resourceType, Class = resourceClass, };
 			_records.Add(record);
 
 			return record;
@@ -501,7 +500,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 
 			if (index != token.Length - 1) return false;
 
-			var suffix = char.ToLowerInvariant(token[index]);
+			var  suffix = char.ToLowerInvariant(token[index]);
 			uint multiplier;
 			switch (suffix)
 			{
@@ -533,10 +532,10 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 
 		private static List<string> Tokenize(string text, int lineNumber)
 		{
-			var tokens = new List<string>();
-			var builder = new StringBuilder();
+			var tokens   = new List<string>();
+			var builder  = new StringBuilder();
 			var inQuotes = false;
-			var escape = false;
+			var escape   = false;
 
 			foreach (var current in text)
 			{
@@ -585,12 +584,12 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 		private static IEnumerable<LogicalLine> ReadLogicalLines(TextReader reader)
 		{
 			string line;
-			var lineNumber = 0;
-			var recordStartLine = 0;
-			var recordHasContent = false;
-			var ownerImplicit = false;
-			var parenDepth = 0;
-			var builder = new StringBuilder();
+			var    lineNumber       = 0;
+			var    recordStartLine  = 0;
+			var    recordHasContent = false;
+			var    ownerImplicit    = false;
+			var    parenDepth       = 0;
+			var    builder          = new StringBuilder();
 
 			while ((line = reader.ReadLine()) != null)
 			{
@@ -606,8 +605,8 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 				if (hasContent && !recordHasContent)
 				{
 					recordHasContent = true;
-					recordStartLine = lineNumber;
-					ownerImplicit = startsWithWhitespace;
+					recordStartLine  = lineNumber;
+					ownerImplicit    = startsWithWhitespace;
 				}
 
 				if (hasContent)
@@ -625,7 +624,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 					yield return new(recordStartLine, builder.ToString(), ownerImplicit);
 					builder.Clear();
 					recordHasContent = false;
-					ownerImplicit = false;
+					ownerImplicit    = false;
 				}
 			}
 
@@ -641,9 +640,9 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 			out bool hasContent
 		)
 		{
-			var builder = new StringBuilder();
+			var builder  = new StringBuilder();
 			var inQuotes = false;
-			var escape = false;
+			var escape   = false;
 			parenDelta = 0;
 
 			foreach (var current in line)
@@ -685,7 +684,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 
 			if (inQuotes) throw new BindZoneFileException(lineNumber, "Unterminated quote inside line.");
 
-			var sanitized = builder.ToString();
+			var sanitized               = builder.ToString();
 			var firstNonWhitespaceIndex = -1;
 			for (var i = 0; i < sanitized.Length; i++)
 				if (!char.IsWhiteSpace(sanitized[i]))
@@ -694,7 +693,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 					break;
 				}
 
-			hasContent = firstNonWhitespaceIndex >= 0;
+			hasContent           = firstNonWhitespaceIndex >= 0;
 			startsWithWhitespace = hasContent && firstNonWhitespaceIndex > 0;
 
 			return sanitized;
@@ -704,7 +703,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 		{
 			ArgumentException.ThrowIfNullOrWhiteSpace(zone);
 
-			var trimmed = zone.Trim();
+			var trimmed                          = zone.Trim();
 			if (trimmed.StartsWith('.')) trimmed = trimmed[1..];
 
 			if (trimmed.EndsWith('.')) trimmed = trimmed[..^1];
@@ -714,8 +713,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 			return trimmed;
 		}
 
-		private static string TrimTrailingDot(string value)
-			=> value.EndsWith('.') ? value[..^1] : value;
+		private static string TrimTrailingDot(string value) => value.EndsWith('.') ? value[..^1] : value;
 
 		private static bool IsClassToken(string token) =>
 			token.Equals("IN", StringComparison.OrdinalIgnoreCase) ||

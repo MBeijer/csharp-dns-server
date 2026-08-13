@@ -24,7 +24,7 @@ public class BindZoneProviderTests
 		var zoneFile = Path.Combine(TestProjectPaths.TestDataDirectory, "Bind", "simple.zone");
 
 		using var provider = CreateProvider(zoneFile);
-		var zone = provider.GenerateZone();
+		var       zone     = provider.GenerateZone();
 
 		Assert.NotNull(zone);
 		Assert.Equal("example.com", zone.Suffix);
@@ -55,16 +55,13 @@ public class BindZoneProviderTests
 		var zoneFile = Path.Combine(TestProjectPaths.TestDataDirectory, "Bind", "invalid_missing_ttl.zone");
 
 		using var provider = CreateProvider(zoneFile);
-		var zone = provider.GenerateZone();
+		var       zone     = provider.GenerateZone();
 
 		Assert.NotNull(zone);
 		Assert.Equal("example.com", zone.Suffix);
 		Assert.Equal(2024010101u, zone.Serial);
 
-		var wwwA = Assert.Single(
-			zone.Records,
-			record => record.Host == "www" && record.Type == ResourceType.A
-		);
+		var wwwA = Assert.Single(zone.Records, record => record.Host == "www" && record.Type == ResourceType.A);
 		Assert.Equal("10.0.0.1", Assert.Single(wwwA.Addresses));
 	}
 
@@ -91,11 +88,14 @@ public class BindZoneProviderTests
 		try
 		{
 			using var provider = CreateProvider(tempZone);
-			var zone = provider.GenerateZone();
+			var       zone     = provider.GenerateZone();
 
 			Assert.NotNull(zone);
 
-			var cname = Assert.Single(zone.Records, record => record.Host == "www" && record.Type == ResourceType.CNAME);
+			var cname = Assert.Single(
+				zone.Records,
+				record => record.Host == "www" && record.Type == ResourceType.CNAME
+			);
 			Assert.Equal("api.example.com", Assert.Single(cname.Addresses));
 
 			var aRecord = Assert.Single(zone.Records, record => record.Host == "www" && record.Type == ResourceType.A);
@@ -128,7 +128,7 @@ public class BindZoneProviderTests
 		try
 		{
 			using var provider = CreateProvider(tempZone, "2.0.192.in-addr.arpa");
-			var zone = provider.GenerateZone();
+			var       zone     = provider.GenerateZone();
 
 			Assert.NotNull(zone);
 			var ptr = Assert.Single(zone.Records, record => record.Host == "10" && record.Type == ResourceType.PTR);
@@ -160,12 +160,15 @@ public class BindZoneProviderTests
 		try
 		{
 			using var provider = CreateProvider(tempZone);
-			var zone = provider.GenerateZone();
+			var       zone     = provider.GenerateZone();
 
 			Assert.NotNull(zone);
 			Assert.Equal(2024010101u, zone.Serial);
 			var apexSoa = Assert.Single(zone.Records, record => record.Host == "" && record.Type == ResourceType.SOA);
-			Assert.Equal("ns1.example.com", apexSoa.Addresses[0]);
+			Assert.Equal(
+				["ns1.example.com", "hostmaster.example.com", "7200", "3600", "1209600", "3600"],
+				apexSoa.Addresses
+			);
 		}
 		finally
 		{
@@ -180,11 +183,7 @@ public class BindZoneProviderTests
 			new SmartZoneResolver(new FakeLogger<SmartZoneResolver>())
 		);
 		provider.Initialize(
-			new()
-			{
-				Name = zoneName,
-				ProviderSettings = new FileWatcherZoneProviderSettings { FileName = zoneFile },
-			}
+			new() { Name = zoneName, ProviderSettings = new FileWatcherZoneProviderSettings { FileName = zoneFile }, }
 		);
 		return provider;
 	}

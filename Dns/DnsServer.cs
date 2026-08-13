@@ -301,7 +301,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 				{
 					message.QR = true;
 					message.AA = true;
-					message.RA = false;
+					message.RA = IsRecursionAllowed(remoteEndPoint);
 					message.AnswerCount++;
 					message.Answers.Add(
 						new()
@@ -320,7 +320,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 					var qName = question.Name.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "");
 					message.QR    = true;
 					message.AA    = true;
-					message.RA    = false;
+					message.RA    = IsRecursionAllowed(remoteEndPoint);
 					message.RCode = (byte)RCode.NOERROR;
 					var zoneRecords = question.Type switch
 					{
@@ -376,9 +376,20 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 				}
 				else // Referral to regular DC DNS servers
 				{
-					// store current IP address and Query ID.
-					var key = new DnsRequestKey(message);
-					_requestResponseMap.TryAdd(key, remoteEndPoint);
+					var recursionAllowed = IsRecursionAllowed(remoteEndPoint);
+					if (recursionAllowed && message.RD)
+					{
+						// Store current IP address and query ID before forwarding to an upstream resolver.
+						var key = new DnsRequestKey(message);
+						_requestResponseMap.TryAdd(key, remoteEndPoint);
+					}
+					else
+					{
+						message.QR    = true;
+						message.AA    = false;
+						message.RA    = recursionAllowed;
+						message.RCode = (byte)RCode.REFUSED;
+					}
 				}
 
 				using var responseStream = BufferPool.RentMemoryStream();
@@ -659,6 +670,15 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 	private static string CanonicalZoneName(string suffix) => suffix?.Trim().Trim('.') ?? string.Empty;
 
+	private sealed record SoaFields(
+		string PrimaryNameServer,
+		string ResponsibleMailbox,
+		uint Refresh,
+		uint Retry,
+		uint Expire,
+		uint MinimumTtl
+	);
+
 	private static byte[] SerializeMessage(DnsMessage message)
 	{
 		using var stream = BufferPool.RentMemoryStream();
@@ -714,26 +734,108 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 	private ResourceRecord CreateSoaRecord(string name, Zone zone, ZoneRecord zoneRecord = null)
 	{
+		zoneRecord ??= zone.Records.FirstOrDefault(record => record.Type == ResourceType.SOA);
+		var soa = ParseSoaFields(name, zone, zoneRecord);
 		return new()
 		{
 			Name  = name,
 			Class = ResourceClass.IN,
 			Type  = ResourceType.SOA,
-			TTL   = 300,
+			TTL   = soa.MinimumTtl,
 			RData = new SOARData
 			{
-				PrimaryNameServer = zoneRecord?.Addresses.Count > 1 ? zoneRecord.Addresses[0] : Environment.MachineName,
-				ResponsibleAuthoritativeMailbox =
-					zoneRecord?.Addresses.Count > 1
-						? zoneRecord.Addresses[1]
-						: zoneRecord?.Addresses.FirstOrDefault() ?? $"hostmaster.{name}",
-				Serial          = zone.Serial,
-				ExpirationLimit = 86400,
-				RetryInterval   = 300,
-				RefreshInterval = 300,
-				MinimumTTL      = 300,
+				PrimaryNameServer               = soa.PrimaryNameServer,
+				ResponsibleAuthoritativeMailbox = soa.ResponsibleMailbox,
+				Serial                          = zone.Serial,
+				ExpirationLimit                 = soa.Expire,
+				RetryInterval                   = soa.Retry,
+				RefreshInterval                 = soa.Refresh,
+				MinimumTTL                      = soa.MinimumTtl,
 			},
 		};
+	}
+
+	private static SoaFields ParseSoaFields(string zoneName, Zone zone, ZoneRecord zoneRecord)
+	{
+		const uint defaultRefresh = 3600;
+		const uint defaultRetry   = 600;
+		const uint defaultExpire  = 1209600;
+		const uint defaultMinimum = 300;
+
+		var primaryNameServer  = zoneRecord?.Addresses.ElementAtOrDefault(0);
+		var responsibleMailbox = zoneRecord?.Addresses.ElementAtOrDefault(1);
+		var refresh            = defaultRefresh;
+		var retry              = defaultRetry;
+		var expire             = defaultExpire;
+		var minimum            = defaultMinimum;
+
+		if (zoneRecord?.Addresses.Count == 1)
+		{
+			var tokens = zoneRecord.Addresses[0]
+			                       .Replace("(", " ", StringComparison.Ordinal)
+			                       .Replace(")", " ", StringComparison.Ordinal)
+			                       .Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length >= 7)
+			{
+				primaryNameServer  = tokens[0];
+				responsibleMailbox = tokens[1];
+				refresh            = ParseSoaInterval(tokens[3], defaultRefresh);
+				retry              = ParseSoaInterval(tokens[4], defaultRetry);
+				expire             = ParseSoaInterval(tokens[5], defaultExpire);
+				minimum            = ParseSoaInterval(tokens[6], defaultMinimum);
+			}
+		}
+		else if (zoneRecord?.Addresses.Count >= 6)
+		{
+			refresh = ParseSoaInterval(zoneRecord.Addresses[2], defaultRefresh);
+			retry   = ParseSoaInterval(zoneRecord.Addresses[3], defaultRetry);
+			expire  = ParseSoaInterval(zoneRecord.Addresses[4], defaultExpire);
+			minimum = ParseSoaInterval(zoneRecord.Addresses[5], defaultMinimum);
+		}
+
+		primaryNameServer = primaryNameServer?.Trim().TrimEnd('.');
+		if (string.IsNullOrWhiteSpace(primaryNameServer))
+			primaryNameServer = zone.Records.Where(record => record.Type == ResourceType.NS)
+			                        .SelectMany(record => record.Addresses)
+			                        .FirstOrDefault()
+			                        ?.Trim()
+			                        .TrimEnd('.') ??
+			                    $"ns1.{zoneName}";
+		if (!primaryNameServer.Contains('.'))
+			primaryNameServer = $"{primaryNameServer}.{zoneName}";
+
+		responsibleMailbox = responsibleMailbox?.Trim().TrimEnd('.');
+		if (string.IsNullOrWhiteSpace(responsibleMailbox)) responsibleMailbox = $"hostmaster.{zoneName}";
+		else if (!responsibleMailbox.Contains('.')) responsibleMailbox        = $"{responsibleMailbox}.{zoneName}";
+
+		return new(
+			primaryNameServer,
+			responsibleMailbox,
+			refresh,
+			retry,
+			expire,
+			minimum
+		);
+	}
+
+	private static uint ParseSoaInterval(string value, uint fallback)
+	{
+		if (string.IsNullOrWhiteSpace(value)) return fallback;
+		var normalized = value.Trim().ToUpperInvariant();
+		if (uint.TryParse(normalized, out var seconds)) return seconds;
+		if (normalized.Length < 2 || !uint.TryParse(normalized[..^1], out var quantity)) return fallback;
+
+		var multiplier = normalized[^1] switch
+		{
+			'S' => 1UL,
+			'M' => 60UL,
+			'H' => 3600UL,
+			'D' => 86400UL,
+			'W' => 604800UL,
+			_   => 0UL,
+		};
+		var total = quantity * multiplier;
+		return multiplier > 0 && total <= uint.MaxValue ? (uint)total : fallback;
 	}
 
 	private ResourceRecord CreateNsRecord(string zoneName, Zone zone, ZoneRecord zoneRecord = null)
@@ -806,6 +908,15 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		if (allowList == null || allowList.Count == 0) return false;
 
 		return allowList.Any(entry => IsAllowedByEntry(ipEndpoint.Address, entry));
+	}
+
+	private bool IsRecursionAllowed(EndPoint remoteEndPoint)
+	{
+		if (serverOptions.Value.DnsListener.RecursionEnabled) return true;
+		if (remoteEndPoint is not IPEndPoint ipEndpoint) return false;
+
+		var allowList = serverOptions.Value.DnsListener.AllowRecursionFrom;
+		return allowList != null && allowList.Any(entry => IsAllowedByEntry(ipEndpoint.Address, entry));
 	}
 
 	private bool IsAllowedByEntry(IPAddress remoteAddress, string allowEntry)
@@ -1035,6 +1146,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 					{
 						message.AnswerCount++;
 						message.Answers.Add(answer);
+						AddNsGlueRecords(message, zone, answer);
 					}
 
 					break;
@@ -1138,30 +1250,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 					break;
 				case ResourceType.SOA:
-					var soaAnswer = new ResourceRecord
-					{
-						Name  = question.Name,
-						Class = zoneRecord.Class,
-						Type  = zoneRecord.Type,
-						TTL   = 10,
-						RData = new SOARData
-						{
-							PrimaryNameServer =
-								zoneRecord.Addresses.Count > 1
-									? zoneRecord.Addresses[0]
-									: Environment.MachineName,
-							ResponsibleAuthoritativeMailbox =
-								zoneRecord.Addresses.Count > 1
-									? zoneRecord.Addresses[1]
-									: zoneRecord.Addresses[0],
-							Serial          = zone.Serial,
-							ExpirationLimit = 86400,
-							RetryInterval   = 300,
-							RefreshInterval = 300,
-							MinimumTTL      = 300,
-						},
-					};
-					soaAnswer.TTL = (soaAnswer.RData as SOARData).MinimumTTL;
+					var soaAnswer = CreateSoaRecord(question.Name, zone, zoneRecord);
 
 					message.AnswerCount++;
 					message.Answers.Add(soaAnswer);
@@ -1202,6 +1291,41 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 					break;
 			}
+		}
+	}
+
+	private static void AddNsGlueRecords(DnsMessage message, Zone zone, ResourceRecord nsRecord)
+	{
+		if (nsRecord.RData is not NSRData nsData) return;
+
+		var zoneName = CanonicalZoneName(zone.Suffix);
+		var target   = CanonicalZoneName(nsData.Name);
+		if (!target.EndsWith($".{zoneName}", StringComparison.OrdinalIgnoreCase) &&
+		    !string.Equals(target, zoneName, StringComparison.OrdinalIgnoreCase))
+			return;
+
+		foreach (var glueSource in zone.Records.Where(record => record.Type is ResourceType.A or ResourceType.AAAA &&
+		                                                        string.Equals(
+			                                                        CanonicalZoneName(
+				                                                        BuildRecordOwnerName(zoneName, record.Host)
+			                                                        ),
+			                                                        target,
+			                                                        StringComparison.OrdinalIgnoreCase
+		                                                        )
+		         ))
+		foreach (var address in glueSource.Addresses)
+		{
+			message.Additionals.Add(
+				new()
+				{
+					Name  = target,
+					Class = glueSource.Class,
+					Type  = glueSource.Type,
+					TTL   = 10,
+					RData = new ANameRData { Address = IPAddress.Parse(address) },
+				}
+			);
+			message.AdditionalCount++;
 		}
 	}
 
