@@ -285,133 +285,43 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 		if (message.IsQuery())
 		{
-			if (message.Questions.Count <= 0) return;
-			Zone zone = null;
-
-			foreach (var question in message.Questions)
+			if (message.Questions.Count == 0)
 			{
-				logger.LogInformation(
-					"{@RemoteEndPoint} asked for {Name} {Class} {Type}",
-					remoteEndPoint,
-					question.Name,
-					question.Class,
-					question.Type
+				SendUdpResponse(
+					BuildBasicResponse(message, (byte)RCode.FORMERR, authoritative: false, recursionAvailable: false),
+					remoteEndPoint
 				);
-				if (question.Type == ResourceType.PTR && question.Name == "1.0.0.127.in-addr.arpa")
-				{
-					message.QR = true;
-					message.AA = true;
-					message.RA = IsRecursionAllowed(remoteEndPoint);
-					message.AnswerCount++;
-					message.Answers.Add(
-						new()
-						{
-							Name       = question.Name,
-							Class      = ResourceClass.IN,
-							Type       = ResourceType.PTR,
-							TTL        = 3600,
-							DataLength = 0xB,
-							RData      = new DomainNamePointRData { Name = "localhost" },
-						}
-					);
-				}
-				else if (_resolvers.FirstOrDefault(x => x.TryGetZone(question.Name, out zone)) != null)
-				{
-					var qName = question.Name.Replace($".{zone.Suffix}", "").Replace($"{zone.Suffix}", "");
-					message.QR    = true;
-					message.AA    = true;
-					message.RA    = IsRecursionAllowed(remoteEndPoint);
-					message.RCode = (byte)RCode.NOERROR;
-					var zoneRecords = question.Type switch
-					{
-						ResourceType.ANY => zone.Records.Where(zr => zr.Host.Equals(qName)).ToList(),
-						ResourceType.A => zone.Records
-						                      .Where(zr => zr.Type is ResourceType.A or ResourceType.CNAME &&
-						                                   zr.Host.Equals(qName)
-						                      )
-						                      .ToList(),
-						ResourceType.AAAA => zone.Records
-						                         .Where(zr => zr.Type is ResourceType.AAAA or ResourceType.CNAME &&
-						                                      zr.Host.Equals(qName)
-						                         )
-						                         .ToList(),
-						_ => zone.Records.Where(zr => zr.Type == question.Type && zr.Host.Equals(qName)).ToList(),
-					};
-
-					if (zoneRecords.Count == 0)
-					{
-						var zoneName = CanonicalZoneName(zone.Suffix);
-						var zoneSoa  = zone.Records.FirstOrDefault(record => record.Type == ResourceType.SOA);
-						var isZoneApexQuery = string.Equals(
-							question.Name.Trim().TrimEnd('.'),
-							zoneName,
-							StringComparison.OrdinalIgnoreCase
-						);
-
-						if (question.Type == ResourceType.SOA && isZoneApexQuery)
-						{
-							message.RCode = (byte)RCode.NOERROR;
-							message.AnswerCount++;
-							message.Answers.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
-						}
-						else
-						{
-							var nameExists = isZoneApexQuery ||
-							                 zone.Records.Any(record => string.Equals(
-								                                  record.Host,
-								                                  qName,
-								                                  StringComparison.OrdinalIgnoreCase
-							                                  )
-							                 );
-
-							message.RCode = (byte)(nameExists ? RCode.NOERROR : RCode.NXDOMAIN);
-							message.NameServerCount++;
-							message.Authorities.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
-						}
-					}
-					else
-					{
-						HandleRecords(zoneRecords, question, message, zone, remoteEndPoint);
-					}
-				}
-				else // Referral to regular DC DNS servers
-				{
-					var recursionAllowed = IsRecursionAllowed(remoteEndPoint);
-					if (recursionAllowed && message.RD)
-					{
-						// Store current IP address and query ID before forwarding to an upstream resolver.
-						var key = new DnsRequestKey(message);
-						_requestResponseMap.TryAdd(key, remoteEndPoint);
-					}
-					else
-					{
-						message.QR    = true;
-						message.AA    = false;
-						message.RA    = recursionAllowed;
-						message.RCode = (byte)RCode.REFUSED;
-					}
-				}
-
-				using var responseStream = BufferPool.RentMemoryStream();
-
-				message.WriteToStream(responseStream);
-				if (message.IsQuery())
-				{
-					// send to upstream DNS servers
-					foreach (var dnsServer in _defaultDns)
-						SendUdp(
-							responseStream.GetBuffer(),
-							0,
-							(int)responseStream.Position,
-							new IPEndPoint(dnsServer, 53)
-						);
-				}
-				else
-				{
-					Interlocked.Increment(ref _responses);
-					SendUdp(responseStream.GetBuffer(), 0, (int)responseStream.Position, remoteEndPoint);
-				}
+				return;
 			}
+
+			var recursionAllowed      = IsRecursionAllowed(remoteEndPoint);
+			var authoritativeResponse = BuildAuthoritativeResponse(message, remoteEndPoint, recursionAllowed);
+			if (authoritativeResponse != null)
+			{
+				SendUdpResponse(authoritativeResponse, remoteEndPoint);
+				return;
+			}
+
+			if (!recursionAllowed || !message.RD)
+			{
+				SendUdpResponse(
+					BuildBasicResponse(
+						message,
+						(byte)RCode.REFUSED,
+						authoritative: false,
+						recursionAvailable: recursionAllowed
+					),
+					remoteEndPoint
+				);
+				return;
+			}
+
+			// Store the client endpoint before forwarding the original query to the upstream resolvers.
+			var key = new DnsRequestKey(message);
+			_requestResponseMap.TryAdd(key, remoteEndPoint);
+			var payload = SerializeMessage(message);
+			foreach (var dnsServer in _defaultDns)
+				SendUdp(payload, 0, payload.Length, new IPEndPoint(dnsServer, 53));
 		}
 		else
 		{
@@ -454,7 +364,126 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		if (question.Type is ResourceType.AXFR or ResourceType.IXFR)
 			return BuildTransferResponse(message, question, remoteEndPoint, viaTcp);
 
-		return BuildBasicResponse(message, (byte)RCode.REFUSED, authoritative: false, recursionAvailable: false);
+		return BuildAuthoritativeResponse(
+			       message,
+			       remoteEndPoint,
+			       recursionAvailable: !viaTcp && IsRecursionAllowed(remoteEndPoint)
+		       ) ??
+		       BuildBasicResponse(message, (byte)RCode.REFUSED, authoritative: false, recursionAvailable: false);
+	}
+
+	private DnsMessage BuildAuthoritativeResponse(DnsMessage request, EndPoint remoteEndPoint, bool recursionAvailable)
+	{
+		var question = request.Questions[0];
+		logger.LogInformation(
+			"{@RemoteEndPoint} asked for {Name} {Class} {Type}",
+			remoteEndPoint,
+			question.Name,
+			question.Class,
+			question.Type
+		);
+
+		var response = BuildBasicResponse(request, (byte)RCode.NOERROR, authoritative: true, recursionAvailable);
+
+		if (question.Type == ResourceType.PTR && question.Name == "1.0.0.127.in-addr.arpa")
+		{
+			response.Answers.Add(
+				new()
+				{
+					Name       = question.Name,
+					Class      = ResourceClass.IN,
+					Type       = ResourceType.PTR,
+					TTL        = 3600,
+					DataLength = 0xB,
+					RData      = new DomainNamePointRData { Name = "localhost" },
+				}
+			);
+			response.AnswerCount = 1;
+			return response;
+		}
+
+		if (!TryResolveZone(question.Name, out var zone)) return null;
+
+		var zoneName    = CanonicalZoneName(zone.Suffix);
+		var qName       = GetRelativeHostName(question.Name, zoneName);
+		var zoneRecords = FindZoneRecords(zone, qName, question.Type);
+		if (zoneRecords.Count > 0)
+		{
+			HandleRecords(zoneRecords, question, response, zone);
+			return response;
+		}
+
+		var zoneSoa = zone.Records.FirstOrDefault(record => record.Type == ResourceType.SOA);
+		var isZoneApexQuery = string.Equals(
+			question.Name.Trim().TrimEnd('.'),
+			zoneName,
+			StringComparison.OrdinalIgnoreCase
+		);
+		if (question.Type == ResourceType.SOA && isZoneApexQuery)
+		{
+			response.Answers.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
+			response.AnswerCount = 1;
+			return response;
+		}
+
+		var nameExists = isZoneApexQuery ||
+		                 zone.Records.Any(record => string.Equals(
+			                                  record.Host,
+			                                  qName,
+			                                  StringComparison.OrdinalIgnoreCase
+		                                  )
+		                 );
+		response.RCode = (byte)(nameExists ? RCode.NOERROR : RCode.NXDOMAIN);
+		response.Authorities.Add(CreateSoaRecord(zoneName, zone, zoneSoa));
+		response.NameServerCount = 1;
+		return response;
+	}
+
+	private static List<ZoneRecord> FindZoneRecords(Zone zone, string relativeName, ResourceType resourceType) =>
+		resourceType switch
+		{
+			ResourceType.ANY => zone.Records.Where(record => string.Equals(
+				                                       record.Host,
+				                                       relativeName,
+				                                       StringComparison.OrdinalIgnoreCase
+			                                       )
+			                        )
+			                        .ToList(),
+			ResourceType.A => zone.Records.Where(record => record.Type is ResourceType.A or ResourceType.CNAME &&
+			                                               string.Equals(
+				                                               record.Host,
+				                                               relativeName,
+				                                               StringComparison.OrdinalIgnoreCase
+			                                               )
+			                      )
+			                      .ToList(),
+			ResourceType.AAAA => zone.Records.Where(record => record.Type is ResourceType.AAAA or ResourceType.CNAME &&
+			                                                  string.Equals(
+				                                                  record.Host,
+				                                                  relativeName,
+				                                                  StringComparison.OrdinalIgnoreCase
+			                                                  )
+			                         )
+			                         .ToList(),
+			_ => zone.Records.Where(record => record.Type == resourceType &&
+			                                  string.Equals(
+				                                  record.Host,
+				                                  relativeName,
+				                                  StringComparison.OrdinalIgnoreCase
+			                                  )
+			         )
+			         .ToList(),
+		};
+
+	private static string GetRelativeHostName(string hostName, string zoneName)
+	{
+		var canonicalHost = CanonicalZoneName(hostName);
+		if (string.Equals(canonicalHost, zoneName, StringComparison.OrdinalIgnoreCase)) return string.Empty;
+
+		var zoneSuffix = $".{zoneName}";
+		return canonicalHost.EndsWith(zoneSuffix, StringComparison.OrdinalIgnoreCase)
+			? canonicalHost[..^zoneSuffix.Length]
+			: canonicalHost;
 	}
 
 	private DnsMessage BuildNotifyResponse(DnsMessage message, EndPoint remoteEndPoint)
@@ -1121,13 +1150,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		SendUdp(payload, 0, payload.Length, notifyTarget);
 	}
 
-	private void HandleRecords(
-		List<ZoneRecord> zoneRecords,
-		Question question,
-		DnsMessage message,
-		Zone zone,
-		EndPoint remoteEndPoint
-	)
+	private void HandleRecords(List<ZoneRecord> zoneRecords, Question question, DnsMessage message, Zone zone)
 	{
 		foreach (var zoneRecord in zoneRecords)
 		{
@@ -1222,29 +1245,22 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							                        .Replace($".{zone.Suffix}", "")
 							                        .Replace($"{zone.Suffix}", "");
 
+							var addressType = question.Type == ResourceType.AAAA ? ResourceType.AAAA : ResourceType.A;
 							var cnameRecords = zone.Records
-							                       .Where(zr => zr.Type is ResourceType.A or ResourceType.AAAA
-								                                    or ResourceType.CNAME &&
-							                                    zr.Host.Equals(address)
+							                       .Where(record => record.Type == addressType &&
+							                                        string.Equals(
+								                                        record.Host,
+								                                        address,
+								                                        StringComparison.OrdinalIgnoreCase
+							                                        )
 							                       )
 							                       .ToList();
-
-							var dnsMessage = new DnsMessage
-							{
-								Opcode = (byte)OpCode.QUERY,
-								Questions =
-								[
-									new(cnameRData.Name, ResourceType.A, ResourceClass.IN),
-								],
-							};
-							using PooledMemoryStream pms = BufferPool.RentMemoryStream();
-							dnsMessage.WriteToStream(pms);
-
-							pms.Position = 0;
-
-							ProcessUdpRequest(pms.ToArray(), (int)pms.Length, remoteEndPoint);
-
-							//HandleRecords(cnameRecords, new Question(cnameRData.Name, ResourceType.A, ResourceClass.IN), message, zone);
+							HandleRecords(
+								cnameRecords,
+								new(cnameRData.Name, addressType, ResourceClass.IN),
+								message,
+								zone
+							);
 						}
 					}
 

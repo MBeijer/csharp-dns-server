@@ -378,8 +378,7 @@ public class DnsServerTests
 			new List<ZoneRecord> { ns },
 			new Question("example.com", ResourceType.NS, ResourceClass.IN),
 			message,
-			zone,
-			new IPEndPoint(IPAddress.Parse("198.51.100.1"), 5300)
+			zone
 		);
 
 		Assert.Single(message.Answers);
@@ -569,6 +568,62 @@ public class DnsServerTests
 			true
 		);
 		Assert.Equal((byte)RCode.REFUSED, refused.RCode);
+	}
+
+	[Fact]
+	public void BuildResponseForQuery_ReturnsAuthoritativeTcpAnswersGlueAndNegativeSoa()
+	{
+		var zone = new Zone { Suffix = "example.com", Serial = 2026081306 };
+		zone.Initialize(
+			[
+				new()
+				{
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"],
+				},
+				new()
+				{
+					Host = "ns1", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.53"],
+				},
+				new()
+				{
+					Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.10"],
+				},
+				new()
+				{
+					Host      = "@",
+					Type      = ResourceType.SOA,
+					Class     = ResourceClass.IN,
+					Addresses = ["ns1.example.com hostmaster.example.com 1 7200 1800 1209600 3600"],
+				},
+			]
+		);
+		var server = CreateServer(resolvers: [new FakeResolver([zone])]);
+		var remote = new IPEndPoint(IPAddress.Parse("198.51.100.20"), 5300);
+
+		var addressRequest = new DnsMessage { QueryIdentifier = 1, QuestionCount = 1 };
+		addressRequest.Questions.Add(new("www.example.com", ResourceType.A, ResourceClass.IN));
+		var addressResponse = InvokePrivate<DnsMessage>(server, "BuildResponseForQuery", addressRequest, remote, true);
+		Assert.True(addressResponse.AA);
+		Assert.Equal((byte)RCode.NOERROR, addressResponse.RCode);
+		Assert.Equal(
+			IPAddress.Parse("192.0.2.10"),
+			Assert.IsType<ANameRData>(Assert.Single(addressResponse.Answers).RData).Address
+		);
+
+		var nsRequest = new DnsMessage { QueryIdentifier = 2, QuestionCount = 1 };
+		nsRequest.Questions.Add(new("example.com", ResourceType.NS, ResourceClass.IN));
+		var nsResponse = InvokePrivate<DnsMessage>(server, "BuildResponseForQuery", nsRequest, remote, true);
+		Assert.Single(nsResponse.Answers);
+		var glue = Assert.Single(nsResponse.Additionals);
+		Assert.Equal("ns1.example.com", glue.Name);
+		Assert.Equal(ResourceType.A, glue.Type);
+
+		var missingRequest = new DnsMessage { QueryIdentifier = 3, QuestionCount = 1 };
+		missingRequest.Questions.Add(new("missing.example.com", ResourceType.A, ResourceClass.IN));
+		var missingResponse = InvokePrivate<DnsMessage>(server, "BuildResponseForQuery", missingRequest, remote, true);
+		Assert.True(missingResponse.AA);
+		Assert.Equal((byte)RCode.NXDOMAIN, missingResponse.RCode);
+		Assert.IsType<SOARData>(Assert.Single(missingResponse.Authorities).RData);
 	}
 
 	[Fact]
@@ -1529,8 +1584,7 @@ public class DnsServerTests
 			zoneRecords,
 			new Question("www.example.com", ResourceType.ANY, ResourceClass.IN),
 			message,
-			zone,
-			new IPEndPoint(IPAddress.Loopback, 5300)
+			zone
 		);
 
 		Assert.True(message.AnswerCount >= 7);
@@ -1554,8 +1608,7 @@ public class DnsServerTests
 			zoneRecords,
 			new Question("www.example.com", ResourceType.ANY, ResourceClass.IN),
 			message,
-			zone,
-			new IPEndPoint(IPAddress.Loopback, 5300)
+			zone
 		);
 
 		var cname = Assert.Single(message.Answers, answer => answer.Type == ResourceType.CNAME);
