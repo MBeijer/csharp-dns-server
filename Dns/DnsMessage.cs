@@ -16,16 +16,16 @@ public class DnsMessage
 {
 	private readonly byte[] _header = new byte[12];
 
-	private ushort _additionalCount;
-	private ushort _answerCount;
-	private ushort _flags;
-	private ushort _nameServerCount;
-	private ushort _queryIdentifier;
-	private ushort _questionCount;
-	public ResourceList Additionals = [];
-	public ResourceList Answers = [];
-	public ResourceList Authorities = [];
-	public QuestionList Questions = [];
+	private ushort       _additionalCount;
+	private ushort       _answerCount;
+	private ushort       _flags;
+	private ushort       _nameServerCount;
+	private ushort       _queryIdentifier;
+	private ushort       _questionCount;
+	public  ResourceList Additionals = [];
+	public  ResourceList Answers     = [];
+	public  ResourceList Authorities = [];
+	public  QuestionList Questions   = [];
 
 	/// <summary>Provides direct access to the Flags WORD</summary>
 	public ushort Flags
@@ -213,7 +213,7 @@ public class DnsMessage
 
 	/// <summary></summary>
 	/// <param name="bytes"></param>
-	private static DnsMessage Parse(byte[] bytes)
+	private static DnsMessage Parse(byte[] bytes, out int bytesRead)
 	{
 		ArgumentNullException.ThrowIfNull(bytes);
 
@@ -225,7 +225,7 @@ public class DnsMessage
 		byteOffset += result.Answers.LoadFrom(bytes, byteOffset, result.AnswerCount);
 		byteOffset += result.Authorities.LoadFrom(bytes, byteOffset, result.NameServerCount);
 		byteOffset += result.Additionals.LoadFrom(bytes, byteOffset, result.AdditionalCount);
-		//Console.WriteLine("Bytes read: {0}", byteOffset);
+		bytesRead  =  byteOffset;
 
 		return result;
 	}
@@ -239,9 +239,9 @@ public class DnsMessage
 		// Phase 5: Use BinaryPrimitives for reading (cleaner, no SwapEndian needed)
 		var headerSpan = _header.AsSpan();
 		_queryIdentifier = BinaryPrimitives.ReadUInt16BigEndian(headerSpan);
-		_flags = BinaryPrimitives.ReadUInt16LittleEndian(headerSpan[2..]); // Flags stored in little-endian
-		_questionCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[4..]);
-		_answerCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[6..]);
+		_flags           = BinaryPrimitives.ReadUInt16LittleEndian(headerSpan[2..]); // Flags stored in little-endian
+		_questionCount   = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[4..]);
+		_answerCount     = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[6..]);
 		_nameServerCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[8..]);
 		_additionalCount = BinaryPrimitives.ReadUInt16BigEndian(headerSpan[10..]);
 
@@ -351,16 +351,34 @@ public class DnsMessage
 		Additionals.WriteToStream(stream);
 	}
 
-	public static bool TryParse(byte[] bytes, out DnsMessage query) => TryParse(bytes, bytes.Length, out query);
+	public static bool TryParse(byte[] bytes, out DnsMessage query)
+	{
+		try
+		{
+			query = Parse(bytes, out _);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine(ex.ToString());
+			query = null;
+			return false;
+		}
+	}
 
 	public static bool TryParse(byte[] bytes, int length, out DnsMessage query)
 	{
 		try
 		{
-			// Create a segment view with the actual length for parsing
-			// For now, we pass the full buffer but parsing respects boundaries
-			// TODO: Future optimization - use Span<byte> for zero-copy parsing
-			query = Parse(bytes);
+			ArgumentNullException.ThrowIfNull(bytes);
+			if (length < 0 || length > bytes.Length) throw new ArgumentOutOfRangeException(nameof(length));
+
+			var payload = length == bytes.Length ? bytes : bytes.AsSpan(0, length).ToArray();
+			query = Parse(payload, out var bytesRead);
+			if (bytesRead != length)
+				throw new InvalidDataException(
+					$"DNS message contains {length - bytesRead} byte(s) of extra input data."
+				);
 			return true;
 		}
 		catch (Exception ex)

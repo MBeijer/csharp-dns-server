@@ -6,31 +6,30 @@ namespace Dns.RDataTypes;
 
 public class SOARData : RData
 {
-	public string PrimaryNameServer { get; set; }
+	public string PrimaryNameServer               { get; set; }
 	public string ResponsibleAuthoritativeMailbox { get; set; }
-	public uint Serial { get; set; }
-	public uint RefreshInterval { get; set; }
-	public uint RetryInterval { get; set; }
-	public uint ExpirationLimit { get; set; }
-	public uint MinimumTTL { get; set; }
+	public uint   Serial                          { get; set; }
+	public uint   RefreshInterval                 { get; set; }
+	public uint   RetryInterval                   { get; set; }
+	public uint   ExpirationLimit                 { get; set; }
+	public uint   MinimumTTL                      { get; set; }
 
 	public override ushort Length =>
-		// dots replaced by bytes
-		// + 1 segment prefix
-		// + 1 null terminator
-		(ushort)(PrimaryNameServer.Length + 2 + ResponsibleAuthoritativeMailbox.Length + 2 + 20);
+		checked((ushort)(DnsProtocol.GetDomainNameWireLength(PrimaryNameServer) +
+		                 DnsProtocol.GetDomainNameWireLength(ResponsibleAuthoritativeMailbox) +
+		                 5 * sizeof(uint)));
 
 	public static SOARData Parse(byte[] bytes, int offset, int size)
 	{
 		var soaRdata = new SOARData
 		{
-			PrimaryNameServer = DnsProtocol.ReadString(bytes, ref offset),
+			PrimaryNameServer               = DnsProtocol.ReadString(bytes, ref offset),
 			ResponsibleAuthoritativeMailbox = DnsProtocol.ReadString(bytes, ref offset),
-			Serial = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
-			RefreshInterval = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
-			RetryInterval = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
-			ExpirationLimit = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
-			MinimumTTL = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
+			Serial                          = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
+			RefreshInterval                 = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
+			RetryInterval                   = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
+			ExpirationLimit                 = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
+			MinimumTTL                      = DnsProtocol.ReadUint(bytes, ref offset).SwapEndian(),
 		};
 		return soaRdata;
 	}
