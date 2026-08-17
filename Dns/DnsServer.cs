@@ -449,20 +449,25 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			                                       )
 			                        )
 			                        .ToList(),
-			ResourceType.A => zone.Records.Where(record => record.Type is ResourceType.A or ResourceType.CNAME &&
-			                                               string.Equals(
-				                                               record.Host,
-				                                               relativeName,
-				                                               StringComparison.OrdinalIgnoreCase
-			                                               )
+			ResourceType.A => zone.Records
+			                      .Where(record =>
+				                             record.Type is ResourceType.A or ResourceType.AAAA or ResourceType.CNAME &&
+				                             string.Equals(
+					                             record.Host,
+					                             relativeName,
+					                             StringComparison.OrdinalIgnoreCase
+				                             )
 			                      )
 			                      .ToList(),
-			ResourceType.AAAA => zone.Records.Where(record => record.Type is ResourceType.AAAA or ResourceType.CNAME &&
-			                                                  string.Equals(
-				                                                  record.Host,
-				                                                  relativeName,
-				                                                  StringComparison.OrdinalIgnoreCase
-			                                                  )
+			ResourceType.AAAA => zone.Records
+			                         .Where(record =>
+				                                record.Type is ResourceType.A or ResourceType.AAAA
+					                                or ResourceType.CNAME &&
+				                                string.Equals(
+					                                record.Host,
+					                                relativeName,
+					                                StringComparison.OrdinalIgnoreCase
+				                                )
 			                         )
 			                         .ToList(),
 			_ => zone.Records.Where(record => record.Type == resourceType &&
@@ -614,17 +619,12 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 				break;
 			case ResourceType.A:
 			case ResourceType.AAAA:
-				records.AddRange(
-					zoneRecord.Addresses.Select(address => new ResourceRecord
-						{
-							Name  = name,
-							Class = zoneRecord.Class,
-							Type  = zoneRecord.Type,
-							TTL   = 10,
-							RData = new ANameRData { Address = IPAddress.Parse(address) },
-						}
-					)
-				);
+				foreach (var address in zoneRecord.Addresses)
+				{
+					var record = CreateAddressResourceRecord(name, zoneRecord.Class, zoneRecord.Type, address);
+					if (record != null) records.Add(record);
+				}
+
 				break;
 			case ResourceType.CNAME:
 				records.AddRange(
@@ -674,6 +674,41 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		}
 
 		return records;
+	}
+
+	private ResourceRecord CreateAddressResourceRecord(
+		string name,
+		ResourceClass resourceClass,
+		ResourceType configuredType,
+		string address,
+		ResourceType? requiredType = null
+	)
+	{
+		if (!IPAddress.TryParse(address, out var ipAddress))
+		{
+			logger.LogWarning("Skipping invalid address {Address} for DNS record {RecordName}", address, name);
+			return null;
+		}
+
+		var actualType = ipAddress.AddressFamily == AddressFamily.InterNetworkV6 ? ResourceType.AAAA : ResourceType.A;
+		if (configuredType != actualType)
+			logger.LogWarning(
+				"Normalizing DNS record {RecordName} from configured type {ConfiguredType} to {ActualType} for address {Address}",
+				name,
+				configuredType,
+				actualType,
+				address
+			);
+		if (requiredType.HasValue && actualType != requiredType.Value) return null;
+
+		return new()
+		{
+			Name  = name,
+			Class = resourceClass,
+			Type  = actualType,
+			TTL   = 10,
+			RData = new ANameRData { Address = ipAddress },
+		};
 	}
 
 	private static string BuildRecordOwnerName(string zoneName, string host)
@@ -1199,21 +1234,21 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 					break;
 				case ResourceType.A:
-					foreach (var answer in zoneRecord.Addresses.Select(address => new ResourceRecord
-						         {
-							         Name  = question.Name,
-							         Class = zoneRecord.Class,
-							         Type  = zoneRecord.Type,
-							         TTL   = 10,
-							         RData = new ANameRData
-							         {
-								         Address = IPAddress.Parse(
-									         address
-								         )
-							         },
-						         }
-					         ))
+				case ResourceType.AAAA:
+					var requiredType = question.Type is ResourceType.A or ResourceType.AAAA
+						? question.Type
+						: (ResourceType?)null;
+					foreach (var address in zoneRecord.Addresses)
 					{
+						var answer = CreateAddressResourceRecord(
+							question.Name,
+							zoneRecord.Class,
+							zoneRecord.Type,
+							address,
+							requiredType
+						);
+						if (answer == null) continue;
+
 						message.AnswerCount++;
 						message.Answers.Add(answer);
 					}
@@ -1247,12 +1282,13 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 
 							var addressType = question.Type == ResourceType.AAAA ? ResourceType.AAAA : ResourceType.A;
 							var cnameRecords = zone.Records
-							                       .Where(record => record.Type == addressType &&
-							                                        string.Equals(
-								                                        record.Host,
-								                                        address,
-								                                        StringComparison.OrdinalIgnoreCase
-							                                        )
+							                       .Where(record =>
+								                              record.Type is ResourceType.A or ResourceType.AAAA &&
+								                              string.Equals(
+									                              record.Host,
+									                              address,
+									                              StringComparison.OrdinalIgnoreCase
+								                              )
 							                       )
 							                       .ToList();
 							HandleRecords(
@@ -1310,7 +1346,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		}
 	}
 
-	private static void AddNsGlueRecords(DnsMessage message, Zone zone, ResourceRecord nsRecord)
+	private void AddNsGlueRecords(DnsMessage message, Zone zone, ResourceRecord nsRecord)
 	{
 		if (nsRecord.RData is not NSRData nsData) return;
 
@@ -1331,16 +1367,10 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		         ))
 		foreach (var address in glueSource.Addresses)
 		{
-			message.Additionals.Add(
-				new()
-				{
-					Name  = target,
-					Class = glueSource.Class,
-					Type  = glueSource.Type,
-					TTL   = 10,
-					RData = new ANameRData { Address = IPAddress.Parse(address) },
-				}
-			);
+			var glueRecord = CreateAddressResourceRecord(target, glueSource.Class, glueSource.Type, address);
+			if (glueRecord == null) continue;
+
+			message.Additionals.Add(glueRecord);
 			message.AdditionalCount++;
 		}
 	}

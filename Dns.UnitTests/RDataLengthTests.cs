@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Reflection;
+using System.Net;
 using System.Linq;
 using Dns.Db.Models.EntityFramework.Enums;
 using Dns.Models.Dns.Packets;
@@ -119,6 +120,24 @@ public sealed class RDataLengthTests
 
 		var payloadWithExtraByte = payload.Append((byte)0).ToArray();
 		Assert.False(DnsMessage.TryParse(payloadWithExtraByte, payloadWithExtraByte.Length, out _));
+	}
+
+	[Fact]
+	public void MessageParser_RejectsIpv6PayloadAdvertisedAsARecord()
+	{
+		var message = new DnsMessage
+		{
+			QueryIdentifier = 0x2345, QR = true, AA = true, AnswerCount = 1,
+		};
+		message.Answers.Add(
+			CreateRecord("bad.example.com", ResourceType.A, new ANameRData { Address = IPAddress.Parse("2001:db8::1") })
+		);
+
+		using var stream = new MemoryStream();
+		message.WriteToStream(stream);
+		var payload = stream.ToArray();
+
+		Assert.False(DnsMessage.TryParse(payload, payload.Length, out _));
 	}
 
 	private static void AssertLengthMatches(RData rData)

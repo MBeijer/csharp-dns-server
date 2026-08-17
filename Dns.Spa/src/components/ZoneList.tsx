@@ -187,6 +187,19 @@ function inferZoneSuffixFromFileName(fileName: string): string {
     return strippedPath.replace(/\.[^.]+$/, "");
 }
 
+function getErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (error instanceof Error && error.message.length > 0) {
+        return error.message;
+    }
+
+    if (typeof error === "object" && error !== null && "message" in error &&
+        typeof error.message === "string" && error.message.length > 0) {
+        return error.message;
+    }
+
+    return fallbackMessage;
+}
+
 export function ZoneList(): JSX.Element {
     const dispatch = useAppDispatch();
     const zones = useAppSelector((state) => state.zones);
@@ -196,6 +209,7 @@ export function ZoneList(): JSX.Element {
     const [zoneDialogMode, setZoneDialogMode] = useState<ZoneDialogMode>("closed");
     const [zoneReadOnlySource, setZoneReadOnlySource] = useState<string | null>(null);
     const [zoneDraft, setZoneDraft] = useState<EditableZone>(emptyZone());
+    const [zoneSaveError, setZoneSaveError] = useState<string | null>(null);
 
     const [recordDialogOpen, setRecordDialogOpen] = useState(false);
     const [recordDraft, setRecordDraft] = useState<ZoneRecord>({host: "", type: "A", class: "IN", data: ""});
@@ -329,18 +343,21 @@ export function ZoneList(): JSX.Element {
     const startCreateZone = () => {
         setZoneDraft(emptyZone());
         setZoneReadOnlySource(null);
+        setZoneSaveError(null);
         setZoneDialogMode("create");
     };
 
     const openZone = (zone: Zone) => {
         setZoneDraft(mapZoneToEditable(zone));
         setZoneReadOnlySource(zone.source ?? null);
+        setZoneSaveError(null);
         setZoneDialogMode(getZoneAccessMode(zone));
     };
 
     const cancelEditZone = () => {
         setZoneDraft(emptyZone());
         setZoneReadOnlySource(null);
+        setZoneSaveError(null);
         setZoneDialogMode("closed");
     };
 
@@ -349,8 +366,13 @@ export function ZoneList(): JSX.Element {
             return;
         }
 
-        await dispatch(saveZone(normalizeZoneForApi(zoneDraft))).unwrap();
-        cancelEditZone();
+        setZoneSaveError(null);
+        try {
+            await dispatch(saveZone(normalizeZoneForApi(zoneDraft))).unwrap();
+            cancelEditZone();
+        } catch (error) {
+            setZoneSaveError(getErrorMessage(error, "Failed to save zone"));
+        }
     };
 
     const removeZone = async (zone: Zone) => {
@@ -510,6 +532,7 @@ export function ZoneList(): JSX.Element {
 
         setRecordDialogOpen(false);
         setRecordEditIndex(null);
+        setZoneSaveError(null);
     };
 
     const deleteRecord = (index: number) => {
@@ -819,6 +842,7 @@ export function ZoneList(): JSX.Element {
                     }}
                 >
                     <Stack spacing={2} sx={{mt: 1}}>
+                        {zoneSaveError ? <Alert severity="error">{zoneSaveError}</Alert> : null}
                         <TextField
                             label="Suffix"
                             value={zoneDraft.suffix}
