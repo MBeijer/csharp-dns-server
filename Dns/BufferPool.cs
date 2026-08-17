@@ -75,7 +75,7 @@ public static class BufferPool
 		// Clear state for reuse
 		args.SetBuffer(null, 0, 0);
 		args.RemoteEndPoint = null;
-		args.UserToken = null;
+		args.UserToken      = null;
 
 		// Only pool if we haven't exceeded our limit
 		if (s_socketArgsPool.Count < MaxPooledSocketArgs)

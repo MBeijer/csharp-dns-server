@@ -592,7 +592,10 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							Class = zoneRecord.Class,
 							Type  = zoneRecord.Type,
 							TTL   = 10,
-							RData = new NSRData { Name = address },
+							RData = new NSRData
+							{
+								Name = NormalizeDomainNameTarget(address, zoneName)
+							},
 						}
 					)
 				);
@@ -601,7 +604,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 				records.AddRange(
 					zoneRecord.Addresses.Select(address =>
 						{
-							var addressSplit = address.Split(' ');
+							var addressSplit = address.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
 							return new ResourceRecord
 							{
 								Name  = name,
@@ -610,7 +613,8 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 								TTL   = 10,
 								RData = new MXRData
 								{
-									Name = addressSplit[1], Preference = Convert.ToUInt16(addressSplit[0])
+									Name       = NormalizeDomainNameTarget(addressSplit[1], zoneName),
+									Preference = Convert.ToUInt16(addressSplit[0])
 								},
 							};
 						}
@@ -636,7 +640,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							TTL   = 10,
 							RData = new CNameRData
 							{
-								Name = NormalizeAliasTarget(address, zoneName)
+								Name = NormalizeDomainNameTarget(address, zoneName)
 							},
 						}
 					)
@@ -663,7 +667,10 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							Class = zoneRecord.Class,
 							Type  = zoneRecord.Type,
 							TTL   = 10,
-							RData = new DomainNamePointRData { Name = address },
+							RData = new DomainNamePointRData
+							{
+								Name = NormalizeDomainNameTarget(address, zoneName)
+							},
 						}
 					)
 				);
@@ -721,15 +728,16 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 		return $"{normalizedHost}.{zoneName}";
 	}
 
-	private static string NormalizeAliasTarget(string address, string zoneName)
+	private static string NormalizeDomainNameTarget(string address, string zoneName)
 	{
 		if (string.IsNullOrWhiteSpace(address)) return address;
 
 		var normalized = address.Trim();
 		if (normalized is "@" or "@." or "\\@" or "\\@.")
 			return zoneName;
+		if (normalized.EndsWith('.')) return normalized.TrimEnd('.');
 
-		return normalized;
+		return $"{normalized}.{zoneName}";
 	}
 
 	private static string CanonicalZoneName(string suffix) => suffix?.Trim().Trim('.') ?? string.Empty;
@@ -857,20 +865,17 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 			minimum = ParseSoaInterval(zoneRecord.Addresses[5], defaultMinimum);
 		}
 
-		primaryNameServer = primaryNameServer?.Trim().TrimEnd('.');
+		primaryNameServer = primaryNameServer?.Trim();
 		if (string.IsNullOrWhiteSpace(primaryNameServer))
 			primaryNameServer = zone.Records.Where(record => record.Type == ResourceType.NS)
 			                        .SelectMany(record => record.Addresses)
-			                        .FirstOrDefault()
-			                        ?.Trim()
-			                        .TrimEnd('.') ??
-			                    $"ns1.{zoneName}";
-		if (!primaryNameServer.Contains('.'))
-			primaryNameServer = $"{primaryNameServer}.{zoneName}";
+			                        .FirstOrDefault() ??
+			                    $"ns1.{zoneName}.";
+		primaryNameServer = NormalizeDomainNameTarget(primaryNameServer, zoneName);
 
-		responsibleMailbox = responsibleMailbox?.Trim().TrimEnd('.');
+		responsibleMailbox = responsibleMailbox?.Trim();
 		if (string.IsNullOrWhiteSpace(responsibleMailbox)) responsibleMailbox = $"hostmaster.{zoneName}";
-		else if (!responsibleMailbox.Contains('.')) responsibleMailbox        = $"{responsibleMailbox}.{zoneName}";
+		else responsibleMailbox = NormalizeDomainNameTarget(responsibleMailbox, zoneName);
 
 		return new(
 			primaryNameServer,
@@ -906,14 +911,11 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 	{
 		var primaryNameServer = zoneRecord?.Addresses.Count > 0
 			? zoneRecord.Addresses[0]
-			: $"{Environment.MachineName}.{zoneName}";
+			: $"{Environment.MachineName}.{zoneName}.";
 
-		var normalizedPrimaryNameServer = primaryNameServer?.Trim().TrimEnd('.');
-		if (string.IsNullOrWhiteSpace(normalizedPrimaryNameServer))
-			normalizedPrimaryNameServer = $"ns1.{zoneName}";
-
-		if (!normalizedPrimaryNameServer.Contains('.'))
-			normalizedPrimaryNameServer = $"{normalizedPrimaryNameServer}.{zoneName}";
+		var normalizedPrimaryNameServer = primaryNameServer?.Trim();
+		if (string.IsNullOrWhiteSpace(normalizedPrimaryNameServer)) normalizedPrimaryNameServer = $"ns1.{zoneName}.";
+		normalizedPrimaryNameServer = NormalizeDomainNameTarget(normalizedPrimaryNameServer, zoneName);
 
 		return new()
 		{
@@ -1198,7 +1200,15 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							         Class = zoneRecord.Class,
 							         Type  = zoneRecord.Type,
 							         TTL   = 10,
-							         RData = new NSRData { Name = address },
+							         RData = new NSRData
+							         {
+								         Name = NormalizeDomainNameTarget(
+									         address,
+									         CanonicalZoneName(
+										         zone.Suffix
+									         )
+								         )
+							         },
 						         }
 					         ))
 					{
@@ -1211,7 +1221,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 				case ResourceType.MX:
 					foreach (var answer in zoneRecord.Addresses.Select(address =>
 						         {
-							         var addressSplit = address.Split(' ');
+							         var addressSplit = address.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
 							         var tmpRecord = new ResourceRecord
 							         {
 								         Name  = question.Name,
@@ -1220,7 +1230,11 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 								         TTL   = 10,
 								         RData = new MXRData
 								         {
-									         Name = addressSplit[1], Preference = Convert.ToUInt16(addressSplit[0])
+									         Name = NormalizeDomainNameTarget(
+										         addressSplit[1],
+										         CanonicalZoneName(zone.Suffix)
+									         ),
+									         Preference = Convert.ToUInt16(addressSplit[0])
 								         },
 							         };
 
@@ -1264,7 +1278,7 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							         TTL   = 10,
 							         RData = new CNameRData
 							         {
-								         Name = NormalizeAliasTarget(
+								         Name = NormalizeDomainNameTarget(
 									         address,
 									         zoneName
 								         )
@@ -1332,7 +1346,12 @@ public class DnsServer(ILogger<DnsServer> logger, IOptions<ServerOptions> server
 							         TTL   = 10,
 							         RData = new DomainNamePointRData
 							         {
-								         Name = address
+								         Name = NormalizeDomainNameTarget(
+									         address,
+									         CanonicalZoneName(
+										         zone.Suffix
+									         )
+								         )
 							         },
 						         }
 					         ))

@@ -280,8 +280,8 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 					"SOA record must include MNAME, RNAME, SERIAL, REFRESH, RETRY, EXPIRE, and MINIMUM fields."
 				);
 
-			record.Addresses.Add(CanonicalizeName(rdata[0], lineNumber)); // primary name server
-			record.Addresses.Add(CanonicalizeName(rdata[1], lineNumber)); // responsible mailbox
+			record.Addresses.Add(CanonicalizeRDataName(rdata[0], lineNumber)); // primary name server
+			record.Addresses.Add(CanonicalizeRDataName(rdata[1], lineNumber)); // responsible mailbox
 
 			for (var i = 2; i < 7; i++)
 			{
@@ -323,7 +323,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 			if (rdata.Count != 1)
 				throw new BindZoneFileException(lineNumber, "NS record expects a single target name.");
 
-			record.Addresses.Add(CanonicalizeName(rdata[0], lineNumber));
+			record.Addresses.Add(CanonicalizeRDataName(rdata[0], lineNumber));
 
 			if (string.Equals(record.Host, "", StringComparison.OrdinalIgnoreCase)) _apexNsCount++;
 		}
@@ -336,7 +336,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 			if (!ushort.TryParse(rdata[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
 				throw new BindZoneFileException(lineNumber, "MX preference must be between 0 and 65535.");
 
-			record.Addresses.Add($"{rdata[0]} {CanonicalizeName(rdata[1], lineNumber)}");
+			record.Addresses.Add($"{rdata[0]} {CanonicalizeRDataName(rdata[1], lineNumber)}");
 		}
 
 		private static void ParseTxt(ZoneRecord record, List<string> rdata, int lineNumber)
@@ -351,7 +351,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 		{
 			if (rdata.Count != 1) throw new BindZoneFileException(lineNumber, "CNAME record expects a single target.");
 
-			var target = CanonicalizeName(rdata[0], lineNumber);
+			var target = CanonicalizeRDataName(rdata[0], lineNumber);
 			record.Addresses.Add(target);
 		}
 
@@ -359,7 +359,7 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 		{
 			if (rdata.Count != 1) throw new BindZoneFileException(lineNumber, "PTR record expects a single target.");
 
-			record.Addresses.Add(CanonicalizeName(rdata[0], lineNumber));
+			record.Addresses.Add(CanonicalizeRDataName(rdata[0], lineNumber));
 		}
 
 		private static void ParseAddressRecord(
@@ -447,6 +447,8 @@ public class BindZoneProvider(ILogger<BindZoneProvider> logger, IDnsResolver dns
 
 			return TrimTrailingDot($"{input}.{_currentOrigin}");
 		}
+
+		private string CanonicalizeRDataName(string token, int lineNumber) => $"{CanonicalizeName(token, lineNumber)}.";
 
 		private void EnsureWithinZone(string fqdn, int lineNumber)
 		{

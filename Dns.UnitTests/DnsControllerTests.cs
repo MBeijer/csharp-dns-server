@@ -99,6 +99,63 @@ public sealed class DnsControllerTests
 	}
 
 	[Fact]
+	public async Task AddZone_ExpandsRelativeDomainNameDataBeforeSaving()
+	{
+		var  controller = CreateController(out var zoneRepository, out _);
+		Zone savedZone  = null;
+		zoneRepository.AddZone(Arg.Do<Zone>(zone => savedZone = zone)).Returns(Task.CompletedTask);
+
+		var result = await controller.AddZone(
+			new ZoneDto
+			{
+				Suffix  = "example.com",
+				Enabled = true,
+				Records =
+				[
+					new() { Host = "dev", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "server1" },
+					new()
+					{
+						Host = "nested", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "sub.test",
+					},
+					new() { Host = "@", Type    = ResourceType.NS, Class = ResourceClass.IN, Data = "ns1" },
+					new() { Host = "mail", Type = ResourceType.MX, Class = ResourceClass.IN, Data = "10 mx.backup" },
+					new()
+					{
+						Host = "pointer", Type = ResourceType.PTR, Class = ResourceClass.IN, Data = "host.reverse",
+					},
+					new()
+					{
+						Host  = "soa",
+						Type  = ResourceType.SOA,
+						Class = ResourceClass.IN,
+						Data  = "ns.primary hostmaster.mail 1 3600 600 1209600 300",
+					},
+					new()
+					{
+						Host  = "external",
+						Type  = ResourceType.CNAME,
+						Class = ResourceClass.IN,
+						Data  = "other.test.",
+					},
+				],
+			}
+		);
+
+		Assert.IsType<CreatedResult>(result);
+		Assert.NotNull(savedZone);
+		Assert.Equal("server1.example.com.", savedZone.Records!.Single(record => record.Host == "dev").Data);
+		Assert.Equal("sub.test.example.com.", savedZone.Records.Single(record => record.Host == "nested").Data);
+		Assert.Equal("ns1.example.com.", savedZone.Records.Single(record => record.Host == "@").Data);
+		Assert.Equal("10 mx.backup.example.com.", savedZone.Records.Single(record => record.Host == "mail").Data);
+		Assert.Equal("host.reverse.example.com.", savedZone.Records.Single(record => record.Host == "pointer").Data);
+		Assert.Equal(
+			"ns.primary.example.com. hostmaster.mail.example.com. 1 3600 600 1209600 300",
+			savedZone.Records.Single(record => record.Type == ResourceType.SOA).Data
+		);
+		Assert.Equal("other.test.", savedZone.Records.Single(record => record.Host == "external").Data);
+	}
+
+	[Fact]
 	public async Task AddZone_ReturnsBadRequest_OnInvalidOperation()
 	{
 		var controller = CreateController(out var zoneRepository, out _);

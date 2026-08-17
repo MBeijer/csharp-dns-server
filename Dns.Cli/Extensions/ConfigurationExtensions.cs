@@ -42,7 +42,6 @@ public static class ConfigurationExtensions
 		/// <summary>
 		/// </summary>
 		/// <returns></returns>
-		public JsonElement ReadJsonElement() =>
-			JsonSerializer.SerializeToElement(section.ToJsonNode());
+		public JsonElement ReadJsonElement() => JsonSerializer.SerializeToElement(section.ToJsonNode());
 	}
 }

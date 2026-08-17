@@ -9,8 +9,8 @@ public static class StringExtensions
 	{
 		str ??= "";
 
-		using var stream = new MemoryStream(str.Length + 2);
-		var segments = str.Split([delimiter], System.StringSplitOptions.RemoveEmptyEntries);
+		using var stream   = new MemoryStream(str.Length + 2);
+		var       segments = str.Split([delimiter], System.StringSplitOptions.RemoveEmptyEntries);
 		foreach (var segment in segments)
 		{
 			stream.WriteByte((byte)segment.Length);

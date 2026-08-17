@@ -33,7 +33,7 @@ public class RequestProcessingBenchmarks
 
 	// Simulated request-response map (like in DnsServer)
 	private Dictionary<string, EndPoint> _requestResponseMap;
-	private ReaderWriterLockSlim _requestResponseMapLock;
+	private ReaderWriterLockSlim         _requestResponseMapLock;
 
 	// Sample endpoint
 	private EndPoint _sampleEndpoint;
@@ -53,9 +53,9 @@ public class RequestProcessingBenchmarks
 
 		DnsMessage.TryParse(_queryBytes, out _parsedQuery);
 
-		_requestResponseMap = new();
+		_requestResponseMap     = new();
 		_requestResponseMapLock = new();
-		_sampleEndpoint = new IPEndPoint(IPAddress.Parse("192.168.1.100"), 12345);
+		_sampleEndpoint         = new IPEndPoint(IPAddress.Parse("192.168.1.100"), 12345);
 	}
 
 	[GlobalCleanup]
@@ -96,21 +96,21 @@ public class RequestProcessingBenchmarks
 		DnsMessage.TryParse(_queryBytes, out var message);
 
 		// Build response (simulating authoritative answer)
-		message.QR = true;
-		message.AA = true;
-		message.RA = false;
-		message.RCode = (byte)RCode.NOERROR;
+		message.QR          = true;
+		message.AA          = true;
+		message.RA          = false;
+		message.RCode       = (byte)RCode.NOERROR;
 		message.AnswerCount = 1;
 
 		var rdata = new ANameRData { Address = IPAddress.Parse("192.0.2.1") };
 		message.Answers.Add(
 			new()
 			{
-				Name = message.Questions[0].Name,
-				Class = ResourceClass.IN,
-				Type = ResourceType.A,
-				TTL = 300,
-				RData = rdata,
+				Name       = message.Questions[0].Name,
+				Class      = ResourceClass.IN,
+				Type       = ResourceType.A,
+				TTL        = 300,
+				RData      = rdata,
 				DataLength = rdata.Length,
 			}
 		);
@@ -129,7 +129,7 @@ public class RequestProcessingBenchmarks
 	public byte[] BufferCopy_NewArray()
 	{
 		var bytesRead = _queryBytes.Length;
-		var payload = new byte[bytesRead];
+		var payload   = new byte[bytesRead];
 		Buffer.BlockCopy(_queryBytes, 0, payload, 0, bytesRead);
 		return payload;
 	}

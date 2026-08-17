@@ -16,19 +16,21 @@ namespace Dns.UnitTests;
 public sealed class TraefikClientServiceTests
 {
 	private readonly StubHttpMessageHandler _successHandler;
-	private readonly HttpClient _client;
-	private readonly TraefikClientService _target;
+	private readonly HttpClient             _client;
+	private readonly TraefikClientService   _target;
 
 	public TraefikClientServiceTests()
 	{
-		_successHandler = new(new HttpResponseMessage(HttpStatusCode.OK)
-		{
-			Content = new StringContent(
-				"[{\"name\":\"route-1\",\"rule\":\"Host(`example.com`)\",\"status\":\"enabled\"}]",
-				Encoding.UTF8,
-				"application/json"
-			),
-		});
+		_successHandler = new(
+			new HttpResponseMessage(HttpStatusCode.OK)
+			{
+				Content = new StringContent(
+					"[{\"name\":\"route-1\",\"rule\":\"Host(`example.com`)\",\"status\":\"enabled\"}]",
+					Encoding.UTF8,
+					"application/json"
+				),
+			}
+		);
 		_client = new(_successHandler);
 		_target = new TraefikClientService(_client);
 	}
@@ -47,7 +49,9 @@ public sealed class TraefikClientServiceTests
 	[Fact]
 	public async Task GetRoutes_Throws_WhenUnauthorized()
 	{
-		var handler = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("denied") });
+		var handler = new StubHttpMessageHandler(
+			new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("denied") }
+		);
 		var target = new TraefikClientService(new HttpClient(handler));
 		target.Initialize(CreateSettings());
 		await Assert.ThrowsAsync<AuthenticationException>(() => target.GetRoutes());
@@ -64,16 +68,19 @@ public sealed class TraefikClientServiceTests
 		{
 			ProviderSettings = new TraefikZoneProviderSettings
 			{
-				TraefikUrl = "http://localhost:8080",
-				Username = "u",
-				Password = "p",
+				TraefikUrl           = "http://localhost:8080",
+				Username             = "u",
+				Password             = "p",
 				DockerHostInternalIp = "172.17.0.1",
 			}
 		};
 
 	private sealed class StubHttpMessageHandler(HttpResponseMessage response) : HttpMessageHandler
 	{
-		protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+		protected override Task<HttpResponseMessage> SendAsync(
+			HttpRequestMessage request,
+			CancellationToken cancellationToken
+		) =>
 			Task.FromResult(response);
 	}
 }

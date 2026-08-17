@@ -224,7 +224,7 @@ public class DnsServerTests
 				"BuildResourceRecords",
 				new ZoneRecord
 				{
-					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"]
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com."]
 				},
 				zone,
 				"example.com"
@@ -348,7 +348,7 @@ public class DnsServerTests
 				soa,
 				new()
 				{
-					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"],
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com."],
 				},
 			]
 		);
@@ -373,7 +373,7 @@ public class DnsServerTests
 		var zone   = new Zone { Suffix = "example.com", Serial = 1 };
 		var ns = new ZoneRecord
 		{
-			Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"],
+			Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1"],
 		};
 		zone.Initialize(
 			[
@@ -400,6 +400,7 @@ public class DnsServerTests
 		);
 
 		Assert.Single(message.Answers);
+		Assert.Equal("ns1.example.com", Assert.IsType<NSRData>(message.Answers[0].RData).Name);
 		Assert.Equal(2, message.AdditionalCount);
 		Assert.Contains(message.Additionals, record => record.Type == ResourceType.A);
 		Assert.Contains(message.Additionals, record => record.Type == ResourceType.AAAA);
@@ -455,6 +456,75 @@ public class DnsServerTests
 			var cname = Assert.Single(records);
 			Assert.Equal("example.com", Assert.IsType<CNameRData>(cname.RData).Name);
 		}
+	}
+
+	[Fact]
+	public void BuildResourceRecords_ExpandsRelativeDomainNameTargets()
+	{
+		var server = CreateServer();
+		var zone   = new Zone { Suffix = "example.com", Serial = 3 };
+
+		var cnameRecords = InvokePrivate<List<ResourceRecord>>(
+			server,
+			"BuildResourceRecords",
+			new ZoneRecord
+			{
+				Host      = "dev",
+				Type      = ResourceType.CNAME,
+				Class     = ResourceClass.IN,
+				Addresses = ["server1", "sub.test", "external.example.net."],
+			},
+			zone,
+			"example.com"
+		);
+		Assert.Equal("server1.example.com", Assert.IsType<CNameRData>(cnameRecords[0].RData).Name);
+		Assert.Equal("sub.test.example.com", Assert.IsType<CNameRData>(cnameRecords[1].RData).Name);
+		Assert.Equal("external.example.net", Assert.IsType<CNameRData>(cnameRecords[2].RData).Name);
+
+		var nsRecords = InvokePrivate<List<ResourceRecord>>(
+			server,
+			"BuildResourceRecords",
+			new ZoneRecord
+			{
+				Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1", "ns.other.net."],
+			},
+			zone,
+			"example.com"
+		);
+		Assert.Equal("ns1.example.com", Assert.IsType<NSRData>(nsRecords[0].RData).Name);
+		Assert.Equal("ns.other.net", Assert.IsType<NSRData>(nsRecords[1].RData).Name);
+
+		var mxRecord = Assert.Single(
+			InvokePrivate<List<ResourceRecord>>(
+				server,
+				"BuildResourceRecords",
+				new ZoneRecord
+				{
+					Host = "@", Type = ResourceType.MX, Class = ResourceClass.IN, Addresses = ["10 mx.backup"],
+				},
+				zone,
+				"example.com"
+			)
+		);
+		var mxData = Assert.IsType<MXRData>(mxRecord.RData);
+		Assert.Equal(
+			"mx.backup.example.com",
+			typeof(MXRData).GetProperty("Name", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(mxData)
+		);
+
+		var ptrRecord = Assert.Single(
+			InvokePrivate<List<ResourceRecord>>(
+				server,
+				"BuildResourceRecords",
+				new ZoneRecord
+				{
+					Host = "1", Type = ResourceType.PTR, Class = ResourceClass.IN, Addresses = ["host.reverse"],
+				},
+				zone,
+				"example.com"
+			)
+		);
+		Assert.Equal("host.reverse.example.com", Assert.IsType<DomainNamePointRData>(ptrRecord.RData).Name);
 	}
 
 	[Fact]
@@ -596,7 +666,7 @@ public class DnsServerTests
 			[
 				new()
 				{
-					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"],
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com."],
 				},
 				new()
 				{
@@ -617,7 +687,7 @@ public class DnsServerTests
 					Host      = "@",
 					Type      = ResourceType.SOA,
 					Class     = ResourceClass.IN,
-					Addresses = ["ns1.example.com hostmaster.example.com 1 7200 1800 1209600 3600"],
+					Addresses = ["ns1.example.com. hostmaster.example.com. 1 7200 1800 1209600 3600"],
 				},
 			]
 		);
@@ -910,11 +980,23 @@ public class DnsServerTests
 		firstSecondary.Start(CancellationToken.None);
 		secondSecondary.Start(CancellationToken.None);
 
-		await WaitForZoneSerialAsync(firstResolver, 1);
+		var firstInitial = await WaitForZoneSerialAsync(firstResolver, 1);
 		await WaitForZoneSerialAsync(secondResolver, 1);
 		Assert.Contains(
 			firstResolver.GetZones().Single(zone => zone.Suffix == "replicated.example").Records,
 			record => record.Type == ResourceType.TXT && record.Addresses.Single() == new string('x', 200)
+		);
+		Assert.Equal(
+			"alias.replicated.example.",
+			firstInitial.Records.Single(record => record.Type == ResourceType.CNAME).Addresses.Single()
+		);
+		Assert.Equal(
+			"10 mail.replicated.example.",
+			firstInitial.Records.Single(record => record.Type == ResourceType.MX).Addresses.Single()
+		);
+		Assert.Equal(
+			"pointer.replicated.example.",
+			firstInitial.Records.Single(record => record.Type == ResourceType.PTR).Addresses.Single()
 		);
 
 		primaryZone = CreateReplicationZone(2, "192.0.2.20");
@@ -1219,7 +1301,7 @@ public class DnsServerTests
 
 			var restoredZone = Assert.Single(restoredResolver.GetZones());
 			Assert.Equal("cached.example", restoredZone.Suffix);
-			Assert.Equal(4, restoredZone.Records.Count);
+			Assert.Equal(7, restoredZone.Records.Count);
 			Assert.Contains(restoredZone.Records, record => record.Type == ResourceType.A);
 			Assert.Contains(restoredZone.Records, record => record.Type == ResourceType.TXT);
 		}
@@ -1270,7 +1352,7 @@ public class DnsServerTests
 				15,
 				TimeSpan.FromSeconds(10)
 			);
-			Assert.Equal(4, repaired.Records.Count);
+			Assert.Equal(7, repaired.Records.Count);
 			Assert.Contains(repaired.Records, record => record.Type == ResourceType.A);
 			Assert.Contains(repaired.Records, record => record.Type == ResourceType.TXT);
 		}
@@ -1292,18 +1374,39 @@ public class DnsServerTests
 					Host      = string.Empty,
 					Type      = ResourceType.SOA,
 					Class     = ResourceClass.IN,
-					Addresses = [$"ns1.{suffix}", $"hostmaster.{suffix}"],
+					Addresses = [$"ns1.{suffix}.", $"hostmaster.{suffix}."],
 				},
 				new()
 				{
 					Host      = string.Empty,
 					Type      = ResourceType.NS,
 					Class     = ResourceClass.IN,
-					Addresses = [$"ns1.{suffix}"],
+					Addresses = [$"ns1.{suffix}."],
 				},
 				new()
 				{
 					Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = [address],
+				},
+				new()
+				{
+					Host      = "alias",
+					Type      = ResourceType.CNAME,
+					Class     = ResourceClass.IN,
+					Addresses = [$"alias.{suffix}."],
+				},
+				new()
+				{
+					Host      = string.Empty,
+					Type      = ResourceType.MX,
+					Class     = ResourceClass.IN,
+					Addresses = [$"10 mail.{suffix}."],
+				},
+				new()
+				{
+					Host      = "pointer",
+					Type      = ResourceType.PTR,
+					Class     = ResourceClass.IN,
+					Addresses = [$"pointer.{suffix}."],
 				},
 				new()
 				{
@@ -1659,6 +1762,34 @@ public class DnsServerTests
 
 		var cname = Assert.Single(message.Answers, answer => answer.Type == ResourceType.CNAME);
 		Assert.Equal("example.com", Assert.IsType<CNameRData>(cname.RData).Name);
+	}
+
+	[Fact]
+	public void HandleRecords_RelativeTargetsUseEffectiveSlaveZoneSuffix()
+	{
+		var server  = CreateServer();
+		var message = new DnsMessage();
+		var zone    = new Zone { Suffix = "slave.example.net", Serial = 5 };
+		var zoneRecords = new List<ZoneRecord>
+		{
+			new() { Host = "dev", Type = ResourceType.CNAME, Class = ResourceClass.IN, Addresses = ["server1"] },
+			new() { Host = "", Type    = ResourceType.NS, Class    = ResourceClass.IN, Addresses = ["ns1"] },
+		};
+		zone.Initialize(zoneRecords);
+
+		InvokePrivateVoid(
+			server,
+			"HandleRecords",
+			zoneRecords,
+			new Question("dev.slave.example.net", ResourceType.ANY, ResourceClass.IN),
+			message,
+			zone
+		);
+
+		var cname = Assert.Single(message.Answers, answer => answer.Type == ResourceType.CNAME);
+		Assert.Equal("server1.slave.example.net", Assert.IsType<CNameRData>(cname.RData).Name);
+		var ns = Assert.Single(message.Answers, answer => answer.Type == ResourceType.NS);
+		Assert.Equal("ns1.slave.example.net", Assert.IsType<NSRData>(ns.RData).Name);
 	}
 
 	private static DnsServer CreateServer(

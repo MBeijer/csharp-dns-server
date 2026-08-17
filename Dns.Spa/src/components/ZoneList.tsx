@@ -864,6 +864,7 @@ export function ZoneList(): JSX.Element {
                                 }))}
                                 fullWidth
                                 disabled={areDraftRecordsReadOnly}
+                                helperText="Names without a trailing dot are relative to this zone."
                             />
                             <TextField
                                 label="Hostmaster"
@@ -874,6 +875,7 @@ export function ZoneList(): JSX.Element {
                                 }))}
                                 fullWidth
                                 disabled={areDraftRecordsReadOnly}
+                                helperText="Names without a trailing dot are relative to this zone."
                             />
                         </Stack>
                         <Stack direction={{xs: "column", sm: "row"}} spacing={2}>
@@ -1160,6 +1162,9 @@ export function ZoneList(): JSX.Element {
                             label="Data"
                             value={recordDraft.data ?? ""}
                             onChange={(event) => setRecordDraft((current) => ({...current, data: event.target.value}))}
+                            helperText={["CNAME", "NS", "MX", "PTR"].includes(recordDraft.type ?? "")
+                                ? "Names without a trailing dot are relative to this zone; add a trailing dot for an absolute name."
+                                : undefined}
                             fullWidth
                         />
                     </Stack>

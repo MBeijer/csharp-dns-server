@@ -164,6 +164,8 @@ SOA responses use the primary nameserver, responsible mailbox, refresh, retry, e
 
 For an apex `NS` answer, the server includes matching in-zone `A` and `AAAA` records in the DNS Additional section. Parent-zone glue is separate: when a delegated nameserver is itself beneath the delegated domain, its address must still be registered with the domain registrar/parent registry.
 
+Domain-name fields entered through the API or SPA follow BIND `$ORIGIN` rules. This applies to `CNAME`, `NS`, `MX`, and `PTR` targets and the SOA primary-name-server and responsible-mailbox fields. A value without a trailing dot is relative to the edited zone (`sub.test` in `example.com` becomes `sub.test.example.com.`); only a value ending in `.` is absolute and left outside the zone origin. When a database zone is used as the template for another zone on the same server, in-zone domain-name fields are rewritten to the slave zone suffix, while targets outside the master zone remain unchanged.
+
 ### Zone Transfer / Notify Configuration
 `AXFR` and `IXFR` are only served over TCP when zone transfer is enabled and the caller IP is allowlisted.
 

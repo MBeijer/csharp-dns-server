@@ -23,22 +23,30 @@ public sealed class AuthorizeOnlyOperationFilterTests
 	public void Apply_AddsSecurityForAuthorizedMethods()
 	{
 		var secureOperation = new OpenApiOperation();
-		var secureContext = CreateOperationFilterContext(typeof(OperationFilterTestEndpoint).GetMethod(nameof(OperationFilterTestEndpoint.Secured))!);
+		var secureContext = CreateOperationFilterContext(
+			typeof(OperationFilterTestEndpoint).GetMethod(nameof(OperationFilterTestEndpoint.Secured))!
+		);
 		_target.Apply(secureOperation, secureContext);
 		Assert.NotNull(secureOperation.Security);
 		Assert.Contains("401", secureOperation.Responses.Keys);
 		Assert.Contains("403", secureOperation.Responses.Keys);
 
 		var openOperation = new OpenApiOperation();
-		var openContext = CreateOperationFilterContext(typeof(OperationFilterTestEndpoint).GetMethod(nameof(OperationFilterTestEndpoint.Open))!);
+		var openContext = CreateOperationFilterContext(
+			typeof(OperationFilterTestEndpoint).GetMethod(nameof(OperationFilterTestEndpoint.Open))!
+		);
 		_target.Apply(openOperation, openContext);
 		Assert.True(openOperation.Security == null || openOperation.Security.Count == 0);
 	}
 
 	private static OperationFilterContext CreateOperationFilterContext(MethodInfo methodInfo)
 	{
-		var ctor = typeof(OperationFilterContext).GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
-		var args = ctor.GetParameters().Select(parameter => ResolveParameter(parameter.ParameterType, methodInfo)).ToArray();
+		var ctor = typeof(OperationFilterContext).GetConstructors()
+		                                         .OrderByDescending(c => c.GetParameters().Length)
+		                                         .First();
+		var args = ctor.GetParameters()
+		               .Select(parameter => ResolveParameter(parameter.ParameterType, methodInfo))
+		               .ToArray();
 		return (OperationFilterContext)ctor.Invoke(args);
 	}
 

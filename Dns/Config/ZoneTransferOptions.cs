@@ -6,7 +6,8 @@ namespace Dns.Config;
 public class ZoneTransferOptions
 {
 	[JsonConverter(typeof(FlexibleBooleanJsonConverter))]
-	[JsonPropertyName("enabled")] public bool Enabled { get; set; }
+	[JsonPropertyName("enabled")]
+	public bool Enabled { get; set; }
 
 	[JsonPropertyName("allowTransfersFrom")]
 	[JsonConverter(typeof(FlexibleStringListJsonConverter))]

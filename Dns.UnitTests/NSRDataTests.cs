@@ -9,7 +9,7 @@ public sealed class NSRDataTests
 	[Fact]
 	public void Length_MatchesEncodedBytes_WithTrailingDot()
 	{
-		var target = new NSRData { Name = "ns1.graalonline.com." };
+		var       target = new NSRData { Name = "ns1.graalonline.com." };
 		using var stream = new MemoryStream();
 
 		target.WriteToStream(stream);

@@ -9,6 +9,7 @@ public sealed class ActiveBindImportRequest
 	///     Replaces existing database records for each imported zone suffix when true.
 	/// </summary>
 	public bool ReplaceExistingRecords { get; set; } = true;
+
 	/// <summary>
 	///     Sets imported database zones to enabled when true.
 	/// </summary>

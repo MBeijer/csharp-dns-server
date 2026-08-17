@@ -14,24 +14,16 @@ namespace Dns.Db.Repositories;
 public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext dbContext) : IZoneRepository
 {
 	public Task<List<Zone>> GetZones() =>
-		dbContext.Zones!
-				 .AsNoTracking()
-				 .Include(z => z.MasterZone)
-				 .Include(z => z.SlaveZones)
-				 .ToListAsync();
+		dbContext.Zones!.AsNoTracking().Include(z => z.MasterZone).Include(z => z.SlaveZones).ToListAsync();
 
 	public Task<Zone?> GetZone(int id) =>
-		dbContext.Zones!
-				 .Include(z => z.MasterZone)
-				 .Include(z => z.SlaveZones)
-				 .SingleOrDefaultAsync(x => x.Id == id);
+		dbContext.Zones!.Include(z => z.MasterZone).Include(z => z.SlaveZones).SingleOrDefaultAsync(x => x.Id == id);
 
 	public Task<Zone?> GetZone(string suffix) =>
-		dbContext.Zones!
-				 .Include(z => z.MasterZone)
-				 .Include(z => z.SlaveZones)
-				 .Where(x => x.Suffix! == suffix)
-				 .SingleOrDefaultAsync();
+		dbContext.Zones!.Include(z => z.MasterZone)
+		         .Include(z => z.SlaveZones)
+		         .Where(x => x.Suffix! == suffix)
+		         .SingleOrDefaultAsync();
 
 	public async Task AddZone(Zone zone)
 	{
@@ -45,10 +37,9 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 
 		if (zone.MasterZoneId != null)
 		{
-			var inserted = await dbContext.Zones!
-										 .Include(z => z.Records)
-										 .SingleAsync(z => z.Id == zone.Id)
-										 .ConfigureAwait(false);
+			var inserted = await dbContext.Zones!.Include(z => z.Records)
+			                              .SingleAsync(z => z.Id == zone.Id)
+			                              .ConfigureAwait(false);
 			await SynchronizeFromMasterAsync(inserted, zone.MasterZoneId.Value).ConfigureAwait(false);
 			await dbContext.SaveChangesAsync().ConfigureAwait(false);
 		}
@@ -59,18 +50,19 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 		ArgumentNullException.ThrowIfNull(zone);
 		if (zone.Id == null) throw new ArgumentException("Zone id is required.", nameof(zone));
 
-		var existing = await dbContext.Zones!
-									  .Include(z => z.Records)
-									  .SingleOrDefaultAsync(z => z.Id == zone.Id)
-									  .ConfigureAwait(false);
+		var existing = await dbContext.Zones!.Include(z => z.Records)
+		                              .SingleOrDefaultAsync(z => z.Id == zone.Id)
+		                              .ConfigureAwait(false);
 
 		if (existing == null) throw new InvalidOperationException($"Zone '{zone.Id}' was not found.");
 		await ValidateMasterReferenceAsync(zone.MasterZoneId, existing.Id).ConfigureAwait(false);
 
 		if (existing.MasterZoneId != null && zone.MasterZoneId == existing.MasterZoneId)
-			throw new InvalidOperationException("Slave zones cannot be edited directly while connected to a master zone.");
+			throw new InvalidOperationException(
+				"Slave zones cannot be edited directly while connected to a master zone."
+			);
 
-		existing.Suffix = zone.Suffix;
+		existing.Suffix       = zone.Suffix;
 		existing.MasterZoneId = zone.MasterZoneId;
 
 		if (existing.MasterZoneId != null)
@@ -79,7 +71,7 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 		}
 		else
 		{
-			existing.Serial = GetNextSerial(existing.Serial);
+			existing.Serial  = GetNextSerial(existing.Serial);
 			existing.Enabled = zone.Enabled;
 			NormalizeSoaSerial(zone.Records, existing.Serial);
 
@@ -88,9 +80,9 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 			existing.Records = zone.Records ?? [];
 			foreach (var record in existing.Records)
 			{
-				record.Id = null;
+				record.Id      = null;
 				record.ZoneObj = existing;
-				record.Zone = existing.Id;
+				record.Zone    = existing.Id;
 			}
 		}
 
@@ -105,10 +97,9 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 
 	public async Task<bool> DeleteZone(int id)
 	{
-		var existing = await dbContext.Zones!
-									  .Include(z => z.Records)
-									  .SingleOrDefaultAsync(z => z.Id == id)
-									  .ConfigureAwait(false);
+		var existing = await dbContext.Zones!.Include(z => z.Records)
+		                              .SingleOrDefaultAsync(z => z.Id == id)
+		                              .ConfigureAwait(false);
 		if (existing == null) return false;
 
 		if (existing.Records?.Count > 0) dbContext.ZoneRecords!.RemoveRange(existing.Records);
@@ -124,10 +115,9 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 			throw new ArgumentException("Zone suffix is required.", nameof(zone));
 		await ValidateMasterReferenceAsync(zone.MasterZoneId, zone.Id).ConfigureAwait(false);
 
-		var existing = await dbContext.Zones!
-									  .Include(z => z.Records)
-									  .SingleOrDefaultAsync(z => z.Suffix == zone.Suffix)
-									  .ConfigureAwait(false);
+		var existing = await dbContext.Zones!.Include(z => z.Records)
+		                              .SingleOrDefaultAsync(z => z.Suffix == zone.Suffix)
+		                              .ConfigureAwait(false);
 
 		if (existing == null)
 		{
@@ -144,11 +134,14 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 
 			return zone;
 		}
-		if (existing.MasterZoneId != null)
-			throw new InvalidOperationException("Slave zones cannot be updated directly while connected to a master zone.");
 
-		existing.Serial = GetNextSerial(existing.Serial);
-		existing.Enabled = zone.Enabled;
+		if (existing.MasterZoneId != null)
+			throw new InvalidOperationException(
+				"Slave zones cannot be updated directly while connected to a master zone."
+			);
+
+		existing.Serial       = GetNextSerial(existing.Serial);
+		existing.Enabled      = zone.Enabled;
 		existing.MasterZoneId = zone.MasterZoneId;
 		NormalizeSoaSerial(zone.Records, existing.Serial);
 
@@ -159,9 +152,9 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 			existing.Records = zone.Records ?? [];
 			foreach (var record in existing.Records)
 			{
-				record.Id = null;
+				record.Id      = null;
 				record.ZoneObj = existing;
-				record.Zone = existing.Id;
+				record.Zone    = existing.Id;
 			}
 		}
 		else
@@ -180,13 +173,13 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 				existing.Records.Add(
 					new()
 					{
-						Id = null,
-						Host = incoming.Host,
-						Type = incoming.Type,
-						Class = incoming.Class,
-						Data = incoming.Data,
+						Id      = null,
+						Host    = incoming.Host,
+						Type    = incoming.Type,
+						Class   = incoming.Class,
+						Data    = incoming.Data,
 						ZoneObj = existing,
-						Zone = existing.Id,
+						Zone    = existing.Id,
 					}
 				);
 			}
@@ -214,17 +207,15 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 
 	private async Task SynchronizeSlavesAsync(int masterZoneId)
 	{
-		var master = await dbContext.Zones!
-									.Include(z => z.Records)
-									.SingleOrDefaultAsync(z => z.Id == masterZoneId)
-									.ConfigureAwait(false);
+		var master = await dbContext.Zones!.Include(z => z.Records)
+		                            .SingleOrDefaultAsync(z => z.Id == masterZoneId)
+		                            .ConfigureAwait(false);
 		if (master == null) return;
 
-		var slaves = await dbContext.Zones!
-									.Include(z => z.Records)
-									.Where(z => z.MasterZoneId == masterZoneId)
-									.ToListAsync()
-									.ConfigureAwait(false);
+		var slaves = await dbContext.Zones!.Include(z => z.Records)
+		                            .Where(z => z.MasterZoneId == masterZoneId)
+		                            .ToListAsync()
+		                            .ConfigureAwait(false);
 
 		foreach (var slave in slaves)
 		{
@@ -234,28 +225,28 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 
 	private async Task SynchronizeFromMasterAsync(Zone slave, int masterZoneId)
 	{
-		var master = await dbContext.Zones!
-									.Include(z => z.Records)
-									.SingleAsync(z => z.Id == masterZoneId)
-									.ConfigureAwait(false);
+		var master = await dbContext.Zones!.Include(z => z.Records)
+		                            .SingleAsync(z => z.Id == masterZoneId)
+		                            .ConfigureAwait(false);
 
 		CopyMasterToSlave(master, slave);
 	}
 
 	private void CopyMasterToSlave(Zone master, Zone slave)
 	{
-		slave.Serial = master.Serial;
+		slave.Serial  = master.Serial;
 		slave.Enabled = master.Enabled;
 
 		if (slave.Records?.Count > 0) dbContext.ZoneRecords!.RemoveRange(slave.Records);
 
-		slave.Records = master.Records?.Select(record => CloneRecordForSlave(record, master.Suffix, slave.Suffix)).ToList() ??
-						new List<ZoneRecord>();
+		slave.Records =
+			master.Records?.Select(record => CloneRecordForSlave(record, master.Suffix, slave.Suffix)).ToList() ??
+			new List<ZoneRecord>();
 		foreach (var record in slave.Records)
 		{
-			record.Id = null;
+			record.Id      = null;
 			record.ZoneObj = slave;
-			record.Zone = slave.Id;
+			record.Zone    = slave.Id;
 		}
 	}
 
@@ -263,36 +254,76 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 	{
 		var clone = new ZoneRecord
 		{
-			Host = source.Host,
-			Class = source.Class,
-			Type = source.Type,
-			Data = source.Data,
+			Host = source.Host, Class = source.Class, Type = source.Type, Data = source.Data,
 		};
 
-		if (clone.Type == Models.EntityFramework.Enums.ResourceType.CNAME)
-			clone.Data = RewriteSlaveCNameTarget(clone.Data, masterSuffix, slaveSuffix);
+		clone.Data = clone.Type switch
+		{
+			Models.EntityFramework.Enums.ResourceType.CNAME or Models.EntityFramework.Enums.ResourceType.NS
+				or Models.EntityFramework.Enums.ResourceType.PTR => RewriteSlaveDomainNameTarget(
+					clone.Data,
+					masterSuffix,
+					slaveSuffix
+				),
+			Models.EntityFramework.Enums.ResourceType.MX  => RewriteSlaveMxData(clone.Data, masterSuffix, slaveSuffix),
+			Models.EntityFramework.Enums.ResourceType.SOA => RewriteSlaveSoaData(clone.Data, masterSuffix, slaveSuffix),
+			_                                             => clone.Data,
+		};
 
 		return clone;
 	}
 
-	private static string? RewriteSlaveCNameTarget(string? target, string? masterSuffix, string? slaveSuffix)
+	private static string? RewriteSlaveMxData(string? data, string? masterSuffix, string? slaveSuffix)
+	{
+		if (string.IsNullOrWhiteSpace(data)) return data;
+
+		var fields = data.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+		return fields.Length == 2
+			? $"{fields[0]} {RewriteSlaveDomainNameTarget(fields[1], masterSuffix, slaveSuffix)}"
+			: data;
+	}
+
+	private static string? RewriteSlaveSoaData(string? data, string? masterSuffix, string? slaveSuffix)
+	{
+		if (string.IsNullOrWhiteSpace(data)) return data;
+
+		var fields = data.Replace("(", " ", StringComparison.Ordinal)
+		                 .Replace(")", " ", StringComparison.Ordinal)
+		                 .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+		if (fields.Length < 2) return data;
+
+		fields[0] = RewriteSlaveDomainNameTarget(fields[0], masterSuffix, slaveSuffix) ?? fields[0];
+		fields[1] = RewriteSlaveDomainNameTarget(fields[1], masterSuffix, slaveSuffix) ?? fields[1];
+		return string.Join(' ', fields);
+	}
+
+	private static string? RewriteSlaveDomainNameTarget(string? target, string? masterSuffix, string? slaveSuffix)
 	{
 		if (string.IsNullOrWhiteSpace(target)) return target;
 
 		var normalizedSlaveSuffix = NormalizeSuffix(slaveSuffix);
 		if (string.IsNullOrWhiteSpace(normalizedSlaveSuffix)) return target;
 
-		var trimmedTarget = target.Trim();
+		var trimmedTarget       = target.Trim();
 		var preserveTrailingDot = trimmedTarget.EndsWith('.');
 
 		if (trimmedTarget == "@" || trimmedTarget == "@.")
 			return preserveTrailingDot ? $"{normalizedSlaveSuffix}." : normalizedSlaveSuffix;
 
 		var normalizedMasterSuffix = NormalizeSuffix(masterSuffix);
-		var normalizedTarget = trimmedTarget.TrimEnd('.');
-		if (!string.IsNullOrWhiteSpace(normalizedMasterSuffix) &&
-			string.Equals(normalizedTarget, normalizedMasterSuffix, StringComparison.OrdinalIgnoreCase))
+		var normalizedTarget       = trimmedTarget.TrimEnd('.');
+		if (string.IsNullOrWhiteSpace(normalizedMasterSuffix)) return target;
+
+		if (string.Equals(normalizedTarget, normalizedMasterSuffix, StringComparison.OrdinalIgnoreCase))
 			return preserveTrailingDot ? $"{normalizedSlaveSuffix}." : normalizedSlaveSuffix;
+
+		var masterSuffixWithSeparator = $".{normalizedMasterSuffix}";
+		if (normalizedTarget.EndsWith(masterSuffixWithSeparator, StringComparison.OrdinalIgnoreCase))
+		{
+			var relativeTarget = normalizedTarget[..^masterSuffixWithSeparator.Length];
+			var rewritten      = $"{relativeTarget}.{normalizedSlaveSuffix}";
+			return preserveTrailingDot ? $"{rewritten}." : rewritten;
+		}
 
 		return target;
 	}
@@ -302,9 +333,13 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 	private static bool AreEquivalentRecords(ZoneRecord left, ZoneRecord right)
 	{
 		return left.Type == right.Type &&
-			   left.Class == right.Class &&
-			   string.Equals(NormalizeField(left.Host), NormalizeField(right.Host), StringComparison.OrdinalIgnoreCase) &&
-			   string.Equals(NormalizeField(left.Data), NormalizeField(right.Data), StringComparison.OrdinalIgnoreCase);
+		       left.Class == right.Class &&
+		       string.Equals(
+			       NormalizeField(left.Host),
+			       NormalizeField(right.Host),
+			       StringComparison.OrdinalIgnoreCase
+		       ) &&
+		       string.Equals(NormalizeField(left.Data), NormalizeField(right.Data), StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static string NormalizeField(string? value) => value?.Trim() ?? string.Empty;
@@ -321,7 +356,7 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 			var parts = record.Data.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
 			if (parts.Count >= 3)
 			{
-				parts[2] = serial.ToString(CultureInfo.InvariantCulture);
+				parts[2]    = serial.ToString(CultureInfo.InvariantCulture);
 				record.Data = string.Join(" ", parts);
 			}
 		}
@@ -330,7 +365,7 @@ public class ZoneRepository(ILogger<ZoneRepository> logger, DnsServerDbContext d
 	private static uint GetNextSerial(uint? currentSerial)
 	{
 		var datePrefix = DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
-		var prefix = uint.Parse(datePrefix, CultureInfo.InvariantCulture);
+		var prefix     = uint.Parse(datePrefix, CultureInfo.InvariantCulture);
 
 		if (currentSerial != null)
 		{

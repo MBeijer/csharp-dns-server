@@ -13,10 +13,10 @@ namespace Dns.UnitTests;
 
 public sealed class UserRepositoryTests : IAsyncLifetime
 {
-	private SqliteConnection _connection;
-	private DnsServerDbContext _context;
+	private SqliteConnection      _connection;
+	private DnsServerDbContext    _context;
 	private IPasswordHasher<User> _passwordHasher;
-	private UserRepository _target;
+	private UserRepository        _target;
 
 	public async Task InitializeAsync()
 	{
@@ -26,7 +26,7 @@ public sealed class UserRepositoryTests : IAsyncLifetime
 		_context = new DnsServerDbContext(options);
 		await _context.Database.EnsureCreatedAsync();
 		_passwordHasher = Substitute.For<IPasswordHasher<User>>();
-		_target = new UserRepository(Substitute.For<ILogger<UserRepository>>(), _context, _passwordHasher);
+		_target         = new UserRepository(Substitute.For<ILogger<UserRepository>>(), _context, _passwordHasher);
 	}
 
 	public async Task DisposeAsync()
@@ -41,7 +41,8 @@ public sealed class UserRepositoryTests : IAsyncLifetime
 		_context.Users.Add(new User { Account = "admin", Password = "old-hash", Activated = true, AdminLevel = 1 });
 		await _context.SaveChangesAsync();
 
-		_passwordHasher.VerifyHashedPassword(Arg.Any<User>(), Arg.Any<string>(), "pw").Returns(PasswordVerificationResult.SuccessRehashNeeded);
+		_passwordHasher.VerifyHashedPassword(Arg.Any<User>(), Arg.Any<string>(), "pw")
+		               .Returns(PasswordVerificationResult.SuccessRehashNeeded);
 		_passwordHasher.HashPassword(Arg.Any<User>(), "pw").Returns("new-hash");
 
 		var verified = _target.VerifyAccount("admin", "pw", out var user);

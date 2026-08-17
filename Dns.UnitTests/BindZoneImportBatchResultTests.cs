@@ -9,7 +9,7 @@ public sealed class BindZoneImportBatchResultTests
 	public void Defaults_AreInitialized()
 	{
 		var result = new BindZoneImportBatchResult();
-		var item = new BindZoneImportBatchItem();
+		var item   = new BindZoneImportBatchItem();
 		Assert.NotNull(result.Items);
 		Assert.Empty(result.Items);
 		Assert.Equal(string.Empty, item.ZoneSuffix);

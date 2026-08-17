@@ -15,7 +15,7 @@ namespace Dns.Cli.Handlers;
 public class JwtTokenHandler : IJwtTokenHandler
 {
 	private readonly JwtSecurityTokenHandler _tokenHandler;
-	private readonly SigningCredentials _signingCredentials;
+	private readonly SigningCredentials      _signingCredentials;
 
 	/// <summary>
 	///
@@ -25,10 +25,7 @@ public class JwtTokenHandler : IJwtTokenHandler
 	{
 		_tokenHandler = new();
 		var key = Encoding.ASCII.GetBytes(serverOptions.Value.WebServer.JwtSecretKey);
-		_signingCredentials = new(
-			new SymmetricSecurityKey(key),
-			SecurityAlgorithms.HmacSha256Signature
-		);
+		_signingCredentials = new(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature);
 	}
 
 	/// <summary>
@@ -47,7 +44,7 @@ public class JwtTokenHandler : IJwtTokenHandler
 					new(ClaimTypes.Upn, user.Account!),
 				]
 			),
-			Expires = DateTime.UtcNow.AddDays(7),
+			Expires            = DateTime.UtcNow.AddDays(7),
 			SigningCredentials = _signingCredentials,
 		};
 		var token = _tokenHandler.CreateToken(tokenDescriptor);
