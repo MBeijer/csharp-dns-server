@@ -89,69 +89,24 @@ public static class DtoMappings
 			Serial       = zoneDto.Serial,
 			Enabled      = zoneDto.Enabled,
 			MasterZoneId = zoneDto.MasterZoneId,
-			Records = zoneDto.Records?.Select(record => record.ToEntity(zoneDto.Suffix)).ToList() ??
-			          new List<ZoneRecord>(),
+			Records      = zoneDto.Records?.Select(ToEntity).ToList() ?? new List<ZoneRecord>(),
 		};
 
 	/// <summary>
 	/// Maps a zone record DTO to a zone record entity.
 	/// </summary>
 	/// <param name="recordDto">Source zone record DTO.</param>
-	/// <param name="zoneSuffix">Zone origin used to expand relative domain-name data.</param>
 	/// <returns>Mapped zone record entity.</returns>
-	public static ZoneRecord ToEntity(this ZoneRecordDto recordDto, string? zoneSuffix = null) =>
+	public static ZoneRecord ToEntity(this ZoneRecordDto recordDto) =>
 		new()
 		{
 			Id    = recordDto.Id,
 			Host  = recordDto.Host,
 			Class = recordDto.Class,
 			Type  = recordDto.Type,
-			Data  = NormalizeDomainNameData(recordDto.Type, recordDto.Data, zoneSuffix),
+			Data  = recordDto.Data,
 			Zone  = recordDto.Zone,
 		};
-
-	private static string? NormalizeDomainNameData(ResourceType? type, string? data, string? zoneSuffix)
-	{
-		if (string.IsNullOrWhiteSpace(data)) return data;
-
-		return type switch
-		{
-			ResourceType.CNAME or ResourceType.NS or ResourceType.PTR => NormalizeDomainName(data, zoneSuffix),
-			ResourceType.MX                                           => NormalizeMxData(data, zoneSuffix),
-			ResourceType.SOA                                          => NormalizeSoaData(data, zoneSuffix),
-			_                                                         => data,
-		};
-	}
-
-	private static string NormalizeMxData(string data, string? zoneSuffix)
-	{
-		var fields = data.Split(' ', 2, System.StringSplitOptions.RemoveEmptyEntries);
-		return fields.Length == 2 ? $"{fields[0]} {NormalizeDomainName(fields[1], zoneSuffix)}" : data;
-	}
-
-	private static string NormalizeSoaData(string data, string? zoneSuffix)
-	{
-		var fields = data.Replace("(", " ", System.StringComparison.Ordinal)
-		                 .Replace(")", " ", System.StringComparison.Ordinal)
-		                 .Split((char[]?)null, System.StringSplitOptions.RemoveEmptyEntries);
-		if (fields.Length < 2) return data;
-
-		fields[0] = NormalizeDomainName(fields[0], zoneSuffix);
-		fields[1] = NormalizeDomainName(fields[1], zoneSuffix);
-		return string.Join(' ', fields);
-	}
-
-	private static string NormalizeDomainName(string data, string? zoneSuffix)
-	{
-		var target = data.Trim();
-		if (target.EndsWith('.')) return target;
-
-		var origin = zoneSuffix?.Trim().Trim('.') ?? string.Empty;
-		if (string.IsNullOrWhiteSpace(origin)) return target;
-		if (target is "@" or "\\@") return $"{origin}.";
-
-		return $"{target}.{origin}.";
-	}
 
 	private static IEnumerable<ZoneRecordDto> ToDtos(Dns.Models.ZoneRecord record, uint serial)
 	{

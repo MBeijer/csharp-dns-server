@@ -99,7 +99,7 @@ public sealed class DnsControllerTests
 	}
 
 	[Fact]
-	public async Task AddZone_ExpandsRelativeDomainNameDataBeforeSaving()
+	public async Task AddZone_PreservesRelativeDomainNameDataWhenSaving()
 	{
 		var  controller = CreateController(out var zoneRepository, out _);
 		Zone savedZone  = null;
@@ -116,6 +116,10 @@ public sealed class DnsControllerTests
 					new()
 					{
 						Host = "nested", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "sub.test",
+					},
+					new()
+					{
+						Host = "@", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "apex-target",
 					},
 					new() { Host = "@", Type    = ResourceType.NS, Class = ResourceClass.IN, Data = "ns1" },
 					new() { Host = "mail", Type = ResourceType.MX, Class = ResourceClass.IN, Data = "10 mx.backup" },
@@ -143,13 +147,20 @@ public sealed class DnsControllerTests
 
 		Assert.IsType<CreatedResult>(result);
 		Assert.NotNull(savedZone);
-		Assert.Equal("server1.example.com.", savedZone.Records!.Single(record => record.Host == "dev").Data);
-		Assert.Equal("sub.test.example.com.", savedZone.Records.Single(record => record.Host == "nested").Data);
-		Assert.Equal("ns1.example.com.", savedZone.Records.Single(record => record.Host == "@").Data);
-		Assert.Equal("10 mx.backup.example.com.", savedZone.Records.Single(record => record.Host == "mail").Data);
-		Assert.Equal("host.reverse.example.com.", savedZone.Records.Single(record => record.Host == "pointer").Data);
+		Assert.Equal("server1", savedZone.Records!.Single(record => record.Host == "dev").Data);
+		Assert.Equal("sub.test", savedZone.Records.Single(record => record.Host == "nested").Data);
 		Assert.Equal(
-			"ns.primary.example.com. hostmaster.mail.example.com. 1 3600 600 1209600 300",
+			"apex-target",
+			savedZone.Records.Single(record => record.Host == "@" && record.Type == ResourceType.CNAME).Data
+		);
+		Assert.Equal(
+			"ns1",
+			savedZone.Records.Single(record => record.Host == "@" && record.Type == ResourceType.NS).Data
+		);
+		Assert.Equal("10 mx.backup", savedZone.Records.Single(record => record.Host == "mail").Data);
+		Assert.Equal("host.reverse", savedZone.Records.Single(record => record.Host == "pointer").Data);
+		Assert.Equal(
+			"ns.primary hostmaster.mail 1 3600 600 1209600 300",
 			savedZone.Records.Single(record => record.Type == ResourceType.SOA).Data
 		);
 		Assert.Equal("other.test.", savedZone.Records.Single(record => record.Host == "external").Data);
