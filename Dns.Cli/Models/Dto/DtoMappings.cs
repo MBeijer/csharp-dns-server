@@ -114,6 +114,10 @@ public static class DtoMappings
 		{
 			var primaryNameServer = record.Addresses.ElementAtOrDefault(0) ?? string.Empty;
 			var mailbox           = record.Addresses.ElementAtOrDefault(1) ?? string.Empty;
+			var refresh           = record.Addresses.ElementAtOrDefault(2) ?? "3600";
+			var retry             = record.Addresses.ElementAtOrDefault(3) ?? "600";
+			var expire            = record.Addresses.ElementAtOrDefault(4) ?? "1209600";
+			var minimum           = record.Addresses.ElementAtOrDefault(5) ?? "300";
 			return
 			[
 				new()
@@ -121,7 +125,7 @@ public static class DtoMappings
 					Host  = record.Host,
 					Class = record.Class,
 					Type  = record.Type,
-					Data  = $"{primaryNameServer} {mailbox} {serial} 300 300 86400 300",
+					Data  = $"{primaryNameServer} {mailbox} {serial} {refresh} {retry} {expire} {minimum}",
 				},
 			];
 		}

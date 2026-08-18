@@ -19,6 +19,8 @@
 - Implement RFC-compliant caching with configurable TTL respect (`Issue #15`).
 - Add DNSSEC support in phases: (1) EDNS(0) prerequisite, (2) DNSSEC record parsing (RRSIG, DNSKEY, DS, NSEC), (3) validating resolver for upstream responses, and (4) future authoritative zone signing (`Issue #2`). Coordinate buffer/memory changes with performance tuning (`Issue #29`).
 - Fix compressed-pointer parsing defects and add regression tests (`Issue #26`).
+- Operate as authoritative-only by default. Recursive forwarding must require either an explicit global switch or a client IP/CIDR ACL, and recursion availability must be reflected accurately in the `RA` flag.
+- Preserve provider and SPA SOA names/timers in authoritative responses and transfers, and include available in-bailiwick `A`/`AAAA` glue with NS answers.
 
 ### 2.2 Zone Providers & Configuration
 - **BIND Zone Provider**: implement forward-zone parsing, $ORIGIN/$TTL handling, and change detection to replace the current `NotImplementedException`.

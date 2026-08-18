@@ -81,7 +81,7 @@ export class DnsApiClient {
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to create zone: ${response.status}`);
+            await this.throwApiError(response, "Failed to create zone");
         }
     }
 
@@ -93,7 +93,7 @@ export class DnsApiClient {
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to update zone: ${response.status}`);
+            await this.throwApiError(response, "Failed to update zone");
         }
     }
 
@@ -153,6 +153,33 @@ export class DnsApiClient {
         }
 
         return headers;
+    }
+
+    private async throwApiError(response: Response, fallbackMessage: string): Promise<never> {
+        let message = `${fallbackMessage}: ${response.status}`;
+
+        try {
+            const problem = await response.json() as {
+                title?: unknown;
+                detail?: unknown;
+                errors?: Record<string, unknown>;
+            };
+            const validationMessages = Object.values(problem.errors ?? {})
+                .flatMap((entry) => Array.isArray(entry) ? entry : [])
+                .filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+
+            if (validationMessages.length > 0) {
+                message = validationMessages.join(" ");
+            } else if (typeof problem.detail === "string" && problem.detail.length > 0) {
+                message = problem.detail;
+            } else if (typeof problem.title === "string" && problem.title.length > 0) {
+                message = problem.title;
+            }
+        } catch {
+            // Preserve the status-based fallback for non-JSON error responses.
+        }
+
+        throw new Error(message);
     }
 
     private normalizeToken(token: string | null): string | null {

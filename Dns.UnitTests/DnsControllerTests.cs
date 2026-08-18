@@ -58,6 +58,13 @@ public sealed class DnsControllerTests
 				{
 					Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.42"],
 				},
+				new()
+				{
+					Host      = "",
+					Type      = ResourceType.SOA,
+					Class     = ResourceClass.IN,
+					Addresses = ["ns1.runtime.example", "hostmaster.runtime.example", "7200", "900", "1209600", "3600"],
+				},
 			]
 		);
 		dnsService.ActiveZones.Returns([new(runtimeZone, "Traefik", false)]);
@@ -73,7 +80,11 @@ public sealed class DnsControllerTests
 		Assert.True(runtime.IsReadOnly);
 		Assert.False(runtime.IsReplicated);
 		Assert.Equal("Traefik", runtime.Source);
-		Assert.Equal("192.0.2.42", Assert.Single(runtime.Records!).Data);
+		Assert.Equal("192.0.2.42", runtime.Records!.Single(record => record.Type == ResourceType.A).Data);
+		Assert.Equal(
+			"ns1.runtime.example hostmaster.runtime.example 42 7200 900 1209600 3600",
+			runtime.Records.Single(record => record.Type == ResourceType.SOA).Data
+		);
 	}
 
 	[Fact]
@@ -85,6 +96,74 @@ public sealed class DnsControllerTests
 		var result = await controller.AddZone(new ZoneDto { Suffix = "example.com", Enabled = true, Records = [], });
 
 		Assert.IsType<CreatedResult>(result);
+	}
+
+	[Fact]
+	public async Task AddZone_PreservesRelativeDomainNameDataWhenSaving()
+	{
+		var  controller = CreateController(out var zoneRepository, out _);
+		Zone savedZone  = null;
+		zoneRepository.AddZone(Arg.Do<Zone>(zone => savedZone = zone)).Returns(Task.CompletedTask);
+
+		var result = await controller.AddZone(
+			new ZoneDto
+			{
+				Suffix  = "example.com",
+				Enabled = true,
+				Records =
+				[
+					new() { Host = "dev", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "server1" },
+					new()
+					{
+						Host = "nested", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "sub.test",
+					},
+					new()
+					{
+						Host = "@", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "apex-target",
+					},
+					new() { Host = "@", Type    = ResourceType.NS, Class = ResourceClass.IN, Data = "ns1" },
+					new() { Host = "mail", Type = ResourceType.MX, Class = ResourceClass.IN, Data = "10 mx.backup" },
+					new()
+					{
+						Host = "pointer", Type = ResourceType.PTR, Class = ResourceClass.IN, Data = "host.reverse",
+					},
+					new()
+					{
+						Host  = "soa",
+						Type  = ResourceType.SOA,
+						Class = ResourceClass.IN,
+						Data  = "ns.primary hostmaster.mail 1 3600 600 1209600 300",
+					},
+					new()
+					{
+						Host  = "external",
+						Type  = ResourceType.CNAME,
+						Class = ResourceClass.IN,
+						Data  = "other.test.",
+					},
+				],
+			}
+		);
+
+		Assert.IsType<CreatedResult>(result);
+		Assert.NotNull(savedZone);
+		Assert.Equal("server1", savedZone.Records!.Single(record => record.Host == "dev").Data);
+		Assert.Equal("sub.test", savedZone.Records.Single(record => record.Host == "nested").Data);
+		Assert.Equal(
+			"apex-target",
+			savedZone.Records.Single(record => record.Host == "@" && record.Type == ResourceType.CNAME).Data
+		);
+		Assert.Equal(
+			"ns1",
+			savedZone.Records.Single(record => record.Host == "@" && record.Type == ResourceType.NS).Data
+		);
+		Assert.Equal("10 mx.backup", savedZone.Records.Single(record => record.Host == "mail").Data);
+		Assert.Equal("host.reverse", savedZone.Records.Single(record => record.Host == "pointer").Data);
+		Assert.Equal(
+			"ns.primary hostmaster.mail 1 3600 600 1209600 300",
+			savedZone.Records.Single(record => record.Type == ResourceType.SOA).Data
+		);
+		Assert.Equal("other.test.", savedZone.Records.Single(record => record.Host == "external").Data);
 	}
 
 	[Fact]

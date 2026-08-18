@@ -7,13 +7,13 @@ namespace Dns.UnitTests;
 
 public sealed class MyHttpClientHandlerTests
 {
-	private readonly CookieContainer _cookieContainer;
+	private readonly CookieContainer       _cookieContainer;
 	private readonly TestHttpClientHandler _target;
 
 	public MyHttpClientHandlerTests()
 	{
 		_cookieContainer = new CookieContainer();
-		_target = new TestHttpClientHandler(_cookieContainer);
+		_target          = new TestHttpClientHandler(_cookieContainer);
 	}
 
 	[Fact]

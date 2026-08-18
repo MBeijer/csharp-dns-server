@@ -133,6 +133,39 @@ Add the provider via `appsettings.json` using the same `server.zones[]` shape us
 
 The provider reads the file whenever it changes (a 10-second settlement window avoids partial writes), validates the directives/records, and only publishes `A`/`AAAA` data to SmartZoneResolver when the parse succeeds.  All other record types are parsed/validated so that zone files failing to meet RFC expectations never poison the active zone.
 
+### Recursion Access Control
+
+The server is authoritative-only by default. Queries outside configured zones receive `REFUSED` unless the client is allowed to use upstream recursion and sets the DNS `RD` flag.
+
+```json
+{
+  "server": {
+    "dnsListener": {
+      "port": 53,
+      "tcpPort": 53,
+      "recursionEnabled": false,
+      "allowRecursionFrom": [
+        "10.0.0.0/8",
+        "2001:db8:1234::/48"
+      ]
+    }
+  }
+}
+```
+
+- `recursionEnabled`: allows recursion for every client. Keep this `false` on an Internet-facing authoritative server to avoid operating an open resolver.
+- `allowRecursionFrom`: allows recursion for selected clients while `recursionEnabled` is `false`. Entries use the same syntax as transfer ACLs: an exact IPv4/IPv6 address, an IPv4/IPv6 CIDR, `*`, or a DNS hostname. IPv4-mapped IPv6 client addresses are matched against their IPv4 form.
+- The `RA` response flag is advertised only to clients allowed by this policy. Authoritative answers remain available to every client regardless of the recursion policy.
+- Upstream recursive forwarding currently uses UDP. TCP remains available for authoritative queries and zone transfers but does not proxy recursive queries.
+
+### SOA and Nameserver Glue
+
+SOA responses use the primary nameserver, responsible mailbox, refresh, retry, expire, and minimum TTL saved by the SPA or supplied by a zone provider. Time suffixes such as `15M`, `1H`, and `2W` are converted to seconds on the wire. New SPA zones default to a one-hour refresh and two-week expire interval; existing zones retain their saved values until edited.
+
+For an apex `NS` answer, the server includes matching in-zone `A` and `AAAA` records in the DNS Additional section. Parent-zone glue is separate: when a delegated nameserver is itself beneath the delegated domain, its address must still be registered with the domain registrar/parent registry.
+
+Domain-name fields entered through the API or SPA follow BIND `$ORIGIN` rules. This applies to `CNAME`, `NS`, `MX`, and `PTR` targets and the SOA primary-name-server and responsible-mailbox fields. A value without a trailing dot is stored as entered and expanded relative to the edited zone when DNS responses are built (`sub.test` in `example.com` is answered as `sub.test.example.com.`); only a value ending in `.` is absolute. Reopening a database zone in the SPA therefore preserves the relative value originally entered. When a database zone is used as the template for another zone on the same server, relative names naturally use the slave origin, in-zone absolute names are rewritten to the slave suffix, and external absolute names remain unchanged.
+
 ### Zone Transfer / Notify Configuration
 `AXFR` and `IXFR` are only served over TCP when zone transfer is enabled and the caller IP is allowlisted.
 
@@ -141,7 +174,9 @@ The provider reads the file whenever it changes (a 10-second settlement window a
   "server": {
     "dnsListener": {
       "port": 53,
-      "tcpPort": 53
+      "tcpPort": 53,
+      "recursionEnabled": false,
+      "allowRecursionFrom": []
     },
     "zoneTransfer": {
       "enabled": true,

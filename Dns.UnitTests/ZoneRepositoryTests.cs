@@ -20,9 +20,7 @@ public sealed class ZoneRepositoryTests
 		await using var connection = new SqliteConnection("Data Source=:memory:");
 		await connection.OpenAsync();
 
-		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
-					  .UseSqlite(connection)
-					  .Options;
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>().UseSqlite(connection).Options;
 
 		await using var dbContext = new DnsServerDbContext(options);
 		await dbContext.Database.EnsureCreatedAsync();
@@ -32,23 +30,20 @@ public sealed class ZoneRepositoryTests
 		await repository.AddZone(
 			new Zone
 			{
-				Suffix = "example.com",
+				Suffix  = "example.com",
 				Enabled = true,
 				Records =
 				[
 					new ZoneRecord
 					{
-						Host = "@",
-						Type = ResourceType.SOA,
+						Host  = "@",
+						Type  = ResourceType.SOA,
 						Class = ResourceClass.IN,
-						Data = "ns1.example.com. hostmaster.example.com. 2026010101 1H 15M 1W 1D",
+						Data  = "ns1.example.com. hostmaster.example.com. 2026010101 1H 15M 1W 1D",
 					},
 					new ZoneRecord
 					{
-						Host = "www",
-						Type = ResourceType.A,
-						Class = ResourceClass.IN,
-						Data = "192.0.2.10",
+						Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Data = "192.0.2.10",
 					},
 				],
 			}
@@ -57,30 +52,24 @@ public sealed class ZoneRepositoryTests
 		await repository.UpsertZone(
 			new Zone
 			{
-				Suffix = "example.com",
+				Suffix  = "example.com",
 				Enabled = true,
 				Records =
 				[
 					new ZoneRecord
 					{
-						Host = "@",
-						Type = ResourceType.SOA,
+						Host  = "@",
+						Type  = ResourceType.SOA,
 						Class = ResourceClass.IN,
-						Data = "ns9.example.com. hostmaster.example.com. 2026010101 1H 15M 1W 1D",
+						Data  = "ns9.example.com. hostmaster.example.com. 2026010101 1H 15M 1W 1D",
 					},
 					new ZoneRecord
 					{
-						Host = "www",
-						Type = ResourceType.A,
-						Class = ResourceClass.IN,
-						Data = "192.0.2.10",
+						Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Data = "192.0.2.10",
 					},
 					new ZoneRecord
 					{
-						Host = "mail",
-						Type = ResourceType.A,
-						Class = ResourceClass.IN,
-						Data = "192.0.2.20",
+						Host = "mail", Type = ResourceType.A, Class = ResourceClass.IN, Data = "192.0.2.20",
 					},
 				],
 			},
@@ -100,9 +89,7 @@ public sealed class ZoneRepositoryTests
 		await using var connection = new SqliteConnection("Data Source=:memory:");
 		await connection.OpenAsync();
 
-		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
-					  .UseSqlite(connection)
-					  .Options;
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>().UseSqlite(connection).Options;
 
 		await using var dbContext = new DnsServerDbContext(options);
 		await dbContext.Database.EnsureCreatedAsync();
@@ -112,16 +99,13 @@ public sealed class ZoneRepositoryTests
 		await repository.AddZone(
 			new Zone
 			{
-				Suffix = "example.com",
+				Suffix  = "example.com",
 				Enabled = true,
 				Records =
 				[
 					new ZoneRecord
 					{
-						Host = "www",
-						Type = ResourceType.A,
-						Class = ResourceClass.IN,
-						Data = "192.0.2.10",
+						Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Data = "192.0.2.10",
 					},
 				],
 			}
@@ -130,44 +114,29 @@ public sealed class ZoneRepositoryTests
 		await repository.UpsertZone(
 			new Zone
 			{
-				Suffix = "example.com",
+				Suffix  = "example.com",
 				Enabled = true,
 				Records =
 				[
 					new ZoneRecord
 					{
-						Host = " WWW ",
-						Type = ResourceType.A,
-						Class = ResourceClass.IN,
-						Data = "192.0.2.10",
+						Host = " WWW ", Type = ResourceType.A, Class = ResourceClass.IN, Data = "192.0.2.10",
 					},
 					new ZoneRecord
 					{
-						Host = "txt1",
-						Type = ResourceType.TXT,
-						Class = ResourceClass.IN,
-						Data = "hello",
+						Host = "txt1", Type = ResourceType.TXT, Class = ResourceClass.IN, Data = "hello",
 					},
 					new ZoneRecord
 					{
-						Host = "skip-no-class",
-						Type = ResourceType.TXT,
-						Class = null,
-						Data = "hello",
+						Host = "skip-no-class", Type = ResourceType.TXT, Class = null, Data = "hello",
 					},
 					new ZoneRecord
 					{
-						Host = "skip-no-data",
-						Type = ResourceType.TXT,
-						Class = ResourceClass.IN,
-						Data = " ",
+						Host = "skip-no-data", Type = ResourceType.TXT, Class = ResourceClass.IN, Data = " ",
 					},
 					new ZoneRecord
 					{
-						Host = "skip-no-type",
-						Type = null,
-						Class = ResourceClass.IN,
-						Data = "hello",
+						Host = "skip-no-type", Type = null, Class = ResourceClass.IN, Data = "hello",
 					},
 				],
 			},
@@ -189,20 +158,13 @@ public sealed class ZoneRepositoryTests
 		await using var connection = new SqliteConnection("Data Source=:memory:");
 		await connection.OpenAsync();
 
-		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
-					  .UseSqlite(connection)
-					  .Options;
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>().UseSqlite(connection).Options;
 
 		await using var dbContext = new DnsServerDbContext(options);
 		await dbContext.Database.EnsureCreatedAsync();
 
 		var repository = new ZoneRepository(new FakeLogger<ZoneRepository>(), dbContext);
-		var zone = new Zone
-		{
-			Suffix = "example.com",
-			Enabled = true,
-			Records = [],
-		};
+		var zone       = new Zone { Suffix = "example.com", Enabled = true, Records = [], };
 		await repository.AddZone(zone);
 
 		var loaded = await repository.GetZone(zone.Id!.Value);
@@ -216,26 +178,23 @@ public sealed class ZoneRepositoryTests
 		await using var connection = new SqliteConnection("Data Source=:memory:");
 		await connection.OpenAsync();
 
-		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
-					  .UseSqlite(connection)
-					  .Options;
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>().UseSqlite(connection).Options;
 
 		await using var dbContext = new DnsServerDbContext(options);
 		await dbContext.Database.EnsureCreatedAsync();
 
 		var repository = new ZoneRepository(new FakeLogger<ZoneRepository>(), dbContext);
 
-		await Assert.ThrowsAsync<InvalidOperationException>(
-			() => repository.UpsertZone(
-				new Zone
-				{
-					Suffix = "example.com",
-					Enabled = true,
-					MasterZoneId = 999,
-					Records = [],
-				},
-				true
-			)
+		await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpsertZone(
+			                                                    new Zone
+			                                                    {
+				                                                    Suffix       = "example.com",
+				                                                    Enabled      = true,
+				                                                    MasterZoneId = 999,
+				                                                    Records      = [],
+			                                                    },
+			                                                    true
+		                                                    )
 		);
 	}
 
@@ -245,41 +204,29 @@ public sealed class ZoneRepositoryTests
 		await using var connection = new SqliteConnection("Data Source=:memory:");
 		await connection.OpenAsync();
 
-		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
-					  .UseSqlite(connection)
-					  .Options;
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>().UseSqlite(connection).Options;
 
 		await using var dbContext = new DnsServerDbContext(options);
 		await dbContext.Database.EnsureCreatedAsync();
 
 		var repository = new ZoneRepository(new FakeLogger<ZoneRepository>(), dbContext);
 
-		var master = new Zone
-		{
-			Suffix = "master.example.com",
-			Enabled = true,
-			Records = [],
-		};
+		var master = new Zone { Suffix = "master.example.com", Enabled = true, Records = [], };
 		await repository.AddZone(master);
 
-		var slave = new Zone
-		{
-			Suffix = "slave.example.com",
-			MasterZoneId = master.Id,
-		};
+		var slave = new Zone { Suffix = "slave.example.com", MasterZoneId = master.Id, };
 		await repository.AddZone(slave);
 
-		await Assert.ThrowsAsync<InvalidOperationException>(
-			() => repository.UpsertZone(
-				new Zone
-				{
-					Suffix = "slave.example.com",
-					Enabled = true,
-					MasterZoneId = master.Id,
-					Records = [],
-				},
-				true
-			)
+		await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpsertZone(
+			                                                    new Zone
+			                                                    {
+				                                                    Suffix       = "slave.example.com",
+				                                                    Enabled      = true,
+				                                                    MasterZoneId = master.Id,
+				                                                    Records      = [],
+			                                                    },
+			                                                    true
+		                                                    )
 		);
 	}
 
@@ -289,9 +236,7 @@ public sealed class ZoneRepositoryTests
 		await using var connection = new SqliteConnection("Data Source=:memory:");
 		await connection.OpenAsync();
 
-		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
-					  .UseSqlite(connection)
-					  .Options;
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>().UseSqlite(connection).Options;
 
 		await using var dbContext = new DnsServerDbContext(options);
 		await dbContext.Database.EnsureCreatedAsync();
@@ -300,50 +245,85 @@ public sealed class ZoneRepositoryTests
 
 		var master = new Zone
 		{
-			Suffix = "master.example.com",
+			Suffix  = "master.example.com",
 			Enabled = true,
 			Records =
 			[
 				new ZoneRecord
 				{
-					Host = "www",
-					Type = ResourceType.CNAME,
-					Class = ResourceClass.IN,
-					Data = "master.example.com",
+					Host = "www", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "master.example.com",
 				},
 				new ZoneRecord
 				{
-					Host = "api",
-					Type = ResourceType.CNAME,
-					Class = ResourceClass.IN,
-					Data = "@",
+					Host = "api", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "@",
 				},
 				new ZoneRecord
 				{
-					Host = "external",
-					Type = ResourceType.CNAME,
+					Host  = "external",
+					Type  = ResourceType.CNAME,
 					Class = ResourceClass.IN,
-					Data = "outside.example.net",
+					Data  = "outside.example.net",
+				},
+				new ZoneRecord
+				{
+					Host  = "service",
+					Type  = ResourceType.CNAME,
+					Class = ResourceClass.IN,
+					Data  = "server1.master.example.com.",
+				},
+				new ZoneRecord
+				{
+					Host = "@", Type = ResourceType.NS, Class = ResourceClass.IN, Data = "ns1.master.example.com.",
+				},
+				new ZoneRecord
+				{
+					Host  = "external-ns",
+					Type  = ResourceType.NS,
+					Class = ResourceClass.IN,
+					Data  = "ns1.outside.example.net.",
+				},
+				new ZoneRecord
+				{
+					Host  = "@",
+					Type  = ResourceType.MX,
+					Class = ResourceClass.IN,
+					Data  = "10 mail.master.example.com.",
+				},
+				new ZoneRecord
+				{
+					Host  = "pointer",
+					Type  = ResourceType.PTR,
+					Class = ResourceClass.IN,
+					Data  = "host.master.example.com.",
+				},
+				new ZoneRecord
+				{
+					Host  = "soa",
+					Type  = ResourceType.SOA,
+					Class = ResourceClass.IN,
+					Data  = "ns1.master.example.com. hostmaster.master.example.com. 2026081701 3600 600 1209600 300",
 				},
 			],
 		};
 
 		await repository.AddZone(master);
 
-		var slave = new Zone
-		{
-			Suffix = "slave.example.com",
-			MasterZoneId = master.Id,
-		};
+		var slave = new Zone { Suffix = "slave.example.com", MasterZoneId = master.Id, };
 		await repository.AddZone(slave);
 
 		var syncedSlave = await repository.GetZone("slave.example.com");
 		Assert.NotNull(syncedSlave);
 
-		var wwwAlias = Assert.Single(syncedSlave!.Records!, record => string.Equals(record.Host, "www", StringComparison.Ordinal));
+		var wwwAlias = Assert.Single(
+			syncedSlave!.Records!,
+			record => string.Equals(record.Host, "www", StringComparison.Ordinal)
+		);
 		Assert.Equal("slave.example.com", wwwAlias.Data);
 
-		var apiAlias = Assert.Single(syncedSlave.Records!, record => string.Equals(record.Host, "api", StringComparison.Ordinal));
+		var apiAlias = Assert.Single(
+			syncedSlave.Records!,
+			record => string.Equals(record.Host, "api", StringComparison.Ordinal)
+		);
 		Assert.Equal("slave.example.com", apiAlias.Data);
 
 		var externalAlias = Assert.Single(
@@ -351,6 +331,27 @@ public sealed class ZoneRepositoryTests
 			record => string.Equals(record.Host, "external", StringComparison.Ordinal)
 		);
 		Assert.Equal("outside.example.net", externalAlias.Data);
+
+		var serviceAlias = Assert.Single(syncedSlave.Records!, record => record.Host == "service");
+		Assert.Equal("server1.slave.example.com.", serviceAlias.Data);
+
+		var localNs = Assert.Single(
+			syncedSlave.Records!,
+			record => record.Host == "@" && record.Type == ResourceType.NS
+		);
+		Assert.Equal("ns1.slave.example.com.", localNs.Data);
+
+		var externalNs = Assert.Single(syncedSlave.Records!, record => record.Host == "external-ns");
+		Assert.Equal("ns1.outside.example.net.", externalNs.Data);
+
+		var mx = Assert.Single(syncedSlave.Records!, record => record.Type == ResourceType.MX);
+		Assert.Equal("10 mail.slave.example.com.", mx.Data);
+
+		var ptr = Assert.Single(syncedSlave.Records!, record => record.Type == ResourceType.PTR);
+		Assert.Equal("host.slave.example.com.", ptr.Data);
+
+		var soa = Assert.Single(syncedSlave.Records!, record => record.Type == ResourceType.SOA);
+		Assert.StartsWith("ns1.slave.example.com. hostmaster.slave.example.com. ", soa.Data);
 	}
 
 	[Fact]
@@ -359,9 +360,7 @@ public sealed class ZoneRepositoryTests
 		await using var connection = new SqliteConnection("Data Source=:memory:");
 		await connection.OpenAsync();
 
-		var options = new DbContextOptionsBuilder<DnsServerDbContext>()
-					  .UseSqlite(connection)
-					  .Options;
+		var options = new DbContextOptionsBuilder<DnsServerDbContext>().UseSqlite(connection).Options;
 
 		await using var dbContext = new DnsServerDbContext(options);
 		await dbContext.Database.EnsureCreatedAsync();
@@ -369,33 +368,26 @@ public sealed class ZoneRepositoryTests
 		var repository = new ZoneRepository(new FakeLogger<ZoneRepository>(), dbContext);
 		var master = new Zone
 		{
-			Suffix = "master.example.com",
+			Suffix  = "master.example.com",
 			Enabled = true,
 			Records =
 			[
 				new ZoneRecord
 				{
-					Host = "atdot",
-					Type = ResourceType.CNAME,
-					Class = ResourceClass.IN,
-					Data = "@.",
+					Host = "atdot", Type = ResourceType.CNAME, Class = ResourceClass.IN, Data = "@.",
 				},
 				new ZoneRecord
 				{
-					Host = "rootdot",
-					Type = ResourceType.CNAME,
+					Host  = "rootdot",
+					Type  = ResourceType.CNAME,
 					Class = ResourceClass.IN,
-					Data = "MASTER.EXAMPLE.COM.",
+					Data  = "MASTER.EXAMPLE.COM.",
 				},
 			],
 		};
 		await repository.AddZone(master);
 
-		var slave = new Zone
-		{
-			Suffix = "slave.example.com.",
-			MasterZoneId = master.Id,
-		};
+		var slave = new Zone { Suffix = "slave.example.com.", MasterZoneId = master.Id, };
 		await repository.AddZone(slave);
 
 		var syncedSlave = await repository.GetZone("slave.example.com.");

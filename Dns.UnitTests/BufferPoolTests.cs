@@ -74,7 +74,7 @@ public class BufferPoolTests
 	{
 		// Stress test concurrent rent/return operations
 		const int iterations = 1000;
-		var tasks = new List<Task>();
+		var       tasks      = new List<Task>();
 
 		for (var i = 0; i < iterations; i++)
 			tasks.Add(
@@ -110,7 +110,7 @@ public class BufferPoolTests
 	{
 		// Simulate high-throughput DNS server usage pattern
 		const int totalRequests = 10000;
-		var initialMemory = GC.GetTotalMemory(true);
+		var       initialMemory = GC.GetTotalMemory(true);
 
 		var tasks = new List<Task>();
 		for (var i = 0; i < totalRequests; i++)
@@ -119,7 +119,7 @@ public class BufferPoolTests
 					{
 						using var buffer = BufferPool.RentBuffer();
 						// Simulate DNS packet processing
-						var span = buffer.Memory.Span;
+						var       span   = buffer.Memory.Span;
 						span[0] = 0x00; // Query ID high byte
 						span[1] = 0x01; // Query ID low byte
 					}
@@ -166,7 +166,7 @@ public class BufferPoolTests
 		// Set some state
 		args.SetBuffer(new byte[100], 0, 100);
 		args.RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 53);
-		args.UserToken = "test";
+		args.UserToken      = "test";
 
 		// Return to pool
 		BufferPool.ReturnSocketAsyncEventArgs(args);
@@ -208,7 +208,7 @@ public class BufferPoolTests
 	public async Task SocketAsyncEventArgs_ConcurrentRentReturn_NoExceptions()
 	{
 		const int iterations = 100;
-		var tasks = new List<Task>();
+		var       tasks      = new List<Task>();
 
 		for (var i = 0; i < iterations; i++)
 			tasks.Add(
@@ -322,7 +322,7 @@ public class BufferPoolTests
 	public async Task PooledMemoryStream_ConcurrentRentReturn_NoExceptions()
 	{
 		const int iterations = 100;
-		var tasks = new List<Task>();
+		var       tasks      = new List<Task>();
 
 		for (var i = 0; i < iterations; i++)
 			tasks.Add(
@@ -344,10 +344,10 @@ public class BufferPoolTests
 	{
 		// Track unique stream instances to verify pool reuse
 		var seenInstances = new HashSet<int>();
-		var lockObj = new object();
+		var lockObj       = new object();
 
 		const int iterations = 1000;
-		var tasks = new List<Task>();
+		var       tasks      = new List<Task>();
 
 		for (var i = 0; i < iterations; i++)
 			tasks.Add(
@@ -431,10 +431,10 @@ public class BufferPoolTests
 	public async Task BufferPool_UnderLoad_MaintainsStability()
 	{
 		// Stress test all pool components simultaneously
-		const int duration = 2; // seconds
-		var cts = new CancellationTokenSource(TimeSpan.FromSeconds(duration));
-		var exceptions = new List<Exception>();
-		var lockObj = new object();
+		const int duration   = 2; // seconds
+		var       cts        = new CancellationTokenSource(TimeSpan.FromSeconds(duration));
+		var       exceptions = new List<Exception>();
+		var       lockObj    = new object();
 
 		var tasks = new List<Task>();
 

@@ -8,11 +8,7 @@ public class DomainNamePointRData : RData
 {
 	public string Name { get; set; }
 
-	public override ushort Length =>
-		// dots replaced by bytes
-		// + 1 segment prefix
-		// + 1 null terminator
-		(ushort)(Name.Length + 2);
+	public override ushort Length => DnsProtocol.GetDomainNameWireLength(Name);
 
 	public static DomainNamePointRData Parse(byte[] bytes, int offset, int size)
 	{

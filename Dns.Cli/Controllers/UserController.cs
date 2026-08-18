@@ -15,10 +15,7 @@ namespace Dns.Cli.Controllers;
 /// <param name="jwtTokenHandler"></param>
 [ApiController]
 [Route("user/")]
-public class UserController(
-	IUserRepository userRepository,
-	IJwtTokenHandler jwtTokenHandler
-) : ControllerBase
+public class UserController(IUserRepository userRepository, IJwtTokenHandler jwtTokenHandler) : ControllerBase
 {
 	/// <summary>
 	///     Get current user

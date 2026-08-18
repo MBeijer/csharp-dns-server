@@ -25,8 +25,8 @@ public sealed class DnsRequestKeyTests
 		var message = new DnsMessage
 		{
 			QueryIdentifier = 99,
-			QuestionCount = 1,
-			Questions = [new Question("example.com", ResourceType.AAAA, ResourceClass.IN)],
+			QuestionCount   = 1,
+			Questions       = [new Question("example.com", ResourceType.AAAA, ResourceClass.IN)],
 		};
 
 		var key = new DnsRequestKey(message);

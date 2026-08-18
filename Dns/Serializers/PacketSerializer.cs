@@ -12,9 +12,9 @@ public static class PacketSerializer
 	public static T Deserialize<T>(this ByteBuffer packet) where T : GenericPacket
 	{
 		var ctor = typeof(T).GetConstructors(BindingFlags.Public | BindingFlags.Instance)
-							.OrderByDescending(c => c.GetParameters().Length)
-							.FirstOrDefault() ??
-				   throw new InvalidOperationException($"Type {typeof(T).Name} must have a public constructor.");
+		                    .OrderByDescending(c => c.GetParameters().Length)
+		                    .FirstOrDefault() ??
+		           throw new InvalidOperationException($"Type {typeof(T).Name} must have a public constructor.");
 
 		var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -45,25 +45,25 @@ public static class PacketSerializer
 			switch (Type.GetTypeCode(t))
 			{
 				case TypeCode.Boolean: return packet.ReadUByte() == 1;
-				case TypeCode.Byte: return packet.ReadUByte();
-				case TypeCode.SByte: return packet.ReadByte();
-				case TypeCode.UInt16: return packet.ReadUShort();
-				case TypeCode.Int16: return packet.ReadShort();
-				case TypeCode.UInt32: return packet.ReadUInt();
-				case TypeCode.Int32: return packet.ReadInt();
-				case TypeCode.UInt64: return packet.ReadULong();
-				case TypeCode.Int64: return packet.ReadLong();
+				case TypeCode.Byte:    return packet.ReadUByte();
+				case TypeCode.SByte:   return packet.ReadByte();
+				case TypeCode.UInt16:  return packet.ReadUShort();
+				case TypeCode.Int16:   return packet.ReadShort();
+				case TypeCode.UInt32:  return packet.ReadUInt();
+				case TypeCode.Int32:   return packet.ReadInt();
+				case TypeCode.UInt64:  return packet.ReadULong();
+				case TypeCode.Int64:   return packet.ReadLong();
 
 				case TypeCode.String:
-					{
-						if (pProp?.GetCustomAttribute<FixedLengthStringAttribute>() is { } fixedLen)
-							return packet.ReadChars2(fixedLen.Length).ToString();
+				{
+					if (pProp?.GetCustomAttribute<FixedLengthStringAttribute>() is { } fixedLen)
+						return packet.ReadChars2(fixedLen.Length).ToString();
 
-						if (pProp?.GetCustomAttribute<DynamicLengthStringAttribute>() is { } dyn)
-							return packet.ReadDynamicString().ToString();
+					if (pProp?.GetCustomAttribute<DynamicLengthStringAttribute>() is { } dyn)
+						return packet.ReadDynamicString().ToString();
 
-						return packet.ReadString().ToString();
-					}
+					return packet.ReadString().ToString();
+				}
 			}
 
 			if (t == typeof(ByteBuffer))
@@ -71,7 +71,7 @@ public static class PacketSerializer
 
 			if (t.IsEnum)
 			{
-				var ut = Enum.GetUnderlyingType(t);
+				var ut  = Enum.GetUnderlyingType(t);
 				var raw = ReadValue(ut, pProp)!;
 				var num = Convert.ChangeType(raw, ut, CultureInfo.InvariantCulture)!;
 				return Enum.ToObject(t, num);
@@ -222,7 +222,7 @@ public static class PacketSerializer
 	{
 		var output = new ByteBuffer();
 
-		var type = packet.GetType();
+		var type       = packet.GetType();
 		/*
 				if (!type.IsSubclassOf(typeof(SubPacket)) && !newProtocol)
 				{
@@ -249,7 +249,7 @@ public static class PacketSerializer
 			if (propertyType.IsEnum)
 			{
 				var underlyingType = Enum.GetUnderlyingType(propertyType);
-				val = Convert.ChangeType(val, underlyingType);
+				val          = Convert.ChangeType(val, underlyingType);
 				propertyType = underlyingType;
 			}
 
@@ -306,31 +306,31 @@ public static class PacketSerializer
 					break;
 				*/
 				case string:
+				{
+					if (prop.GetCustomAttribute<FixedLengthStringAttribute>() is { } graalStringFixed)
 					{
-						if (prop.GetCustomAttribute<FixedLengthStringAttribute>() is { } graalStringFixed)
-						{
-							//output.WriteGByte1((byte)graalStringFixed.Length);
-							var stringVal = val?.ToString() ?? "";
+						//output.WriteGByte1((byte)graalStringFixed.Length);
+						var stringVal = val?.ToString() ?? "";
 
-							while (stringVal.Length < graalStringFixed.Length)
-								stringVal += ' ';
+						while (stringVal.Length < graalStringFixed.Length)
+							stringVal += ' ';
 
-							output.Write(stringVal);
-
-							break;
-						}
-
-						if (prop.GetCustomAttribute<DynamicLengthStringAttribute>() is not null)
-						{
-							var outputString = val?.ToString() ?? "";
-							output.WriteDynamicString(outputString);
-							break;
-						}
-
-						output.Write(val?.ToString() ?? "");
+						output.Write(stringVal);
 
 						break;
 					}
+
+					if (prop.GetCustomAttribute<DynamicLengthStringAttribute>() is not null)
+					{
+						var outputString = val?.ToString() ?? "";
+						output.WriteDynamicString(outputString);
+						break;
+					}
+
+					output.Write(val?.ToString() ?? "");
+
+					break;
+				}
 			}
 		}
 

@@ -8,11 +8,14 @@ public sealed class AppConfigTests
 	[Fact]
 	public void Properties_CanBeInitialized()
 	{
-		var zoneTransfer  = new ZoneTransferOptions { Enabled   = true, InjectedNsAddress = "192.0.2.10" };
-		var secondarySync = new SecondarySyncOptions { Enabled  = true, Master            = "primary.example.com:53" };
-		var listener      = new DnsListenerOptions { Port       = 53, TcpPort             = 5335 };
-		var zone          = new ZoneOptions { Name              = "example", Provider     = "database" };
-		var web           = new WebServerOptions { JwtSecretKey = "secret" };
+		var zoneTransfer  = new ZoneTransferOptions { Enabled  = true, InjectedNsAddress = "192.0.2.10" };
+		var secondarySync = new SecondarySyncOptions { Enabled = true, Master            = "primary.example.com:53" };
+		var listener = new DnsListenerOptions
+		{
+			Port = 53, TcpPort = 5335, AllowRecursionFrom = ["10.0.0.0/8", "2001:db8::/32"],
+		};
+		var zone = new ZoneOptions { Name              = "example", Provider = "database" };
+		var web  = new WebServerOptions { JwtSecretKey = "secret" };
 		var server = new ServerOptions
 		{
 			DnsListener   = listener,
@@ -24,6 +27,8 @@ public sealed class AppConfigTests
 		var app = new AppConfig { Server = server };
 
 		Assert.Equal((ushort)53, app.Server.DnsListener.Port);
+		Assert.False(app.Server.DnsListener.RecursionEnabled);
+		Assert.Equal(2, app.Server.DnsListener.AllowRecursionFrom.Count);
 		Assert.Equal("database", app.Server.Zones[0].Provider);
 		Assert.Equal("secret", app.Server.WebServer.JwtSecretKey);
 		Assert.True(app.Server.SecondarySync.Enabled);

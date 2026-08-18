@@ -18,6 +18,24 @@ public class DnsProtocol
 	/// <summary>Maximum length for a DNS name (255 bytes per RFC 1035).</summary>
 	private const int MaxDnsNameLength = 255;
 
+	/// <summary>Gets the uncompressed wire length of a DNS domain name.</summary>
+	/// <param name="name">A relative or fully-qualified textual domain name.</param>
+	/// <returns>The encoded length, including label length bytes and the root terminator.</returns>
+	public static ushort GetDomainNameWireLength(string name)
+	{
+		if (string.IsNullOrWhiteSpace(name)) return 1;
+
+		var length = 1;
+		foreach (var label in name.Split('.', StringSplitOptions.RemoveEmptyEntries))
+		{
+			if (label.Length > 63) throw new InvalidDataException("DNS label length exceeds 63 bytes.");
+			length += label.Length + 1;
+		}
+
+		if (length > MaxDnsNameLength) throw new InvalidDataException("DNS name exceeds 255 bytes.");
+		return (ushort)length;
+	}
+
 	/// <summary>Try to parse a DNS message from a byte array.</summary>
 	/// <param name="bytes">The buffer containing the DNS message.</param>
 	/// <param name="dnsMessage">The parsed DNS message if successful.</param>
@@ -96,10 +114,10 @@ public class DnsProtocol
 	{
 		// Stack-allocate buffer for the domain name (max 255 chars per RFC 1035)
 		Span<char> nameBuffer = stackalloc char[MaxDnsNameLength];
-		var nameLength = 0;
+		var        nameLength = 0;
 
-		var compressionOffset = -1;
-		var readOffset = currentOffset;
+		var          compressionOffset     = -1;
+		var          readOffset            = currentOffset;
 		HashSet<int> pointerVisitedOffsets = null;
 
 		while (true)
@@ -180,9 +198,9 @@ public class DnsProtocol
 	/// </summary>
 	public static string ReadStringLegacy(byte[] bytes, ref int currentOffset)
 	{
-		var resourceName = new StringBuilder();
-		var compressionOffset = -1;
-		var readOffset = currentOffset;
+		var          resourceName          = new StringBuilder();
+		var          compressionOffset     = -1;
+		var          readOffset            = currentOffset;
 		HashSet<int> pointerVisitedOffsets = null;
 
 		while (true)

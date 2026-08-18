@@ -18,8 +18,8 @@ namespace Dns.UnitTests;
 
 public sealed class DatabaseZoneProviderTests
 {
-	private readonly IZoneRepository _zoneRepository;
-	private readonly IDnsResolver _resolver;
+	private readonly IZoneRepository      _zoneRepository;
+	private readonly IDnsResolver         _resolver;
 	private readonly DatabaseZoneProvider _target;
 
 	public DatabaseZoneProviderTests()
@@ -27,22 +27,32 @@ public sealed class DatabaseZoneProviderTests
 		_zoneRepository = Substitute.For<IZoneRepository>();
 		var services = new ServiceCollection().AddScoped(_ => _zoneRepository).BuildServiceProvider();
 		_resolver = Substitute.For<IDnsResolver>();
-		_target = new DatabaseZoneProvider(Substitute.For<ILogger<DatabaseZoneProvider>>(), services, _resolver);
+		_target   = new DatabaseZoneProvider(Substitute.For<ILogger<DatabaseZoneProvider>>(), services, _resolver);
 	}
 
 	[Fact]
 	public async Task Initialize_And_GetZones_MapDatabaseRecords()
 	{
-		_zoneRepository.GetZones().Returns(
-		[
-			new DbZone
-			{
-				Suffix = "example.com",
-				Serial = 17,
-				Records = [new DbZoneRecord { Host = "www", Data = "192.0.2.10", Type = ResourceType.A, Class = ResourceClass.IN }],
-			},
-		]
-		);
+		_zoneRepository.GetZones()
+		               .Returns(
+			               [
+				               new DbZone
+				               {
+					               Suffix = "example.com",
+					               Serial = 17,
+					               Records =
+					               [
+						               new DbZoneRecord
+						               {
+							               Host  = "www",
+							               Data  = "192.0.2.10",
+							               Type  = ResourceType.A,
+							               Class = ResourceClass.IN
+						               }
+					               ],
+				               },
+			               ]
+		               );
 
 		_target.Initialize(new ZoneOptions { Name = "example.com" });
 		_resolver.Received(1).SubscribeTo(_target);
@@ -57,7 +67,7 @@ public sealed class DatabaseZoneProviderTests
 	private static async Task<T> InvokePrivateAsync<T>(object target, string methodName)
 	{
 		var method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-		var task = (Task<T>)method!.Invoke(target, null)!;
+		var task   = (Task<T>)method!.Invoke(target, null)!;
 		return await task.ConfigureAwait(false);
 	}
 }

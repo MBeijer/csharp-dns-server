@@ -8,9 +8,12 @@ namespace Dns.Db.Repositories;
 
 #pragma warning disable CS9113
 
-public class UserRepository(ILogger<UserRepository> logger, DnsServerDbContext dbContext, IPasswordHasher<User> userPasswordHasher) : IUserRepository
+public class UserRepository(
+	ILogger<UserRepository> logger,
+	DnsServerDbContext dbContext,
+	IPasswordHasher<User> userPasswordHasher
+) : IUserRepository
 {
-
 	public bool VerifyAccount(string username, string password, out User? user)
 	{
 		user = null;

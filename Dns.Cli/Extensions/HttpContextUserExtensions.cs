@@ -14,8 +14,6 @@ public static class HttpContextUserExtensions
 	/// </summary>
 	/// <param name="ctx"></param>
 	/// <returns></returns>
-	public static User? GetCurrentUser(this HttpContext ctx)
-		=> ctx.Items.TryGetValue(LoadCurrentUserMiddleware.HttpContextItemKey, out var u)
-			? u as User
-			: null;
+	public static User? GetCurrentUser(this HttpContext ctx) =>
+		ctx.Items.TryGetValue(LoadCurrentUserMiddleware.HttpContextItemKey, out var u) ? u as User : null;
 }

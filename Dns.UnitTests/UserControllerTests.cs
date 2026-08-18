@@ -12,13 +12,13 @@ namespace Dns.UnitTests;
 
 public sealed class UserControllerTests
 {
-	private readonly IUserRepository _userRepository;
+	private readonly IUserRepository  _userRepository;
 	private readonly IJwtTokenHandler _jwtTokenHandler;
-	private readonly UserController _target;
+	private readonly UserController   _target;
 
 	public UserControllerTests()
 	{
-		_userRepository = Substitute.For<IUserRepository>();
+		_userRepository  = Substitute.For<IUserRepository>();
 		_jwtTokenHandler = Substitute.For<IJwtTokenHandler>();
 		_target = new UserController(_userRepository, _jwtTokenHandler)
 		{
@@ -38,14 +38,11 @@ public sealed class UserControllerTests
 	{
 		_target.HttpContext.Items[LoadCurrentUserMiddleware.HttpContextItemKey] = new User
 		{
-			Id = 10,
-			Account = "admin",
-			Activated = true,
-			AdminLevel = 1,
+			Id = 10, Account = "admin", Activated = true, AdminLevel = 1,
 		};
 
 		var result = _target.GetUser();
-		var ok = Assert.IsType<OkObjectResult>(result);
+		var ok     = Assert.IsType<OkObjectResult>(result);
 		Assert.NotNull(ok.Value);
 	}
 
@@ -54,15 +51,16 @@ public sealed class UserControllerTests
 	{
 		var user = new User { Id = 1, Account = "acc" };
 		_userRepository.VerifyAccount(Arg.Any<string>(), Arg.Any<string>(), out Arg.Any<User>())
-			.Returns(callInfo =>
-			{
-				callInfo[2] = user;
-				return true;
-			});
+		               .Returns(callInfo =>
+			               {
+				               callInfo[2] = user;
+				               return true;
+			               }
+		               );
 		_jwtTokenHandler.GenerateJwtToken(user).Returns("token");
 
 		var result = _target.LoginAsync(new LoginRequest { Account = "acc", Password = "pwd" });
-		var ok = Assert.IsType<OkObjectResult>(result);
+		var ok     = Assert.IsType<OkObjectResult>(result);
 		Assert.Equal("token", ok.Value);
 	}
 

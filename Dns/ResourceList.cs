@@ -47,7 +47,14 @@ public class ResourceList : List<ResourceRecord>
 			currentOffset             += sizeof(ushort);
 
 			if (resourceRecord.Class == ResourceClass.IN && resourceRecord.Type is ResourceType.A or ResourceType.AAAA)
+			{
+				var expectedLength = resourceRecord.Type == ResourceType.A ? 4 : 16;
+				if (resourceRecord.DataLength != expectedLength)
+					throw new InvalidDataException(
+						$"{resourceRecord.Type} RDATA must contain {expectedLength} bytes, but contains {resourceRecord.DataLength}."
+					);
 				resourceRecord.RData = ANameRData.Parse(bytes, currentOffset, resourceRecord.DataLength);
+			}
 			else
 				resourceRecord.RData = resourceRecord.Type switch
 				{

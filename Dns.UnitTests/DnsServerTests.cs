@@ -224,11 +224,29 @@ public class DnsServerTests
 				"BuildResourceRecords",
 				new ZoneRecord
 				{
-					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com"]
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com."]
 				},
 				zone,
 				"example.com"
 			)
+		);
+		var mixedAddressRecords = InvokePrivate<List<ResourceRecord>>(
+			server,
+			"BuildResourceRecords",
+			new ZoneRecord
+			{
+				Host      = "mixed",
+				Type      = ResourceType.A,
+				Class     = ResourceClass.IN,
+				Addresses = ["192.0.2.11", "2001:db8::11", "not-an-address"],
+			},
+			zone,
+			"example.com"
+		);
+		Assert.Collection(
+			mixedAddressRecords,
+			record => Assert.Equal(ResourceType.A, record.Type),
+			record => Assert.Equal(ResourceType.AAAA, record.Type)
 		);
 		Assert.Single(
 			InvokePrivate<List<ResourceRecord>>(
@@ -314,6 +332,109 @@ public class DnsServerTests
 	}
 
 	[Fact]
+	public void CreateSoaRecord_UsesConfiguredNamesAndIntervals()
+	{
+		var server = CreateServer();
+		var zone   = new Zone { Suffix = "example.com", Serial = 2026081301 };
+		var soa = new ZoneRecord
+		{
+			Host      = "@",
+			Type      = ResourceType.SOA,
+			Class     = ResourceClass.IN,
+			Addresses = ["ns1.example.com. hostmaster.example.com. 1 4H 15M 2W 1H"],
+		};
+		zone.Initialize(
+			[
+				soa,
+				new()
+				{
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com."],
+				},
+			]
+		);
+
+		var record = InvokePrivate<ResourceRecord>(server, "CreateSoaRecord", "example.com", zone, soa);
+		var data   = Assert.IsType<SOARData>(record.RData);
+
+		Assert.Equal("ns1.example.com", data.PrimaryNameServer);
+		Assert.Equal("hostmaster.example.com", data.ResponsibleAuthoritativeMailbox);
+		Assert.Equal(2026081301u, data.Serial);
+		Assert.Equal(14400u, data.RefreshInterval);
+		Assert.Equal(900u, data.RetryInterval);
+		Assert.Equal(1209600u, data.ExpirationLimit);
+		Assert.Equal(3600u, data.MinimumTTL);
+		Assert.Equal(3600u, record.TTL);
+	}
+
+	[Fact]
+	public void HandleRecords_AddsInZoneIpv4AndIpv6GlueForNsAnswers()
+	{
+		var server = CreateServer();
+		var zone   = new Zone { Suffix = "example.com", Serial = 1 };
+		var ns = new ZoneRecord
+		{
+			Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1"],
+		};
+		zone.Initialize(
+			[
+				ns,
+				new()
+				{
+					Host = "ns1", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.53"],
+				},
+				new()
+				{
+					Host = "ns1", Type = ResourceType.AAAA, Class = ResourceClass.IN, Addresses = ["2001:db8::53"],
+				},
+			]
+		);
+		var message = new DnsMessage();
+
+		InvokePrivateVoid(
+			server,
+			"HandleRecords",
+			new List<ZoneRecord> { ns },
+			new Question("example.com", ResourceType.NS, ResourceClass.IN),
+			message,
+			zone
+		);
+
+		Assert.Single(message.Answers);
+		Assert.Equal("ns1.example.com", Assert.IsType<NSRData>(message.Answers[0].RData).Name);
+		Assert.Equal(2, message.AdditionalCount);
+		Assert.Contains(message.Additionals, record => record.Type == ResourceType.A);
+		Assert.Contains(message.Additionals, record => record.Type == ResourceType.AAAA);
+	}
+
+	[Fact]
+	public void IsRecursionAllowed_UsesGlobalSwitchOrClientAcl()
+	{
+		var restricted = CreateServer(allowRecursionFrom: ["10.0.0.0/8", "2001:db8::/32", "192.0.2.53"]);
+
+		Assert.True(
+			InvokePrivate<bool>(restricted, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("10.20.30.40"), 5300))
+		);
+		Assert.True(
+			InvokePrivate<bool>(restricted, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("2001:db8::42"), 5300))
+		);
+		Assert.True(
+			InvokePrivate<bool>(
+				restricted,
+				"IsRecursionAllowed",
+				new IPEndPoint(IPAddress.Parse("::ffff:192.0.2.53"), 5300)
+			)
+		);
+		Assert.False(
+			InvokePrivate<bool>(restricted, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("198.51.100.2"), 5300))
+		);
+
+		var global = CreateServer(recursionEnabled: true);
+		Assert.True(
+			InvokePrivate<bool>(global, "IsRecursionAllowed", new IPEndPoint(IPAddress.Parse("198.51.100.2"), 5300))
+		);
+	}
+
+	[Fact]
 	public void BuildResourceRecords_CnameAtShorthandTargetsResolveToZoneApex()
 	{
 		var server = CreateServer();
@@ -335,6 +456,75 @@ public class DnsServerTests
 			var cname = Assert.Single(records);
 			Assert.Equal("example.com", Assert.IsType<CNameRData>(cname.RData).Name);
 		}
+	}
+
+	[Fact]
+	public void BuildResourceRecords_ExpandsRelativeDomainNameTargets()
+	{
+		var server = CreateServer();
+		var zone   = new Zone { Suffix = "example.com", Serial = 3 };
+
+		var cnameRecords = InvokePrivate<List<ResourceRecord>>(
+			server,
+			"BuildResourceRecords",
+			new ZoneRecord
+			{
+				Host      = "dev",
+				Type      = ResourceType.CNAME,
+				Class     = ResourceClass.IN,
+				Addresses = ["server1", "sub.test", "external.example.net."],
+			},
+			zone,
+			"example.com"
+		);
+		Assert.Equal("server1.example.com", Assert.IsType<CNameRData>(cnameRecords[0].RData).Name);
+		Assert.Equal("sub.test.example.com", Assert.IsType<CNameRData>(cnameRecords[1].RData).Name);
+		Assert.Equal("external.example.net", Assert.IsType<CNameRData>(cnameRecords[2].RData).Name);
+
+		var nsRecords = InvokePrivate<List<ResourceRecord>>(
+			server,
+			"BuildResourceRecords",
+			new ZoneRecord
+			{
+				Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1", "ns.other.net."],
+			},
+			zone,
+			"example.com"
+		);
+		Assert.Equal("ns1.example.com", Assert.IsType<NSRData>(nsRecords[0].RData).Name);
+		Assert.Equal("ns.other.net", Assert.IsType<NSRData>(nsRecords[1].RData).Name);
+
+		var mxRecord = Assert.Single(
+			InvokePrivate<List<ResourceRecord>>(
+				server,
+				"BuildResourceRecords",
+				new ZoneRecord
+				{
+					Host = "@", Type = ResourceType.MX, Class = ResourceClass.IN, Addresses = ["10 mx.backup"],
+				},
+				zone,
+				"example.com"
+			)
+		);
+		var mxData = Assert.IsType<MXRData>(mxRecord.RData);
+		Assert.Equal(
+			"mx.backup.example.com",
+			typeof(MXRData).GetProperty("Name", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(mxData)
+		);
+
+		var ptrRecord = Assert.Single(
+			InvokePrivate<List<ResourceRecord>>(
+				server,
+				"BuildResourceRecords",
+				new ZoneRecord
+				{
+					Host = "1", Type = ResourceType.PTR, Class = ResourceClass.IN, Addresses = ["host.reverse"],
+				},
+				zone,
+				"example.com"
+			)
+		);
+		Assert.Equal("host.reverse.example.com", Assert.IsType<DomainNamePointRData>(ptrRecord.RData).Name);
 	}
 
 	[Fact]
@@ -469,15 +659,97 @@ public class DnsServerTests
 	}
 
 	[Fact]
+	public void BuildResponseForQuery_ReturnsAuthoritativeTcpAnswersGlueAndNegativeSoa()
+	{
+		var zone = new Zone { Suffix = "example.com", Serial = 2026081306 };
+		zone.Initialize(
+			[
+				new()
+				{
+					Host = "", Type = ResourceType.NS, Class = ResourceClass.IN, Addresses = ["ns1.example.com."],
+				},
+				new()
+				{
+					Host      = "ns1",
+					Type      = ResourceType.A,
+					Class     = ResourceClass.IN,
+					Addresses = ["192.0.2.53", "2001:db8::53"],
+				},
+				new()
+				{
+					Host      = "www",
+					Type      = ResourceType.A,
+					Class     = ResourceClass.IN,
+					Addresses = ["192.0.2.10", "2001:db8::10"],
+				},
+				new()
+				{
+					Host      = "@",
+					Type      = ResourceType.SOA,
+					Class     = ResourceClass.IN,
+					Addresses = ["ns1.example.com. hostmaster.example.com. 1 7200 1800 1209600 3600"],
+				},
+			]
+		);
+		var server = CreateServer(resolvers: [new FakeResolver([zone])]);
+		var remote = new IPEndPoint(IPAddress.Parse("198.51.100.20"), 5300);
+
+		var addressRequest = new DnsMessage { QueryIdentifier = 1, QuestionCount = 1 };
+		addressRequest.Questions.Add(new("www.example.com", ResourceType.A, ResourceClass.IN));
+		var addressResponse = InvokePrivate<DnsMessage>(server, "BuildResponseForQuery", addressRequest, remote, true);
+		Assert.True(addressResponse.AA);
+		Assert.Equal((byte)RCode.NOERROR, addressResponse.RCode);
+		Assert.Equal(
+			IPAddress.Parse("192.0.2.10"),
+			Assert.IsType<ANameRData>(Assert.Single(addressResponse.Answers).RData).Address
+		);
+		var ipv6Request = new DnsMessage { QueryIdentifier = 4, QuestionCount = 1 };
+		ipv6Request.Questions.Add(new("www.example.com", ResourceType.AAAA, ResourceClass.IN));
+		var ipv6Response = InvokePrivate<DnsMessage>(server, "BuildResponseForQuery", ipv6Request, remote, true);
+		Assert.Equal(
+			IPAddress.Parse("2001:db8::10"),
+			Assert.IsType<ANameRData>(Assert.Single(ipv6Response.Answers).RData).Address
+		);
+
+		var nsRequest = new DnsMessage { QueryIdentifier = 2, QuestionCount = 1 };
+		nsRequest.Questions.Add(new("example.com", ResourceType.NS, ResourceClass.IN));
+		var nsResponse = InvokePrivate<DnsMessage>(server, "BuildResponseForQuery", nsRequest, remote, true);
+		Assert.Single(nsResponse.Answers);
+		Assert.Collection(
+			nsResponse.Additionals,
+			glue =>
+			{
+				Assert.Equal("ns1.example.com", glue.Name);
+				Assert.Equal(ResourceType.A, glue.Type);
+			},
+			glue =>
+			{
+				Assert.Equal("ns1.example.com", glue.Name);
+				Assert.Equal(ResourceType.AAAA, glue.Type);
+			}
+		);
+
+		var missingRequest = new DnsMessage { QueryIdentifier = 3, QuestionCount = 1 };
+		missingRequest.Questions.Add(new("missing.example.com", ResourceType.A, ResourceClass.IN));
+		var missingResponse = InvokePrivate<DnsMessage>(server, "BuildResponseForQuery", missingRequest, remote, true);
+		Assert.True(missingResponse.AA);
+		Assert.Equal((byte)RCode.NXDOMAIN, missingResponse.RCode);
+		Assert.IsType<SOARData>(Assert.Single(missingResponse.Authorities).RData);
+	}
+
+	[Fact]
 	public void BuildTransferResponse_HandlesRefusedNotauthAndSuccess()
 	{
 		var zone = new Zone { Suffix = "example.com", Serial = 7 };
 		zone.Initialize(
 			[
 				new ZoneRecord
-					{
-						Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = ["192.0.2.7"]
-					}
+				{
+					Host      = "www",
+					Type      = ResourceType.A,
+					Class     = ResourceClass.IN,
+					Addresses = ["192.0.2.7", "2001:db8::7"],
+				}
 			]
 		);
 		var resolver = new FakeResolver([zone]);
@@ -530,6 +802,8 @@ public class DnsServerTests
 		);
 		Assert.Equal((byte)RCode.NOERROR, ok.RCode);
 		Assert.True(ok.AnswerCount >= 3);
+		Assert.Contains(ok.Answers, record => record.Type == ResourceType.A);
+		Assert.Contains(ok.Answers, record => record.Type == ResourceType.AAAA);
 	}
 
 	[Fact]
@@ -706,11 +980,23 @@ public class DnsServerTests
 		firstSecondary.Start(CancellationToken.None);
 		secondSecondary.Start(CancellationToken.None);
 
-		await WaitForZoneSerialAsync(firstResolver, 1);
+		var firstInitial = await WaitForZoneSerialAsync(firstResolver, 1);
 		await WaitForZoneSerialAsync(secondResolver, 1);
 		Assert.Contains(
 			firstResolver.GetZones().Single(zone => zone.Suffix == "replicated.example").Records,
 			record => record.Type == ResourceType.TXT && record.Addresses.Single() == new string('x', 200)
+		);
+		Assert.Equal(
+			"alias.replicated.example.",
+			firstInitial.Records.Single(record => record.Type == ResourceType.CNAME).Addresses.Single()
+		);
+		Assert.Equal(
+			"10 mail.replicated.example.",
+			firstInitial.Records.Single(record => record.Type == ResourceType.MX).Addresses.Single()
+		);
+		Assert.Equal(
+			"pointer.replicated.example.",
+			firstInitial.Records.Single(record => record.Type == ResourceType.PTR).Addresses.Single()
 		);
 
 		primaryZone = CreateReplicationZone(2, "192.0.2.20");
@@ -1015,7 +1301,7 @@ public class DnsServerTests
 
 			var restoredZone = Assert.Single(restoredResolver.GetZones());
 			Assert.Equal("cached.example", restoredZone.Suffix);
-			Assert.Equal(4, restoredZone.Records.Count);
+			Assert.Equal(7, restoredZone.Records.Count);
 			Assert.Contains(restoredZone.Records, record => record.Type == ResourceType.A);
 			Assert.Contains(restoredZone.Records, record => record.Type == ResourceType.TXT);
 		}
@@ -1066,7 +1352,7 @@ public class DnsServerTests
 				15,
 				TimeSpan.FromSeconds(10)
 			);
-			Assert.Equal(4, repaired.Records.Count);
+			Assert.Equal(7, repaired.Records.Count);
 			Assert.Contains(repaired.Records, record => record.Type == ResourceType.A);
 			Assert.Contains(repaired.Records, record => record.Type == ResourceType.TXT);
 		}
@@ -1088,18 +1374,39 @@ public class DnsServerTests
 					Host      = string.Empty,
 					Type      = ResourceType.SOA,
 					Class     = ResourceClass.IN,
-					Addresses = [$"ns1.{suffix}", $"hostmaster.{suffix}"],
+					Addresses = [$"ns1.{suffix}.", $"hostmaster.{suffix}."],
 				},
 				new()
 				{
 					Host      = string.Empty,
 					Type      = ResourceType.NS,
 					Class     = ResourceClass.IN,
-					Addresses = [$"ns1.{suffix}"],
+					Addresses = [$"ns1.{suffix}."],
 				},
 				new()
 				{
 					Host = "www", Type = ResourceType.A, Class = ResourceClass.IN, Addresses = [address],
+				},
+				new()
+				{
+					Host      = "alias",
+					Type      = ResourceType.CNAME,
+					Class     = ResourceClass.IN,
+					Addresses = [$"alias.{suffix}."],
+				},
+				new()
+				{
+					Host      = string.Empty,
+					Type      = ResourceType.MX,
+					Class     = ResourceClass.IN,
+					Addresses = [$"10 mail.{suffix}."],
+				},
+				new()
+				{
+					Host      = "pointer",
+					Type      = ResourceType.PTR,
+					Class     = ResourceClass.IN,
+					Addresses = [$"pointer.{suffix}."],
 				},
 				new()
 				{
@@ -1426,8 +1733,7 @@ public class DnsServerTests
 			zoneRecords,
 			new Question("www.example.com", ResourceType.ANY, ResourceClass.IN),
 			message,
-			zone,
-			new IPEndPoint(IPAddress.Loopback, 5300)
+			zone
 		);
 
 		Assert.True(message.AnswerCount >= 7);
@@ -1451,24 +1757,60 @@ public class DnsServerTests
 			zoneRecords,
 			new Question("www.example.com", ResourceType.ANY, ResourceClass.IN),
 			message,
-			zone,
-			new IPEndPoint(IPAddress.Loopback, 5300)
+			zone
 		);
 
 		var cname = Assert.Single(message.Answers, answer => answer.Type == ResourceType.CNAME);
 		Assert.Equal("example.com", Assert.IsType<CNameRData>(cname.RData).Name);
 	}
 
+	[Fact]
+	public void HandleRecords_RelativeTargetsUseEffectiveSlaveZoneSuffix()
+	{
+		var server  = CreateServer();
+		var message = new DnsMessage();
+		var zone    = new Zone { Suffix = "slave.example.net", Serial = 5 };
+		var zoneRecords = new List<ZoneRecord>
+		{
+			new() { Host = "dev", Type = ResourceType.CNAME, Class = ResourceClass.IN, Addresses = ["server1"] },
+			new() { Host = "", Type    = ResourceType.NS, Class    = ResourceClass.IN, Addresses = ["ns1"] },
+		};
+		zone.Initialize(zoneRecords);
+
+		InvokePrivateVoid(
+			server,
+			"HandleRecords",
+			zoneRecords,
+			new Question("dev.slave.example.net", ResourceType.ANY, ResourceClass.IN),
+			message,
+			zone
+		);
+
+		var cname = Assert.Single(message.Answers, answer => answer.Type == ResourceType.CNAME);
+		Assert.Equal("server1.slave.example.net", Assert.IsType<CNameRData>(cname.RData).Name);
+		var ns = Assert.Single(message.Answers, answer => answer.Type == ResourceType.NS);
+		Assert.Equal("ns1.slave.example.net", Assert.IsType<NSRData>(ns.RData).Name);
+	}
+
 	private static DnsServer CreateServer(
 		bool zoneTransferEnabled = true,
 		List<string> allowTransfersFrom = null,
 		List<IDnsResolver> resolvers = null,
-		string injectedNsAddress = null
+		string injectedNsAddress = null,
+		bool recursionEnabled = false,
+		List<string> allowRecursionFrom = null
 	)
 	{
 		var options = new ServerOptions
 		{
-			DnsListener = new DnsListenerOptions { Port = 5301, TcpPort = 5301 },
+			DnsListener =
+				new DnsListenerOptions
+				{
+					Port               = 5301,
+					TcpPort            = 5301,
+					RecursionEnabled   = recursionEnabled,
+					AllowRecursionFrom = allowRecursionFrom ?? [],
+				},
 			ZoneTransfer = new ZoneTransferOptions
 			{
 				Enabled            = zoneTransferEnabled,

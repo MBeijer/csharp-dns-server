@@ -13,14 +13,19 @@ public sealed class JwtTokenHandlerTests
 
 	public JwtTokenHandlerTests() =>
 		_target = new(
-			Options.Create(new ServerOptions { WebServer = new WebServerOptions { JwtSecretKey = "this-is-a-long-enough-secret-key" } })
+			Options.Create(
+				new ServerOptions
+				{
+					WebServer = new WebServerOptions { JwtSecretKey = "this-is-a-long-enough-secret-key" }
+				}
+			)
 		);
 
 	[Fact]
 	public void GenerateJwtToken_ContainsExpectedClaims()
 	{
 		var token = _target.GenerateJwtToken(new User { Id = 7, Account = "admin" });
-		var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+		var jwt   = new JwtSecurityTokenHandler().ReadJwtToken(token);
 		Assert.Contains(jwt.Claims, c => c.Type == "nameid" && c.Value == "7");
 		Assert.Contains(jwt.Claims, c => c.Type == "unique_name" && c.Value == "admin");
 	}

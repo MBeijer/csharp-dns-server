@@ -8,16 +8,17 @@ namespace Dns.UnitTests;
 
 public sealed class LoadCurrentUserMiddlewareTests
 {
-	private bool _called;
+	private          bool                      _called;
 	private readonly LoadCurrentUserMiddleware _target;
 
 	public LoadCurrentUserMiddlewareTests()
 	{
 		_target = new(_ =>
-		{
-			_called = true;
-			return Task.CompletedTask;
-		});
+			{
+				_called = true;
+				return Task.CompletedTask;
+			}
+		);
 	}
 
 	[Fact]

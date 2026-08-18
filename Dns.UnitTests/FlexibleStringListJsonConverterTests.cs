@@ -19,8 +19,8 @@ public sealed class FlexibleStringListJsonConverterTests
 	public void Read_ReadsStringAndArrayAndNull()
 	{
 		var fromString = JsonSerializer.Deserialize<List<string>>("\"a,b, c\"", _options);
-		var fromArray = JsonSerializer.Deserialize<List<string>>("[\"x\",\" y \" ]", _options);
-		var fromNull = JsonSerializer.Deserialize<List<string>>("null", _options);
+		var fromArray  = JsonSerializer.Deserialize<List<string>>("[\"x\",\" y \" ]", _options);
+		var fromNull   = JsonSerializer.Deserialize<List<string>>("null", _options);
 
 		Assert.Equal(["a", "b", "c"], fromString);
 		Assert.Equal(["x", "y"], fromArray);

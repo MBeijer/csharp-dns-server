@@ -18,7 +18,13 @@ public sealed class ServiceCollectionExtensionsTests
 	{
 		_services.AddDatabaseDependencies(new DatabaseSettings { SQLiteDefault = "Data Source=:memory:" });
 		Assert.Contains(_services, s => s.ServiceType == typeof(DnsServerDbContext));
-		Assert.Contains(_services, s => s.ServiceType == typeof(IUserRepository) && s.ImplementationType == typeof(UserRepository));
-		Assert.Contains(_services, s => s.ServiceType == typeof(IZoneRepository) && s.ImplementationType == typeof(ZoneRepository));
+		Assert.Contains(
+			_services,
+			s => s.ServiceType == typeof(IUserRepository) && s.ImplementationType == typeof(UserRepository)
+		);
+		Assert.Contains(
+			_services,
+			s => s.ServiceType == typeof(IZoneRepository) && s.ImplementationType == typeof(ZoneRepository)
+		);
 	}
 }

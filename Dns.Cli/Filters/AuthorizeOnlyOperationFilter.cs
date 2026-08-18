@@ -19,12 +19,11 @@ public sealed class AuthorizeOnlyOperationFilter : IOperationFilter
 	public void Apply(OpenApiOperation operation, OperationFilterContext context)
 	{
 		// Policy names map to scopes
-		var requiredScopes = context.MethodInfo
-									.GetCustomAttributes(true)
-									.OfType<AuthorizeAttribute>()
-									.Select(attribute => attribute.Policy!)
-									.Distinct()
-									.ToList();
+		var requiredScopes = context.MethodInfo.GetCustomAttributes(true)
+		                            .OfType<AuthorizeAttribute>()
+		                            .Select(attribute => attribute.Policy!)
+		                            .Distinct()
+		                            .ToList();
 
 		if (requiredScopes.Count > 0)
 		{
@@ -34,10 +33,7 @@ public sealed class AuthorizeOnlyOperationFilter : IOperationFilter
 
 			operation.Security =
 			[
-				new()
-				{
-					[new(JwtBearerDefaults.AuthenticationScheme, context.Document)] = requiredScopes,
-				},
+				new() { [new(JwtBearerDefaults.AuthenticationScheme, context.Document)] = requiredScopes, },
 			];
 		}
 	}

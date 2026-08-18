@@ -17,7 +17,7 @@ public class PrependBearerSchemeMiddleware(RequestDelegate next)
 	{
 		var authorizationHeader = context.Request.Headers.Authorization.FirstOrDefault();
 		if (authorizationHeader != null &&
-			!authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+		    !authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
 			context.Request.Headers.Authorization = "Bearer " + authorizationHeader;
 
 		await next(context).ConfigureAwait(false);

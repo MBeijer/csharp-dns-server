@@ -494,11 +494,19 @@ public sealed class SecondaryZoneProvider(
 
 		groupedRecords[(string.Empty, ResourceType.SOA, ResourceClass.IN)] = new()
 		{
-			Host      = string.Empty,
-			Type      = ResourceType.SOA,
-			Class     = ResourceClass.IN,
-			Addresses = [openingSoa.PrimaryNameServer, openingSoa.ResponsibleAuthoritativeMailbox],
-			Count     = 2,
+			Host  = string.Empty,
+			Type  = ResourceType.SOA,
+			Class = ResourceClass.IN,
+			Addresses =
+			[
+				MarkAbsoluteDomainName(openingSoa.PrimaryNameServer),
+				MarkAbsoluteDomainName(openingSoa.ResponsibleAuthoritativeMailbox),
+				openingSoa.RefreshInterval.ToString(),
+				openingSoa.RetryInterval.ToString(),
+				openingSoa.ExpirationLimit.ToString(),
+				openingSoa.MinimumTTL.ToString(),
+			],
+			Count = 6,
 		};
 
 		var zone = new Zone { Suffix = zoneName, Serial = openingSoa.Serial };
@@ -510,11 +518,11 @@ public sealed class SecondaryZoneProvider(
 		record.RData switch
 		{
 			ANameRData address       => address.Address.ToString(),
-			CNameRData cname         => cname.Name,
-			NSRData ns               => ns.Name,
-			MXRData mx               => $"{mx.Preference} {mx.Name}",
+			CNameRData cname         => MarkAbsoluteDomainName(cname.Name),
+			NSRData ns               => MarkAbsoluteDomainName(ns.Name),
+			MXRData mx               => $"{mx.Preference} {MarkAbsoluteDomainName(mx.Name)}",
 			TXTRData txt             => txt.Name,
-			DomainNamePointRData ptr => ptr.Name,
+			DomainNamePointRData ptr => MarkAbsoluteDomainName(ptr.Name),
 			_                        => null,
 		};
 
@@ -564,6 +572,7 @@ public sealed class SecondaryZoneProvider(
 						continue;
 					}
 
+					MarkCachedDomainNamesAbsolute(zone);
 					_zones[CanonicalName(zone.Suffix)] = zone;
 				}
 
@@ -580,6 +589,43 @@ public sealed class SecondaryZoneProvider(
 		{
 			logger.LogWarning(ex, "Unable to load secondary zone cache {CacheFile}", path);
 		}
+	}
+
+	private static void MarkCachedDomainNamesAbsolute(Zone zone)
+	{
+		foreach (var record in zone.Records)
+		{
+			switch (record.Type)
+			{
+				case ResourceType.CNAME:
+				case ResourceType.NS:
+				case ResourceType.PTR:
+					for (var index = 0; index < record.Addresses.Count; index++)
+						record.Addresses[index] = MarkAbsoluteDomainName(record.Addresses[index]);
+					break;
+				case ResourceType.MX:
+					for (var index = 0; index < record.Addresses.Count; index++)
+					{
+						var fields = record.Addresses[index].Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+						if (fields.Length == 2)
+							record.Addresses[index] = $"{fields[0]} {MarkAbsoluteDomainName(fields[1])}";
+					}
+
+					break;
+				case ResourceType.SOA:
+					for (var index = 0; index < Math.Min(2, record.Addresses.Count); index++)
+						record.Addresses[index] = MarkAbsoluteDomainName(record.Addresses[index]);
+					break;
+			}
+		}
+	}
+
+	private static string MarkAbsoluteDomainName(string name)
+	{
+		if (string.IsNullOrWhiteSpace(name)) return name;
+
+		var normalized = name.Trim();
+		return normalized.EndsWith('.') ? normalized : $"{normalized}.";
 	}
 
 	private async Task SaveCacheAsync(IReadOnlyCollection<Zone> zones, CancellationToken cancellationToken)
