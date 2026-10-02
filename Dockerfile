@@ -1,4 +1,4 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+﻿FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS base
 WORKDIR /app
 
 FROM node:24-alpine AS spa-setup
@@ -11,7 +11,7 @@ FROM spa-setup AS spa-build
 WORKDIR /src/Dns.Spa
 RUN npm run build
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS setup
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS setup
 WORKDIR /src
 COPY ["Dns/Dns.csproj", "Dns/"]
 COPY ["Dns.Cli/Dns.Cli.csproj", "Dns.Cli/"]
